@@ -25,7 +25,7 @@ import { formatPrice } from "@/lib/clinic";
 
 const title = "Agendar atendimento — JR Clinic";
 const description =
-  "Escolha o serviço, a data e o horário do seu atendimento na JR Clinic e confirme em poucos passos.";
+  "Escolha o serviço, o profissional, a data e o horário do seu atendimento na JR Clinic.";
 
 const searchSchema = z.object({
   servico: z.string().optional(),
@@ -60,7 +60,7 @@ const days = Array.from({ length: 14 }).map((_, index) => {
 
 function Agendar() {
   const { servico } = Route.useSearch();
-  const { services, timeSlots } = Route.useLoaderData();
+  const { services, timeSlots, serviceProfessionals } = Route.useLoaderData();
   const navigate = Route.useNavigate();
   const authNavigate = useNavigate();
   const { user } = useAuth();
@@ -68,7 +68,12 @@ function Agendar() {
 
   const selectedSlug = servico ?? services[0]!.slug;
   const service = services.find((s) => s.slug === selectedSlug) ?? services[0]!;
+  const professionals = serviceProfessionals
+    .filter((item: any) => item.service_id === service.id && item.professional)
+    .map((item: any) => item.professional)
+    .sort((a: any, b: any) => a.sort_order - b.sort_order);
 
+  const [professionalId, setProfessionalId] = useState("");
   const [day, setDay] = useState(days.find((item) => !item.disabled)?.key ?? days[0]!.key);
   const [time, setTime] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -76,6 +81,13 @@ function Agendar() {
   const [phone, setPhone] = useState("");
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
+
+  const selectedProfessional = professionals.find((item: any) => item.id === professionalId) ?? professionals[0];
+
+  useEffect(() => {
+    setProfessionalId(professionals[0]?.id ?? "");
+    setTime(null);
+  }, [service.id]);
 
   useEffect(() => {
     if (!user) return;
@@ -97,7 +109,7 @@ function Agendar() {
       });
   }, [user]);
 
-  const canConfirm = Boolean(day && time && name.trim() && email.trim());
+  const canConfirm = Boolean(professionalId && day && time && name.trim() && email.trim());
 
   const confirm = async () => {
     if (!user) {
@@ -105,12 +117,13 @@ function Agendar() {
       await authNavigate({ to: "/auth", search: { next: "/agendar" } });
       return;
     }
-    if (!time) return;
+    if (!time || !professionalId) return;
     setBusy(true);
     try {
       await submitAppointment({
         data: {
           serviceId: service.id,
+          professionalId,
           patientName: name,
           patientEmail: email,
           patientPhone: phone,
@@ -120,7 +133,7 @@ function Agendar() {
         },
       });
       toast.success("Agendamento enviado", {
-        description: "A equipe da JR Clinic poderá confirmar o horário pelo painel.",
+        description: `Atendimento solicitado com ${selectedProfessional?.name ?? "o profissional escolhido"}.`,
       });
       await authNavigate({ to: "/minha-conta" });
     } catch (error) {
@@ -138,14 +151,15 @@ function Agendar() {
         <span className="eyebrow text-muted-foreground max-sm:text-[10px]">Agendamento</span>
         <h1 className="mt-1 max-w-full text-[28px] font-semibold leading-tight sm:mt-2 sm:text-4xl">Reserve seu horário</h1>
         <p className="mt-2 max-w-[52ch] text-sm leading-relaxed text-muted-foreground sm:mt-3 sm:text-base">
-          Escolha o serviço, selecione data e horário e confirme seus dados.
+          Escolha o serviço, quem vai atender você, a data e o horário.
           <span className="hidden sm:inline"> Nenhum pagamento é feito nesta etapa.</span>
         </p>
 
-        <div className="mt-5 grid w-full min-w-0 grid-cols-3 gap-2 sm:hidden">
+        <div className="mt-5 grid w-full min-w-0 grid-cols-4 gap-1.5 sm:hidden">
           <StepChip number="1" label="Serviço" />
-          <StepChip number="2" label="Horário" />
-          <StepChip number="3" label="Dados" />
+          <StepChip number="2" label="Profissional" />
+          <StepChip number="3" label="Horário" />
+          <StepChip number="4" label="Dados" />
         </div>
 
         <div className="mt-5 grid w-full min-w-0 max-w-full gap-4 sm:mt-10 sm:gap-8 lg:grid-cols-[1.15fr_0.85fr]">
@@ -153,8 +167,9 @@ function Agendar() {
             <section className="box-border w-full min-w-0 max-w-full overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-6">
               <div className="flex min-w-0 items-center gap-2">
                 <span className="grid size-6 shrink-0 place-items-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground sm:hidden">1</span>
-                <h2 className="min-w-0 truncate text-base font-semibold sm:text-lg">Serviço</h2>
+                <h2 className="min-w-0 truncate text-base font-semibold sm:text-lg">Serviço e profissional</h2>
               </div>
+
               <div className="mt-3 w-full min-w-0 max-w-full sm:mt-4">
                 <Label htmlFor="servico" className="text-xs sm:text-sm">Escolha o atendimento</Label>
                 <Select
@@ -167,15 +182,35 @@ function Agendar() {
                   <SelectContent className="max-w-[calc(100dvw-24px)]">
                     {services.map((item) => (
                       <SelectItem key={item.slug} value={item.slug}>
-                        {item.name} · {item.professional}
+                        {item.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
+
+              <div className="mt-4 w-full min-w-0 max-w-full">
+                <Label htmlFor="profissional" className="text-xs sm:text-sm">Quem você prefere?</Label>
+                <Select value={professionalId} onValueChange={(value) => { setProfessionalId(value); setTime(null); }}>
+                  <SelectTrigger id="profissional" className="mt-2 h-11 w-full min-w-0 max-w-full overflow-hidden rounded-xl">
+                    <SelectValue placeholder="Escolha o profissional" />
+                  </SelectTrigger>
+                  <SelectContent className="max-w-[calc(100dvw-24px)]">
+                    {professionals.map((item: any) => (
+                      <SelectItem key={item.id} value={item.id}>
+                        {item.name} · {item.specialty}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {professionals.length === 0 && (
+                  <p className="mt-2 text-xs text-destructive">Nenhum profissional está vinculado a este serviço no momento.</p>
+                )}
+              </div>
+
               <div className="mt-3 flex w-full min-w-0 max-w-full items-center justify-between gap-3 overflow-hidden rounded-xl bg-secondary/60 px-3 py-2.5 sm:hidden">
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-medium">{service.professional}</p>
+                  <p className="truncate text-xs font-medium">{selectedProfessional?.name ?? "Escolha o profissional"}</p>
                   <p className="mt-0.5 text-[10px] text-muted-foreground">{service.duration_min} min</p>
                 </div>
                 <p className="shrink-0 text-sm font-semibold text-primary">{formatPrice(Number(service.price))}</p>
@@ -184,7 +219,7 @@ function Agendar() {
 
             <section className="box-border w-full min-w-0 max-w-full overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-6">
               <div className="flex min-w-0 items-center gap-2">
-                <span className="grid size-6 shrink-0 place-items-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground sm:hidden">2</span>
+                <span className="grid size-6 shrink-0 place-items-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground sm:hidden">3</span>
                 <h2 className="min-w-0 truncate text-base font-semibold sm:text-lg">Data e horário</h2>
               </div>
 
@@ -211,7 +246,7 @@ function Agendar() {
               <p className="mt-4 text-xs font-medium text-muted-foreground sm:mt-6 sm:text-sm sm:text-foreground">Horários disponíveis</p>
               <div className="mt-2 grid w-full min-w-0 grid-cols-2 gap-2 sm:mt-3 sm:grid-cols-4">
                 {timeSlots.map((slot) => {
-                  const disabled = !slot.is_available;
+                  const disabled = !slot.is_available || !professionalId;
                   return (
                     <button
                       key={slot.slot}
@@ -233,51 +268,25 @@ function Agendar() {
 
             <section className="box-border w-full min-w-0 max-w-full overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-6">
               <div className="flex min-w-0 items-center gap-2">
-                <span className="grid size-6 shrink-0 place-items-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground sm:hidden">3</span>
+                <span className="grid size-6 shrink-0 place-items-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground sm:hidden">4</span>
                 <h2 className="min-w-0 truncate text-base font-semibold sm:text-lg">Seus dados</h2>
               </div>
               <div className="mt-3 grid w-full min-w-0 max-w-full gap-3 sm:mt-4 sm:grid-cols-2 sm:gap-4">
                 <div className="w-full min-w-0 max-w-full">
                   <Label htmlFor="nome" className="text-xs sm:text-sm">Nome completo</Label>
-                  <Input
-                    id="nome"
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    placeholder="Como no documento"
-                    className="mt-1.5 h-11 w-full min-w-0 max-w-full rounded-xl sm:mt-2"
-                  />
+                  <Input id="nome" value={name} onChange={(event) => setName(event.target.value)} placeholder="Como no documento" className="mt-1.5 h-11 w-full min-w-0 max-w-full rounded-xl sm:mt-2" />
                 </div>
                 <div className="w-full min-w-0 max-w-full">
                   <Label htmlFor="email" className="text-xs sm:text-sm">E-mail</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={email}
-                    onChange={(event) => setEmail(event.target.value)}
-                    placeholder="voce@email.com"
-                    className="mt-1.5 h-11 w-full min-w-0 max-w-full rounded-xl sm:mt-2"
-                  />
+                  <Input id="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="voce@email.com" className="mt-1.5 h-11 w-full min-w-0 max-w-full rounded-xl sm:mt-2" />
                 </div>
                 <div className="w-full min-w-0 max-w-full sm:col-span-2">
                   <Label htmlFor="telefone" className="text-xs sm:text-sm">Telefone/WhatsApp <span className="font-normal text-muted-foreground">(opcional)</span></Label>
-                  <Input
-                    id="telefone"
-                    value={phone}
-                    onChange={(event) => setPhone(event.target.value)}
-                    placeholder="(85) 99999-9999"
-                    className="mt-1.5 h-11 w-full min-w-0 max-w-full rounded-xl sm:mt-2"
-                  />
+                  <Input id="telefone" value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="(85) 99999-9999" className="mt-1.5 h-11 w-full min-w-0 max-w-full rounded-xl sm:mt-2" />
                 </div>
                 <div className="w-full min-w-0 max-w-full sm:col-span-2">
                   <Label htmlFor="obs" className="text-xs sm:text-sm">Observações <span className="font-normal text-muted-foreground">(opcional)</span></Label>
-                  <Textarea
-                    id="obs"
-                    value={notes}
-                    onChange={(event) => setNotes(event.target.value)}
-                    placeholder="Informações úteis para a equipe"
-                    className="mt-1.5 min-h-[82px] w-full min-w-0 max-w-full resize-none rounded-xl sm:mt-2"
-                    rows={3}
-                  />
+                  <Textarea id="obs" value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Informações úteis para a equipe" className="mt-1.5 min-h-[82px] w-full min-w-0 max-w-full resize-none rounded-xl sm:mt-2" rows={3} />
                 </div>
               </div>
             </section>
@@ -288,7 +297,7 @@ function Agendar() {
               <h2 className="text-lg font-semibold">Resumo</h2>
               <dl className="mt-4 space-y-3 text-sm">
                 <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Serviço</dt><dd className="text-right font-medium">{service.name}</dd></div>
-                <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Profissional</dt><dd className="text-right font-medium">{service.professional}</dd></div>
+                <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Profissional</dt><dd className="text-right font-medium">{selectedProfessional?.name ?? "—"}</dd></div>
                 <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Data</dt><dd className="text-right font-medium">{new Date(`${day}T12:00:00`).toLocaleDateString("pt-BR")} · {time ?? "—"}</dd></div>
                 <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Duração</dt><dd className="text-right font-medium">{service.duration_min} min</dd></div>
               </dl>
@@ -312,7 +321,7 @@ function Agendar() {
       <div className="fixed bottom-0 left-0 right-0 z-50 box-border w-[100dvw] max-w-[100dvw] overflow-hidden border-t border-border bg-card/95 px-3 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_30px_rgba(0,0,0,0.06)] backdrop-blur-xl lg:hidden">
         <div className="mx-auto flex w-full min-w-0 max-w-lg items-center gap-2.5">
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[10px] text-muted-foreground">{service.name}</p>
+            <p className="truncate text-[10px] text-muted-foreground">{service.name} · {selectedProfessional?.name ?? "Escolha quem atende"}</p>
             <p className="text-base font-semibold leading-tight text-primary">{formatPrice(Number(service.price))}</p>
           </div>
           <Button className="h-11 min-w-[142px] shrink-0 rounded-full px-4" disabled={!canConfirm || busy} onClick={confirm}>
@@ -328,9 +337,9 @@ function Agendar() {
 
 function StepChip({ number, label }: { number: string; label: string }) {
   return (
-    <div className="flex min-w-0 items-center justify-center gap-1.5 rounded-xl bg-secondary/70 px-1.5 py-2">
+    <div className="flex min-w-0 items-center justify-center gap-1 rounded-xl bg-secondary/70 px-1 py-2">
       <span className="grid size-4 shrink-0 place-items-center rounded-full bg-primary text-[9px] font-semibold text-primary-foreground">{number}</span>
-      <span className="truncate text-[10px] font-medium">{label}</span>
+      <span className="truncate text-[9px] font-medium">{label}</span>
     </div>
   );
 }
