@@ -51,14 +51,23 @@ export const getCatalog = createServerFn({ method: "GET" }).handler(() => fetchC
 
 export const getBookingCatalog = createServerFn({ method: "GET" }).handler(async () => {
   const supabase = publicClient();
-  const [catalog, slots] = await Promise.all([
+  const db = supabase as any;
+  const [catalog, slots, links] = await Promise.all([
     fetchCatalog(),
     supabase.from("time_slots").select("slot, is_available").order("sort_order"),
+    db
+      .from("service_professionals")
+      .select("service_id, professional:professionals(id, name, specialty, sort_order, is_active)"),
   ]);
 
   if (slots.error) throw slots.error;
+  if (links.error) throw links.error;
 
-  return { ...catalog, timeSlots: slots.data ?? [] };
+  return {
+    ...catalog,
+    timeSlots: slots.data ?? [],
+    serviceProfessionals: (links.data ?? []).filter((item: any) => item.professional?.is_active),
+  };
 });
 
 export const getServiceDetail = createServerFn({ method: "GET" })
@@ -99,6 +108,7 @@ export const createAppointment = createServerFn({ method: "POST" })
     z
       .object({
         serviceId: z.string().uuid(),
+        professionalId: z.string().uuid(),
         patientName: z.string().trim().min(2).max(120),
         patientEmail: z.string().trim().email(),
         patientPhone: z.string().trim().max(40).optional().default(""),
@@ -109,11 +119,23 @@ export const createAppointment = createServerFn({ method: "POST" })
       .parse(data),
   )
   .handler(async ({ data, context }) => {
-    const { data: created, error } = await context.supabase
+    const db = context.supabase as any;
+    const { data: validLink, error: linkError } = await db
+      .from("service_professionals")
+      .select("service_id")
+      .eq("service_id", data.serviceId)
+      .eq("professional_id", data.professionalId)
+      .maybeSingle();
+
+    if (linkError) throw linkError;
+    if (!validLink) throw new Error("Esse profissional não atende o serviço selecionado.");
+
+    const { data: created, error } = await db
       .from("appointments")
       .insert({
         user_id: context.userId,
         service_id: data.serviceId,
+        professional_id: data.professionalId,
         patient_name: data.patientName,
         patient_email: data.patientEmail,
         patient_phone: data.patientPhone,
@@ -131,10 +153,11 @@ export const createAppointment = createServerFn({ method: "POST" })
 export const getMyAppointments = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
+    const db = context.supabase as any;
+    const { data, error } = await db
       .from("appointments")
       .select(
-        "id, patient_name, patient_email, patient_phone, scheduled_date, scheduled_time, status, created_at, service:services(name, price, professional, professional_role, duration_min)",
+        "id, patient_name, patient_email, patient_phone, scheduled_date, scheduled_time, status, created_at, service:services(name, price, duration_min), professional:professionals(name, specialty)",
       )
       .order("scheduled_date", { ascending: false })
       .order("scheduled_time", { ascending: false });
@@ -182,7 +205,7 @@ export const getAdminOverview = createServerFn({ method: "GET" })
       db
         .from("appointments")
         .select(
-          "id, patient_name, patient_email, scheduled_date, scheduled_time, status, service:services(name, price)",
+          "id, patient_name, patient_email, scheduled_date, scheduled_time, status, service:services(name, price), professional:professionals(name, specialty)",
         )
         .order("scheduled_date", { ascending: true }),
       db.from("services").select(serviceColumns).order("name"),
