@@ -27,17 +27,20 @@ export const Route = createFileRoute("/")({
 const highlights = [
   {
     icon: CalendarCheck,
-    title: "Agenda em tempo real",
+    title: "Agenda rápida",
+    desktopTitle: "Agenda em tempo real",
     text: "Escolha data e horário disponíveis e confirme em menos de um minuto.",
   },
   {
     icon: ShieldCheck,
-    title: "Equipe verificada",
+    title: "Equipe segura",
+    desktopTitle: "Equipe verificada",
     text: "Profissionais com registro ativo e histórico de avaliações abertas.",
   },
   {
     icon: Sparkles,
-    title: "Cuidado continuado",
+    title: "Acompanhamento",
+    desktopTitle: "Cuidado continuado",
     text: "Cada serviço inclui plano de acompanhamento e retorno orientado.",
   },
 ];
@@ -48,19 +51,18 @@ function Home() {
       <SiteHeader />
 
       <main>
-        <section className="mx-auto grid max-w-[1440px] items-center gap-12 px-5 py-16 sm:px-8 lg:grid-cols-[1.1fr_0.9fr] lg:py-24">
+        <section className="mx-auto grid max-w-[1440px] items-center gap-6 px-4 py-7 sm:gap-12 sm:px-8 sm:py-16 lg:grid-cols-[1.1fr_0.9fr] lg:py-24">
           <div>
-            <span className="eyebrow text-accent-foreground">Plataforma de serviços clínicos</span>
-            <h1 className="mt-5 max-w-[20ch] text-4xl leading-[1.05] font-semibold text-balance sm:text-5xl">
+            <span className="eyebrow text-accent-foreground max-sm:text-[10px]">Plataforma de serviços clínicos</span>
+            <h1 className="mt-3 max-w-[20ch] text-[34px] font-semibold leading-[1.03] text-balance sm:mt-5 sm:text-5xl">
               Cuidar da sua saúde, com calma e precisão.
             </h1>
-            <p className="mt-5 max-w-[46ch] text-base leading-relaxed text-muted-foreground">
-              Consultas, terapias e exames organizados em um catálogo simples. Escolha o serviço
-              certo, veja quem atende e reserve seu horário.
+            <p className="mt-3 max-w-[46ch] text-sm leading-relaxed text-muted-foreground sm:mt-5 sm:text-base">
+              Consultas, terapias e exames em um só lugar. Escolha o serviço, veja quem atende e reserve seu horário.
             </p>
 
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Button asChild size="lg" className="rounded-full">
+            <div className="mt-5 sm:mt-8">
+              <Button asChild size="lg" className="w-full rounded-full sm:w-auto">
                 <Link to="/catalogo">
                   Explorar catálogo
                   <ArrowRight className="size-4" />
@@ -68,18 +70,18 @@ function Home() {
               </Button>
             </div>
 
-            <dl className="mt-12 grid grid-cols-3 gap-6 border-t border-border pt-8">
-              <div>
-                <dt className="text-sm text-muted-foreground">Serviços</dt>
-                <dd className="font-display text-2xl font-semibold">{services.length}</dd>
+            <dl className="mt-6 grid grid-cols-3 divide-x divide-border rounded-2xl border border-border bg-card py-3 shadow-soft sm:mt-12 sm:gap-6 sm:divide-x-0 sm:rounded-none sm:border-x-0 sm:border-b-0 sm:bg-transparent sm:pt-8 sm:shadow-none">
+              <div className="px-2 text-center sm:px-0 sm:text-left">
+                <dt className="text-[10px] text-muted-foreground sm:text-sm">Serviços</dt>
+                <dd className="font-display text-xl font-semibold sm:text-2xl">{services.length}</dd>
               </div>
-              <div>
-                <dt className="text-sm text-muted-foreground">Especialidades</dt>
-                <dd className="font-display text-2xl font-semibold">{categories.length}</dd>
+              <div className="px-2 text-center sm:px-0 sm:text-left">
+                <dt className="text-[10px] text-muted-foreground sm:text-sm">Especialidades</dt>
+                <dd className="font-display text-xl font-semibold sm:text-2xl">{categories.length}</dd>
               </div>
-              <div>
-                <dt className="text-sm text-muted-foreground">Avaliação média</dt>
-                <dd className="font-display text-2xl font-semibold">4,8</dd>
+              <div className="px-2 text-center sm:px-0 sm:text-left">
+                <dt className="text-[10px] text-muted-foreground sm:text-sm">Avaliação</dt>
+                <dd className="font-display text-xl font-semibold sm:text-2xl">4,8</dd>
               </div>
             </dl>
           </div>
@@ -90,56 +92,59 @@ function Home() {
               alt="Recepção iluminada da JR Clinic com madeira clara e plantas"
               width={1280}
               height={1600}
-              className="aspect-4/5 w-full rounded-3xl object-cover shadow-lift"
+              className="aspect-[16/10] w-full rounded-2xl object-cover shadow-lift sm:aspect-4/5 sm:rounded-3xl"
             />
-            <div className="absolute -bottom-5 left-4 rounded-2xl border border-border bg-card px-5 py-4 shadow-soft">
-              <p className="text-xs text-muted-foreground">Próxima disponibilidade</p>
-              <p className="font-display text-lg font-semibold">Hoje, 14:30</p>
+            <div className="absolute -bottom-3 left-3 rounded-xl border border-border bg-card/95 px-3 py-2 shadow-soft backdrop-blur sm:-bottom-5 sm:left-4 sm:rounded-2xl sm:px-5 sm:py-4">
+              <p className="text-[9px] text-muted-foreground sm:text-xs">Próxima disponibilidade</p>
+              <p className="font-display text-sm font-semibold sm:text-lg">Hoje, 14:30</p>
             </div>
           </div>
         </section>
 
         <section className="border-y border-primary bg-primary text-primary-foreground">
-          <div className="mx-auto grid max-w-[1440px] gap-8 px-5 py-14 sm:px-8 md:grid-cols-3">
+          <div className="mx-auto grid max-w-[1440px] grid-cols-3 gap-1 px-3 py-4 sm:gap-8 sm:px-8 sm:py-14 md:grid-cols-3">
             {highlights.map((item) => (
-              <div key={item.title}>
-                <span className="grid size-10 place-items-center rounded-xl bg-white/10 text-primary-foreground ring-1 ring-white/15">
-                  <item.icon className="size-5" />
+              <div key={item.title} className="rounded-xl px-1.5 py-2 text-center sm:rounded-none sm:px-0 sm:py-0 sm:text-left">
+                <span className="mx-auto grid size-8 place-items-center rounded-lg bg-white/10 text-primary-foreground ring-1 ring-white/15 sm:mx-0 sm:size-10 sm:rounded-xl">
+                  <item.icon className="size-4 sm:size-5" />
                 </span>
-                <h2 className="mt-4 text-lg font-semibold">{item.title}</h2>
-                <p className="mt-2 text-sm leading-relaxed text-primary-foreground/75">{item.text}</p>
+                <h2 className="mt-2 text-[11px] font-semibold leading-tight sm:mt-4 sm:text-lg">
+                  <span className="sm:hidden">{item.title}</span>
+                  <span className="hidden sm:inline">{item.desktopTitle}</span>
+                </h2>
+                <p className="mt-2 hidden text-sm leading-relaxed text-primary-foreground/75 sm:block">{item.text}</p>
               </div>
             ))}
           </div>
         </section>
 
-        <section className="mx-auto max-w-[1440px] px-5 py-16 sm:px-8">
-          <div className="flex flex-wrap items-end justify-between gap-4">
+        <section className="mx-auto max-w-[1440px] px-4 py-8 sm:px-8 sm:py-16">
+          <div className="flex items-end justify-between gap-3">
             <div>
-              <span className="eyebrow text-muted-foreground">Especialidades</span>
-              <h2 className="mt-2 text-3xl font-semibold">Escolha por categoria</h2>
+              <span className="eyebrow text-muted-foreground max-sm:text-[10px]">Especialidades</span>
+              <h2 className="mt-1 text-xl font-semibold sm:mt-2 sm:text-3xl">Escolha por categoria</h2>
             </div>
             <Link
               to="/catalogo"
-              className="text-sm font-medium text-primary underline-offset-4 hover:underline"
+              className="shrink-0 text-xs font-medium text-primary underline-offset-4 hover:underline sm:text-sm"
             >
-              Ver catálogo completo
+              Ver todas
             </Link>
           </div>
 
-          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-4 grid grid-cols-2 gap-2.5 sm:mt-8 sm:gap-4 lg:grid-cols-3">
             {categories.map((category) => (
               <Link
                 key={category.id}
                 to="/catalogo"
                 search={{ categoria: category.id }}
-                className="card-lift rounded-2xl border border-border bg-card p-5 shadow-soft"
+                className="card-lift rounded-2xl border border-border bg-card p-3.5 shadow-soft sm:p-5"
               >
-                <h3 className="text-lg font-semibold">{category.name}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                <h3 className="text-sm font-semibold sm:text-lg">{category.name}</h3>
+                <p className="mt-2 hidden text-sm leading-relaxed text-muted-foreground sm:block">
                   {category.description}
                 </p>
-                <p className="mt-4 text-xs text-muted-foreground">
+                <p className="mt-1.5 text-[10px] text-muted-foreground sm:mt-4 sm:text-xs">
                   {services.filter((s) => s.categoryId === category.id).length === 1
                     ? "1 serviço"
                     : `${services.filter((s) => s.categoryId === category.id).length} serviços`}
@@ -149,12 +154,12 @@ function Home() {
           </div>
         </section>
 
-        <section className="mx-auto max-w-[1440px] px-5 pb-8 sm:px-8">
-          <span className="eyebrow text-muted-foreground">Em destaque</span>
-          <h2 className="mt-2 text-3xl font-semibold">Serviços mais agendados</h2>
-          <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {services.slice(0, 3).map((service) => (
-              <ServiceCard key={service.slug} service={service} />
+        <section className="mx-auto max-w-[1440px] px-4 pb-8 sm:px-8">
+          <span className="eyebrow text-muted-foreground max-sm:text-[10px]">Em destaque</span>
+          <h2 className="mt-1 text-xl font-semibold sm:mt-2 sm:text-3xl">Serviços mais agendados</h2>
+          <div className="mt-4 grid grid-cols-2 gap-2.5 sm:mt-8 sm:gap-5 lg:grid-cols-3">
+            {services.slice(0, 4).map((service) => (
+              <ServiceCard key={service.slug} service={service} compactMobile />
             ))}
           </div>
         </section>
