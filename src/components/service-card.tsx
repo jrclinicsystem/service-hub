@@ -19,7 +19,7 @@ export function ServiceCard({
       className={cn(
         "card-lift flex min-h-[350px] flex-col rounded-2xl border border-border bg-card p-5 shadow-soft",
         compactMobile &&
-          "max-sm:min-h-[230px] max-sm:rounded-xl max-sm:p-2.5 max-sm:shadow-none",
+          "max-sm:min-h-[190px] max-sm:rounded-xl max-sm:p-2.5 max-sm:shadow-none",
       )}
     >
       <Link
@@ -31,7 +31,7 @@ export function ServiceCard({
         <div
           className={cn(
             "flex items-center justify-between gap-3",
-            compactMobile && "max-sm:flex-col max-sm:items-start max-sm:gap-1.5",
+            compactMobile && "max-sm:flex-col max-sm:items-start max-sm:gap-1",
           )}
         >
           <Badge
@@ -39,7 +39,7 @@ export function ServiceCard({
             className={cn(
               "rounded-full font-normal",
               compactMobile &&
-                "max-sm:max-w-full max-sm:truncate max-sm:px-2 max-sm:py-0.5 max-sm:text-[9px]",
+                "max-sm:max-w-full max-sm:truncate max-sm:px-2 max-sm:py-0 max-sm:text-[8px]",
             )}
           >
             {category?.name}
@@ -47,10 +47,10 @@ export function ServiceCard({
           <span
             className={cn(
               "flex items-center gap-1.5 text-xs text-muted-foreground",
-              compactMobile && "max-sm:gap-1 max-sm:text-[9px]",
+              compactMobile && "max-sm:gap-1 max-sm:text-[8px]",
             )}
           >
-            <Clock className={cn("size-3.5", compactMobile && "max-sm:size-3")} />
+            <Clock className={cn("size-3.5", compactMobile && "max-sm:size-2.5")} />
             {service.durationMin} min
           </span>
         </div>
@@ -58,7 +58,7 @@ export function ServiceCard({
         <h3
           className={cn(
             "mt-4 text-xl font-semibold",
-            compactMobile && "max-sm:mt-2.5 max-sm:text-[13px] max-sm:leading-[1.2]",
+            compactMobile && "max-sm:mt-2 max-sm:line-clamp-2 max-sm:text-[12px] max-sm:leading-[1.18]",
           )}
         >
           {service.name}
@@ -75,13 +75,13 @@ export function ServiceCard({
         <div
           className={cn(
             "mt-auto border-t border-border pt-4",
-            compactMobile && "max-sm:pt-2.5",
+            compactMobile && "max-sm:pt-2",
           )}
         >
           <p
             className={cn(
               "text-sm font-medium leading-tight",
-              compactMobile && "max-sm:line-clamp-2 max-sm:text-[10px]",
+              compactMobile && "max-sm:line-clamp-1 max-sm:text-[9px]",
             )}
           >
             {service.professional}
@@ -89,19 +89,12 @@ export function ServiceCard({
           <p
             className={cn(
               "mt-1 flex items-center gap-1 text-xs text-muted-foreground",
-              compactMobile && "max-sm:text-[9px]",
+              compactMobile && "max-sm:hidden",
             )}
           >
-            <Star
-              className={cn(
-                "size-3 fill-accent text-accent",
-                compactMobile && "max-sm:size-2.5",
-              )}
-            />
+            <Star className="size-3 fill-accent text-accent" />
             <span>{service.rating.toFixed(1)}</span>
-            <span className={cn(compactMobile && "max-sm:hidden")}>
-              · {service.reviewsCount} avaliações
-            </span>
+            <span>· {service.reviewsCount} avaliações</span>
           </p>
         </div>
       </Link>
@@ -112,7 +105,7 @@ export function ServiceCard({
         preload="intent"
         className={cn(
           "group/booking mt-4 flex items-center justify-between gap-3",
-          compactMobile && "max-sm:mt-2.5 max-sm:block",
+          compactMobile && "max-sm:mt-2 max-sm:block",
         )}
         aria-label={`Agendar ${service.name} por ${formatPrice(service.price)}`}
       >
@@ -120,7 +113,7 @@ export function ServiceCard({
           <p
             className={cn(
               "text-[9px] tracking-[0.14em] text-muted-foreground uppercase",
-              compactMobile && "max-sm:text-[7px] max-sm:tracking-[0.08em]",
+              compactMobile && "max-sm:text-[6px] max-sm:tracking-[0.06em]",
             )}
           >
             A partir de
@@ -128,7 +121,7 @@ export function ServiceCard({
           <p
             className={cn(
               "font-sans text-xl leading-none font-semibold tracking-tight text-primary lining-nums tabular-nums",
-              compactMobile && "max-sm:mt-0.5 max-sm:text-[13px]",
+              compactMobile && "max-sm:mt-0.5 max-sm:text-[12px]",
             )}
           >
             {formatPrice(service.price)}
@@ -138,11 +131,11 @@ export function ServiceCard({
           className={cn(
             "flex shrink-0 items-center gap-1.5 rounded-full border border-transparent bg-accent px-3 py-2 text-xs font-semibold text-white transition-[border-color] duration-200 ease-out group-hover/booking:border-white/80 group-focus-visible/booking:border-white/80 motion-reduce:transition-none",
             compactMobile &&
-              "max-sm:mt-2 max-sm:w-full max-sm:justify-center max-sm:gap-1 max-sm:px-1.5 max-sm:py-1.5 max-sm:text-[9px]",
+              "max-sm:mt-1.5 max-sm:w-full max-sm:justify-center max-sm:gap-1 max-sm:px-1.5 max-sm:py-1 max-sm:text-[8px]",
           )}
         >
           Agendar
-          <ArrowRight className={cn("size-3.5", compactMobile && "max-sm:size-3")} />
+          <ArrowRight className={cn("size-3.5", compactMobile && "max-sm:size-2.5")} />
         </span>
       </Link>
     </article>
