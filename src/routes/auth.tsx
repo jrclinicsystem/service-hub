@@ -10,13 +10,15 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
 
 const title = "Entrar na JR Clinic — acesso do paciente";
 const description =
   "Acesse sua conta da JR Clinic para agendar atendimentos, acompanhar consultas e gerenciar seus dados.";
 
 export const Route = createFileRoute("/auth")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    next: search.next === "/admin" ? "/admin" : undefined,
+  }),
   head: () => ({
     meta: [
       { title },
@@ -32,6 +34,7 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const { user, loading } = useAuth();
+  const { next } = Route.useSearch();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -39,8 +42,8 @@ function AuthPage() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (!loading && user) navigate({ to: "/minha-conta" });
-  }, [loading, user, navigate]);
+    if (!loading && user) navigate({ to: next ?? "/minha-conta" });
+  }, [loading, user, navigate, next]);
 
   const signIn = async () => {
     setBusy(true);
@@ -55,11 +58,14 @@ function AuthPage() {
 
   const signUp = async () => {
     setBusy(true);
+    const redirectTo = next
+      ? `${window.location.origin}/auth?next=${encodeURIComponent(next)}`
+      : `${window.location.origin}/auth`;
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth`,
+        emailRedirectTo: redirectTo,
         data: { full_name: name },
       },
     });
@@ -72,11 +78,16 @@ function AuthPage() {
   };
 
   const signInGoogle = async () => {
-    try {
-      await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin });
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Não foi possível entrar com o Google.");
-    }
+    setBusy(true);
+    const redirectTo = next
+      ? `${window.location.origin}/auth?next=${encodeURIComponent(next)}`
+      : `${window.location.origin}/auth`;
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo },
+    });
+    setBusy(false);
+    if (error) toast.error(error.message || "Não foi possível entrar com o Google.");
   };
 
   return (
@@ -91,7 +102,7 @@ function AuthPage() {
         </p>
 
         <div className="mt-8 rounded-2xl border border-border bg-card p-6 shadow-soft">
-          <Button variant="outline" className="w-full rounded-full" onClick={signInGoogle}>
+          <Button variant="outline" className="w-full rounded-full" onClick={signInGoogle} disabled={busy}>
             Continuar com Google
           </Button>
 
