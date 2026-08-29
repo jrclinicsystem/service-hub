@@ -1,0 +1,17 @@
+{
+  "name": "JR Clinic",
+  "short_name": "JR Clinic",
+  "description": "Serviços, agendamentos e conta do paciente JR Clinic.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8f3f0",
+  "theme_color": "#0f4d3e",
+  "icons": [
+    {
+      "src": "/jr-clinic-icon.png",
+      "sizes": "589x630",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
