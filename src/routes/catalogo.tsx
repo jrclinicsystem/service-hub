@@ -122,7 +122,7 @@ function Catalogo() {
             Nenhum serviço encontrado para esta combinação de filtros.
           </p>
         ) : (
-          <div className="mt-10 grid items-stretch gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-10 grid items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
             {filtered.map((service) => (
               <ServiceCard key={service.slug} service={service} />
             ))}
