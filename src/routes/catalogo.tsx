@@ -97,7 +97,7 @@ function Catalogo() {
           />
         </div>
 
-        <div className="sticky top-14 z-30 -mx-4 mt-4 flex gap-2 overflow-x-auto border-b border-border bg-background/95 px-4 py-2.5 backdrop-blur-xl sm:top-16 sm:-mx-8 sm:mt-8 sm:px-8 sm:py-3">
+        <div className="sticky top-14 z-30 -mx-4 mt-4 flex gap-2 overflow-x-auto bg-background/95 px-4 pb-4 pt-2.5 backdrop-blur-xl [scrollbar-width:thin] [scrollbar-color:rgb(15_77_62_/_0.14)_transparent] [&::-webkit-scrollbar]:h-[2px] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-primary/15 [&::-webkit-scrollbar-track]:bg-transparent sm:top-16 sm:-mx-8 sm:mt-8 sm:px-8 sm:pb-3 sm:pt-3">
           <Button
             variant={categoria ? "outline" : "default"}
             size="sm"
@@ -119,7 +119,7 @@ function Catalogo() {
           ))}
         </div>
 
-        <div className="mt-4 flex items-center justify-between sm:mt-6">
+        <div className="mt-3 flex items-center justify-between sm:mt-6">
           <p className="text-[11px] text-muted-foreground sm:text-xs">
             {filtered.length === 1 ? "1 resultado" : `${filtered.length} resultados`}
           </p>
