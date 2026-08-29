@@ -20,6 +20,8 @@ const searchSchema = z.object({
 export const Route = createFileRoute("/catalogo")({
   validateSearch: searchSchema,
   loader: () => getCatalog(),
+  staleTime: 5 * 60 * 1000,
+  preloadStaleTime: 5 * 60 * 1000,
   head: () => ({
     meta: [
       { title },
@@ -73,9 +75,11 @@ function Catalogo() {
     <div className="min-h-screen">
       <SiteHeader />
 
-      <main className="mx-auto max-w-6xl px-5 py-12 sm:px-8">
-        <span className="eyebrow text-muted-foreground">Catálogo</span>
-        <h1 className="mt-2 text-3xl font-semibold sm:text-4xl">Serviços da JR Clinic</h1>
+      <main className="mx-auto max-w-6xl px-5 py-14 sm:px-8 lg:py-20">
+        <span className="eyebrow text-accent">Catálogo</span>
+        <h1 className="mt-2 text-4xl font-semibold text-primary sm:text-5xl">
+          Serviços da JR Clinic
+        </h1>
         <p className="mt-3 max-w-[52ch] text-muted-foreground">
           {services.length} serviços em {categories.length} especialidades. Filtre por categoria ou
           busque pelo nome do serviço ou do profissional.
@@ -86,7 +90,7 @@ function Catalogo() {
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Buscar serviço ou profissional"
-            className="h-11 rounded-full bg-card"
+            className="h-12 rounded-full border-border bg-card px-5 shadow-soft"
             aria-label="Buscar serviço"
           />
         </div>
@@ -118,7 +122,7 @@ function Catalogo() {
             Nenhum serviço encontrado para esta combinação de filtros.
           </p>
         ) : (
-          <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-10 grid items-stretch gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {filtered.map((service) => (
               <ServiceCard key={service.slug} service={service} />
             ))}

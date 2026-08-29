@@ -6,7 +6,7 @@
 
 /*
  * JR Clinic design system.
- * Serene clinical: cream paper, deep teal, warm amber accent.
+ * Premium identity: elegant ivory, emerald green and matte gold.
  * All colors in oklch. Never hardcode colors in components.
  */
 
@@ -19,7 +19,7 @@
   --radius-3xl: calc(var(--radius) + 12px);
   --radius-4xl: calc(var(--radius) + 16px);
 
-  --font-display: "Bricolage Grotesque", ui-serif, Georgia, serif;
+  --font-display: "Cormorant Garamond", ui-serif, Georgia, serif;
   --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
 
   --color-background: var(--background);
@@ -63,47 +63,47 @@
 }
 
 :root {
-  --radius: 1rem;
+  --radius: 1.125rem;
 
-  --background: oklch(0.98 0.012 92);
-  --foreground: oklch(0.26 0.022 170);
-  --card: oklch(0.995 0.006 95);
-  --card-foreground: oklch(0.26 0.022 170);
-  --popover: oklch(0.995 0.006 95);
-  --popover-foreground: oklch(0.26 0.022 170);
-  --primary: oklch(0.4 0.062 176);
-  --primary-foreground: oklch(0.98 0.012 92);
-  --primary-soft: oklch(0.9 0.033 173);
-  --secondary: oklch(0.945 0.018 92);
-  --secondary-foreground: oklch(0.32 0.03 174);
-  --muted: oklch(0.945 0.014 92);
-  --muted-foreground: oklch(0.53 0.021 120);
-  --accent: oklch(0.73 0.128 62);
-  --accent-foreground: oklch(0.24 0.03 60);
-  --surface: oklch(0.955 0.017 88);
+  --background: #f8f3f0;
+  --foreground: #153c33;
+  --card: #fffdfb;
+  --card-foreground: #153c33;
+  --popover: #fffdfb;
+  --popover-foreground: #153c33;
+  --primary: #0f4d3e;
+  --primary-foreground: #fffaf6;
+  --primary-soft: #dbe8e3;
+  --secondary: #ebe0da;
+  --secondary-foreground: #0f4d3e;
+  --muted: #f0e8e3;
+  --muted-foreground: #6f746e;
+  --accent: #b08a4a;
+  --accent-foreground: #2f2618;
+  --surface: #ebe0da;
   --destructive: oklch(0.56 0.19 27);
   --destructive-foreground: oklch(0.98 0.012 92);
-  --border: oklch(0.9 0.014 100);
-  --input: oklch(0.9 0.014 100);
-  --ring: oklch(0.4 0.062 176);
+  --border: #dfd1c9;
+  --input: #d7c8bf;
+  --ring: #b08a4a;
 
-  --chart-1: oklch(0.4 0.062 176);
-  --chart-2: oklch(0.73 0.128 62);
+  --chart-1: #0f4d3e;
+  --chart-2: #b08a4a;
   --chart-3: oklch(0.6 0.06 175);
   --chart-4: oklch(0.78 0.06 130);
   --chart-5: oklch(0.5 0.04 250);
 
-  --sidebar: oklch(0.33 0.045 176);
-  --sidebar-foreground: oklch(0.96 0.012 92);
-  --sidebar-primary: oklch(0.73 0.128 62);
+  --sidebar: #0f4d3e;
+  --sidebar-foreground: #f8f3f0;
+  --sidebar-primary: #b08a4a;
   --sidebar-primary-foreground: oklch(0.24 0.03 60);
   --sidebar-accent: oklch(0.4 0.055 176);
   --sidebar-accent-foreground: oklch(0.96 0.012 92);
   --sidebar-border: oklch(0.42 0.045 176);
   --sidebar-ring: oklch(0.73 0.128 62);
 
-  --shadow-soft: 0 1px 2px oklch(0.4 0.062 176 / 0.06), 0 8px 24px -18px oklch(0.4 0.062 176 / 0.35);
-  --shadow-lift: 0 18px 40px -26px oklch(0.4 0.062 176 / 0.5);
+  --shadow-soft: 0 1px 2px rgb(15 77 62 / 0.05), 0 14px 34px -24px rgb(15 77 62 / 0.28);
+  --shadow-lift: 0 26px 56px -30px rgb(15 77 62 / 0.38);
 }
 
 .dark {
@@ -148,6 +148,7 @@
     color: var(--color-foreground);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+    background-image: radial-gradient(circle at 8% 0%, rgb(176 138 74 / 0.08), transparent 28rem);
   }
 
   h1,
@@ -155,7 +156,7 @@
   h3,
   h4 {
     font-family: var(--font-display);
-    letter-spacing: -0.02em;
+    letter-spacing: -0.015em;
   }
 }
 

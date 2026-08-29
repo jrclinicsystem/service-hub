@@ -16,7 +16,7 @@ function publicClient() {
   );
 }
 
-export const getCatalog = createServerFn({ method: "GET" }).handler(async () => {
+async function fetchCatalog() {
   const supabase = publicClient();
 
   const [categories, services, slots] = await Promise.all([
@@ -38,6 +38,24 @@ export const getCatalog = createServerFn({ method: "GET" }).handler(async () => 
     })),
     timeSlots: slots.data ?? [],
   };
+}
+
+type CatalogData = Awaited<ReturnType<typeof fetchCatalog>>;
+let catalogCache: { value: CatalogData; expiresAt: number } | undefined;
+let catalogRequest: Promise<CatalogData> | undefined;
+
+export const getCatalog = createServerFn({ method: "GET" }).handler(async () => {
+  const now = Date.now();
+  if (catalogCache && catalogCache.expiresAt > now) return catalogCache.value;
+
+  catalogRequest ??= fetchCatalog();
+  try {
+    const value = await catalogRequest;
+    catalogCache = { value, expiresAt: now + 5 * 60 * 1000 };
+    return value;
+  } finally {
+    catalogRequest = undefined;
+  }
 });
 
 export const getServiceDetail = createServerFn({ method: "GET" })
