@@ -200,7 +200,10 @@ function Admin() {
   if (isLoading) {
     return (
       <div className="grid min-h-screen place-items-center bg-background">
-        <p className="text-sm text-muted-foreground">Carregando painel...</p>
+        <div className="text-center">
+          <div className="mx-auto size-8 animate-pulse rounded-full bg-primary/10" />
+          <p className="mt-3 text-sm text-muted-foreground">Carregando painel...</p>
+        </div>
       </div>
     );
   }
@@ -213,7 +216,7 @@ function Admin() {
           <p className="mt-2 text-sm text-muted-foreground">
             {error instanceof Error ? error.message : "Erro inesperado ao consultar o Supabase."}
           </p>
-          <div className="mt-5 flex justify-center gap-2">
+          <div className="mt-5 flex flex-col justify-center gap-2 sm:flex-row">
             <Button variant="outline" onClick={() => refetch()}>Tentar novamente</Button>
             <Button onClick={signOut}>Entrar novamente</Button>
           </div>
@@ -226,12 +229,14 @@ function Admin() {
     return (
       <div className="grid min-h-screen place-items-center bg-background px-5">
         <div className="max-w-md text-center">
-          <ShieldCheck className="mx-auto size-10 text-primary" />
+          <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-primary-soft text-primary">
+            <ShieldCheck className="size-5" />
+          </span>
           <h1 className="mt-5 text-2xl font-semibold">Acesso restrito</h1>
-          <p className="mt-3 text-muted-foreground">
+          <p className="mt-3 text-sm text-muted-foreground">
             O e-mail {data?.currentEmail || "desta conta"} não está autorizado para administrar a JR Clinic.
           </p>
-          <div className="mt-6 flex justify-center gap-3">
+          <div className="mt-6 flex flex-col justify-center gap-2 sm:flex-row">
             <Button variant="outline" asChild><Link to="/">Voltar ao site</Link></Button>
             <Button onClick={signOut}>Sair</Button>
           </div>
@@ -253,144 +258,239 @@ function Admin() {
     refresh();
   };
 
+  const categoryName = (service: any) =>
+    data.categories.find((category: any) => category.id === service.category_id)?.name ?? "Sem categoria";
+
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-40 border-b border-border bg-card/95 backdrop-blur">
-        <div className="mx-auto flex h-17 max-w-[1480px] items-center justify-between px-5 sm:px-8">
-          <div className="flex items-center gap-4">
-            <img src={logo} alt="JR Clinic" className="h-9 w-auto" />
+      <header className="sticky top-0 z-40 border-b border-border/80 bg-card/95 backdrop-blur-xl">
+        <div className="mx-auto flex h-14 max-w-[1480px] items-center justify-between px-4 sm:h-17 sm:px-8">
+          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+            <img src={logo} alt="JR Clinic" className="h-7 w-auto sm:h-9" />
             <span className="hidden h-6 w-px bg-border sm:block" />
-            <div className="hidden sm:block">
+            <div className="hidden min-w-0 sm:block">
               <p className="text-sm font-semibold">Administração</p>
-              <p className="text-[11px] text-muted-foreground">{data.currentEmail}</p>
+              <p className="max-w-[220px] truncate text-[11px] text-muted-foreground">{data.currentEmail}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" asChild><Link to="/">Ver site</Link></Button>
-            <Button variant="outline" size="sm" onClick={signOut}>
-              <LogOut className="size-4" /> Sair
+          <div className="flex items-center gap-1 sm:gap-2">
+            <Button variant="ghost" size="sm" className="h-9 px-2.5 text-xs sm:px-3 sm:text-sm" asChild>
+              <Link to="/">Ver site</Link>
+            </Button>
+            <Button variant="outline" size="sm" className="h-9 rounded-full px-2.5 sm:px-3" onClick={signOut}>
+              <LogOut className="size-3.5 sm:size-4" />
+              <span className="hidden sm:inline">Sair</span>
             </Button>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1480px] px-5 py-10 sm:px-8">
-        <span className="eyebrow text-muted-foreground">Controle da clínica</span>
-        <h1 className="mt-2 text-3xl font-semibold sm:text-4xl">Painel de controle</h1>
-        <p className="mt-3 max-w-[58ch] text-muted-foreground">
-          Gerencie agendamentos, catálogo, promoções, horários disponíveis e acessos administrativos.
-        </p>
+      <main className="mx-auto max-w-[1480px] px-4 pb-10 pt-5 sm:px-8 sm:py-10">
+        <div className="sm:hidden">
+          <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Administração</p>
+          <div className="mt-1 flex items-end justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="text-[26px] font-semibold leading-tight">Painel de controle</h1>
+              <p className="mt-1 truncate text-xs text-muted-foreground">{data.currentEmail}</p>
+            </div>
+            <span className="shrink-0 rounded-full bg-primary-soft px-2.5 py-1 text-[11px] font-medium text-primary">Online</span>
+          </div>
+        </div>
 
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Metric icon={CalendarDays} label="Agendamentos" value={String(data.appointments.length)} hint="registros no sistema" />
-          <Metric icon={CircleDollarSign} label="Receita estimada" value={formatPrice(revenue)} hint="exclui cancelados" />
-          <Metric icon={Stethoscope} label="Serviços ativos" value={String(activeServices)} hint="publicados no catálogo" />
+        <div className="hidden sm:block">
+          <span className="eyebrow text-muted-foreground">Controle da clínica</span>
+          <h1 className="mt-2 text-4xl font-semibold">Painel de controle</h1>
+          <p className="mt-3 max-w-[58ch] text-muted-foreground">
+            Gerencie agendamentos, catálogo, promoções, horários disponíveis e acessos administrativos.
+          </p>
+        </div>
+
+        <div className="mt-5 grid grid-cols-2 gap-2.5 sm:mt-8 sm:gap-4 lg:grid-cols-4">
+          <Metric icon={CalendarDays} label="Agendamentos" value={String(data.appointments.length)} hint="no sistema" />
+          <Metric icon={CircleDollarSign} label="Receita" value={formatPrice(revenue)} hint="estimada" />
+          <Metric icon={Stethoscope} label="Serviços" value={String(activeServices)} hint="ativos" />
           <Metric icon={Users} label="Pacientes" value={String(uniquePatients)} hint="e-mails únicos" />
         </div>
 
-        <Tabs defaultValue="agendamentos" className="mt-10">
-          <TabsList className="h-auto w-full justify-start overflow-x-auto rounded-xl bg-secondary/70 p-1 sm:w-auto">
-            <TabsTrigger value="agendamentos">Agendamentos</TabsTrigger>
-            <TabsTrigger value="servicos">Serviços</TabsTrigger>
-            <TabsTrigger value="promocoes">Promoções</TabsTrigger>
-            <TabsTrigger value="horarios">Horários</TabsTrigger>
-            <TabsTrigger value="acessos">Acessos</TabsTrigger>
-          </TabsList>
+        <Tabs defaultValue="agendamentos" className="mt-5 sm:mt-10">
+          <div className="sticky top-14 z-30 -mx-4 border-y border-border/70 bg-background/95 px-3 py-2 backdrop-blur-xl sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
+            <TabsList className="grid h-auto w-full grid-cols-5 gap-1 rounded-2xl bg-secondary/70 p-1 sm:inline-flex sm:w-auto sm:justify-start sm:rounded-xl">
+              <MobileTab value="agendamentos" icon={CalendarDays} label="Agenda" desktopLabel="Agendamentos" />
+              <MobileTab value="servicos" icon={Stethoscope} label="Serviços" desktopLabel="Serviços" />
+              <MobileTab value="promocoes" icon={Tag} label="Ofertas" desktopLabel="Promoções" />
+              <MobileTab value="horarios" icon={Clock3} label="Horários" desktopLabel="Horários" />
+              <MobileTab value="acessos" icon={ShieldCheck} label="Acessos" desktopLabel="Acessos" />
+            </TabsList>
+          </div>
 
-          <TabsContent value="agendamentos" className="mt-5">
-            <PanelTable>
-              <TableHeader><TableRow>
-                <TableHead>Paciente</TableHead><TableHead>Serviço</TableHead>
-                <TableHead>Quando</TableHead><TableHead className="text-right">Status</TableHead>
-              </TableRow></TableHeader>
-              <TableBody>
-                {data.appointments.map((appointment: any) => (
-                  <TableRow key={appointment.id}>
-                    <TableCell>
-                      <p className="font-medium">{appointment.patient_name}</p>
-                      <p className="text-xs text-muted-foreground">{appointment.patient_email}</p>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{appointment.service?.name}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {formatDate(appointment.scheduled_date)} · {appointment.scheduled_time}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Select
-                        value={appointment.status}
-                        onValueChange={(status) =>
-                          updateRow("appointments", "id", appointment.id, { status }, "Status atualizado.")
-                        }
-                      >
-                        <SelectTrigger className="ml-auto w-[145px]"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="pendente">Pendente</SelectItem>
-                          <SelectItem value="confirmado">Confirmado</SelectItem>
-                          <SelectItem value="cancelado">Cancelado</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </PanelTable>
+          <TabsContent value="agendamentos" className="mt-4 sm:mt-5">
+            <div className="mb-3 flex items-center justify-between sm:hidden">
+              <div>
+                <h2 className="text-base font-semibold">Próximos agendamentos</h2>
+                <p className="text-xs text-muted-foreground">{data.appointments.length} registros</p>
+              </div>
+            </div>
+
+            <div className="space-y-2.5 md:hidden">
+              {data.appointments.map((appointment: any) => (
+                <div key={appointment.id} className="rounded-2xl border border-border bg-card p-4 shadow-soft">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold">{appointment.patient_name}</p>
+                      <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{appointment.patient_email}</p>
+                    </div>
+                    <span className="shrink-0 rounded-lg bg-secondary px-2 py-1 text-[11px] font-medium text-muted-foreground">
+                      {appointment.scheduled_time}
+                    </span>
+                  </div>
+                  <div className="mt-3 grid grid-cols-[1fr_auto] items-end gap-3 border-t border-border/70 pt-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-xs font-medium text-foreground">{appointment.service?.name}</p>
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">{formatDate(appointment.scheduled_date)}</p>
+                    </div>
+                    <Select
+                      value={appointment.status}
+                      onValueChange={(status) =>
+                        updateRow("appointments", "id", appointment.id, { status }, "Status atualizado.")
+                      }
+                    >
+                      <SelectTrigger className="h-8 w-[118px] rounded-lg px-2 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pendente">Pendente</SelectItem>
+                        <SelectItem value="confirmado">Confirmado</SelectItem>
+                        <SelectItem value="cancelado">Cancelado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="hidden md:block">
+              <PanelTable>
+                <TableHeader><TableRow>
+                  <TableHead>Paciente</TableHead><TableHead>Serviço</TableHead>
+                  <TableHead>Quando</TableHead><TableHead className="text-right">Status</TableHead>
+                </TableRow></TableHeader>
+                <TableBody>
+                  {data.appointments.map((appointment: any) => (
+                    <TableRow key={appointment.id}>
+                      <TableCell>
+                        <p className="font-medium">{appointment.patient_name}</p>
+                        <p className="text-xs text-muted-foreground">{appointment.patient_email}</p>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{appointment.service?.name}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {formatDate(appointment.scheduled_date)} · {appointment.scheduled_time}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Select
+                          value={appointment.status}
+                          onValueChange={(status) =>
+                            updateRow("appointments", "id", appointment.id, { status }, "Status atualizado.")
+                          }
+                        >
+                          <SelectTrigger className="ml-auto w-[145px]"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="pendente">Pendente</SelectItem>
+                            <SelectItem value="confirmado">Confirmado</SelectItem>
+                            <SelectItem value="cancelado">Cancelado</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </PanelTable>
+            </div>
           </TabsContent>
 
-          <TabsContent value="servicos" className="mt-5">
+          <TabsContent value="servicos" className="mt-4 sm:mt-5">
             <SectionHeader
               title="Catálogo de serviços"
               subtitle="Crie, edite ou retire serviços do catálogo."
               action={<ServiceEditor categories={data.categories} onSaved={refresh} />}
             />
-            <PanelTable>
-              <TableHeader><TableRow>
-                <TableHead>Serviço</TableHead><TableHead>Categoria</TableHead>
-                <TableHead>Valor</TableHead><TableHead>Publicado</TableHead><TableHead />
-              </TableRow></TableHeader>
-              <TableBody>
-                {data.services.map((service: any) => (
-                  <TableRow key={service.id}>
-                    <TableCell>
-                      <p className="font-medium">{service.name}</p>
-                      <p className="text-xs text-muted-foreground">{service.professional}</p>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {data.categories.find((c: any) => c.id === service.category_id)?.name}
-                    </TableCell>
-                    <TableCell className="font-medium">{formatPrice(service.price)}</TableCell>
-                    <TableCell>
+
+            <div className="space-y-2.5 md:hidden">
+              {data.services.map((service: any) => (
+                <div key={service.id} className="rounded-2xl border border-border bg-card p-4 shadow-soft">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold">{service.name}</p>
+                      <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{categoryName(service)} · {service.professional || "Sem profissional"}</p>
+                    </div>
+                    <ServiceEditor service={service} categories={data.categories} onSaved={refresh} />
+                  </div>
+                  <div className="mt-3 flex items-center justify-between border-t border-border/70 pt-3">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Valor</p>
+                      <p className="text-sm font-semibold text-primary">{formatPrice(service.price)}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-muted-foreground">{service.is_active ? "Publicado" : "Oculto"}</span>
                       <Switch
                         checked={service.is_active}
                         onCheckedChange={(is_active) =>
                           updateRow("services", "id", service.id, { is_active }, is_active ? "Serviço publicado." : "Serviço ocultado.")
                         }
                       />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <ServiceEditor service={service} categories={data.categories} onSaved={refresh} />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </PanelTable>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="hidden md:block">
+              <PanelTable>
+                <TableHeader><TableRow>
+                  <TableHead>Serviço</TableHead><TableHead>Categoria</TableHead>
+                  <TableHead>Valor</TableHead><TableHead>Publicado</TableHead><TableHead />
+                </TableRow></TableHeader>
+                <TableBody>
+                  {data.services.map((service: any) => (
+                    <TableRow key={service.id}>
+                      <TableCell>
+                        <p className="font-medium">{service.name}</p>
+                        <p className="text-xs text-muted-foreground">{service.professional}</p>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{categoryName(service)}</TableCell>
+                      <TableCell className="font-medium">{formatPrice(service.price)}</TableCell>
+                      <TableCell>
+                        <Switch
+                          checked={service.is_active}
+                          onCheckedChange={(is_active) =>
+                            updateRow("services", "id", service.id, { is_active }, is_active ? "Serviço publicado." : "Serviço ocultado.")
+                          }
+                        />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <ServiceEditor service={service} categories={data.categories} onSaved={refresh} />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </PanelTable>
+            </div>
           </TabsContent>
 
-          <TabsContent value="promocoes" className="mt-5">
+          <TabsContent value="promocoes" className="mt-4 sm:mt-5">
             <SectionHeader
               title="Promoções"
               subtitle="Crie campanhas e vincule a um serviço."
               action={<PromotionEditor services={data.services} onSaved={refresh} />}
             />
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-2.5 sm:gap-4 md:grid-cols-2 xl:grid-cols-3">
               {data.promotions.length === 0 ? (
                 <EmptyCard icon={Tag} text="Nenhuma promoção cadastrada ainda." />
               ) : data.promotions.map((promotion: any) => (
-                <div key={promotion.id} className="rounded-2xl border border-border bg-card p-5 shadow-soft">
+                <div key={promotion.id} className="rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-5">
                   <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <Badge variant={promotion.is_active ? "default" : "secondary"} className="rounded-full">
+                    <div className="min-w-0">
+                      <Badge variant={promotion.is_active ? "default" : "secondary"} className="rounded-full px-2 py-0 text-[10px] sm:text-xs">
                         {promotion.is_active ? "Ativa" : "Pausada"}
                       </Badge>
-                      <h3 className="mt-3 text-lg font-semibold">{promotion.title}</h3>
+                      <h3 className="mt-2 truncate text-sm font-semibold sm:mt-3 sm:text-lg">{promotion.title}</h3>
                     </div>
                     <Switch
                       checked={promotion.is_active}
@@ -399,8 +499,8 @@ function Admin() {
                       }
                     />
                   </div>
-                  <p className="mt-2 text-sm text-muted-foreground">{promotion.description}</p>
-                  <p className="mt-4 font-medium text-primary">
+                  {promotion.description ? <p className="mt-1.5 line-clamp-2 text-xs text-muted-foreground sm:mt-2 sm:text-sm">{promotion.description}</p> : null}
+                  <p className="mt-3 text-sm font-semibold text-primary sm:mt-4">
                     {promotion.promotional_price != null
                       ? formatPrice(promotion.promotional_price)
                       : promotion.discount_percent != null
@@ -412,14 +512,16 @@ function Admin() {
             </div>
           </TabsContent>
 
-          <TabsContent value="horarios" className="mt-5">
-            <SectionHeader title="Horários disponíveis" subtitle="Ative ou pause horários que aparecem no agendamento." />
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <TabsContent value="horarios" className="mt-4 sm:mt-5">
+            <SectionHeader title="Horários disponíveis" subtitle="Ative ou pause horários exibidos no agendamento." />
+            <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
               {data.timeSlots.map((slot: any) => (
-                <div key={slot.id} className="flex items-center justify-between rounded-2xl border border-border bg-card p-4 shadow-soft">
-                  <div className="flex items-center gap-3">
-                    <Clock3 className="size-4 text-primary" />
-                    <span className="font-medium lining-nums tabular-nums">{slot.slot}</span>
+                <div key={slot.id} className="flex min-h-[74px] items-center justify-between rounded-2xl border border-border bg-card px-3.5 py-3 shadow-soft sm:p-4">
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <span className="grid size-7 place-items-center rounded-lg bg-primary-soft text-primary sm:size-8">
+                      <Clock3 className="size-3.5 sm:size-4" />
+                    </span>
+                    <span className="text-sm font-semibold lining-nums tabular-nums">{slot.slot}</span>
                   </div>
                   <Switch
                     checked={slot.is_available}
@@ -432,7 +534,7 @@ function Admin() {
             </div>
           </TabsContent>
 
-          <TabsContent value="acessos" className="mt-5">
+          <TabsContent value="acessos" className="mt-4 sm:mt-5">
             <SectionHeader
               title="E-mails administrativos"
               subtitle="Somente estes e-mails podem usar o painel interno."
@@ -442,10 +544,10 @@ function Admin() {
               {data.adminEmails.map((item: any) => {
                 const isCurrent = item.email === data.currentEmail;
                 return (
-                  <div key={item.email} className="flex items-center justify-between gap-4 border-b border-border px-5 py-4 last:border-b-0">
-                    <div>
-                      <p className="text-sm font-medium">{item.email}</p>
-                      <p className="text-xs text-muted-foreground">{isCurrent ? "Seu acesso atual" : "Acesso administrativo"}</p>
+                  <div key={item.email} className="flex items-center justify-between gap-3 border-b border-border px-4 py-3.5 last:border-b-0 sm:gap-4 sm:px-5 sm:py-4">
+                    <div className="min-w-0">
+                      <p className="truncate text-xs font-semibold sm:text-sm">{item.email}</p>
+                      <p className="mt-0.5 text-[10px] text-muted-foreground sm:text-xs">{isCurrent ? "Seu acesso atual" : "Acesso administrativo"}</p>
                     </div>
                     <Switch
                       checked={item.enabled}
@@ -465,22 +567,42 @@ function Admin() {
   );
 }
 
+function MobileTab({ value, icon: Icon, label, desktopLabel }: any) {
+  return (
+    <TabsTrigger
+      value={value}
+      className="h-[50px] min-w-0 flex-col gap-0.5 rounded-xl px-1 text-[10px] font-medium data-[state=active]:bg-card data-[state=active]:shadow-sm sm:h-9 sm:flex-row sm:gap-2 sm:px-3 sm:text-sm"
+    >
+      <Icon className="size-3.5 shrink-0 sm:hidden" />
+      <span className="truncate sm:hidden">{label}</span>
+      <span className="hidden sm:inline">{desktopLabel}</span>
+    </TabsTrigger>
+  );
+}
+
 function Metric({ icon: Icon, label, value, hint }: any) {
   return (
-    <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
-      <span className="grid size-9 place-items-center rounded-xl bg-primary-soft text-primary"><Icon className="size-4.5" /></span>
-      <p className="mt-4 text-sm text-muted-foreground">{label}</p>
-      <p className="font-sans text-2xl font-semibold tracking-tight lining-nums tabular-nums">{value}</p>
-      <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
+    <div className="rounded-2xl border border-border bg-card p-3.5 shadow-soft sm:p-5">
+      <div className="flex items-start justify-between gap-2 sm:block">
+        <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-primary-soft text-primary sm:size-9 sm:rounded-xl">
+          <Icon className="size-3.5 sm:size-4.5" />
+        </span>
+        <p className="text-[10px] text-muted-foreground sm:mt-4 sm:text-sm">{label}</p>
+      </div>
+      <p className="mt-2 truncate font-sans text-xl font-semibold tracking-tight lining-nums tabular-nums sm:mt-0 sm:text-2xl">{value}</p>
+      <p className="mt-0.5 text-[10px] text-muted-foreground sm:mt-1 sm:text-xs">{hint}</p>
     </div>
   );
 }
 
 function SectionHeader({ title, subtitle, action }: any) {
   return (
-    <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
-      <div><h2 className="text-lg font-semibold">{title}</h2><p className="text-sm text-muted-foreground">{subtitle}</p></div>
-      {action}
+    <div className="mb-3 flex items-center justify-between gap-3 sm:mb-4 sm:flex-wrap sm:items-end sm:gap-4">
+      <div className="min-w-0">
+        <h2 className="text-base font-semibold sm:text-lg">{title}</h2>
+        <p className="mt-0.5 line-clamp-1 text-[11px] text-muted-foreground sm:text-sm">{subtitle}</p>
+      </div>
+      <div className="shrink-0">{action}</div>
     </div>
   );
 }
@@ -491,9 +613,9 @@ function PanelTable({ children }: { children: React.ReactNode }) {
 
 function EmptyCard({ icon: Icon, text }: any) {
   return (
-    <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center">
+    <div className="rounded-2xl border border-dashed border-border bg-card p-6 text-center sm:p-8">
       <Icon className="mx-auto size-5 text-muted-foreground" />
-      <p className="mt-3 text-sm text-muted-foreground">{text}</p>
+      <p className="mt-3 text-xs text-muted-foreground sm:text-sm">{text}</p>
     </div>
   );
 }
@@ -541,12 +663,16 @@ function ServiceEditor({ service, categories, onSaved }: any) {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {service ? (
-          <Button variant="ghost" size="icon" aria-label={`Editar ${service.name}`}><Pencil className="size-4" /></Button>
+          <Button variant="ghost" size="icon" className="size-8 rounded-lg sm:size-9" aria-label={`Editar ${service.name}`}>
+            <Pencil className="size-3.5 sm:size-4" />
+          </Button>
         ) : (
-          <Button><Plus className="size-4" /> Novo serviço</Button>
+          <Button size="sm" className="h-9 rounded-full px-3 text-xs sm:h-10 sm:px-4 sm:text-sm">
+            <Plus className="size-3.5 sm:size-4" /> <span className="sm:hidden">Novo</span><span className="hidden sm:inline">Novo serviço</span>
+          </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+      <DialogContent className="max-h-[92dvh] w-[calc(100%-1rem)] overflow-y-auto rounded-2xl p-5 sm:max-w-xl sm:p-6">
         <DialogHeader>
           <DialogTitle>{service ? "Editar serviço" : "Novo serviço"}</DialogTitle>
           <DialogDescription>As alterações refletem no catálogo da JR Clinic.</DialogDescription>
@@ -566,7 +692,7 @@ function ServiceEditor({ service, categories, onSaved }: any) {
           <div className="sm:col-span-2"><Field label="Resumo"><Textarea value={summary} onChange={(e) => setSummary(e.target.value)} /></Field></div>
           <div className="sm:col-span-2"><Field label="Descrição"><Textarea value={descriptionText} onChange={(e) => setDescriptionText(e.target.value)} /></Field></div>
         </div>
-        <DialogFooter><Button disabled={busy} onClick={save}>{busy ? "Salvando..." : "Salvar"}</Button></DialogFooter>
+        <DialogFooter><Button className="w-full sm:w-auto" disabled={busy} onClick={save}>{busy ? "Salvando..." : "Salvar"}</Button></DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -605,8 +731,12 @@ function PromotionEditor({ services, onSaved }: any) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild><Button><Plus className="size-4" /> Nova promoção</Button></DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
+      <DialogTrigger asChild>
+        <Button size="sm" className="h-9 rounded-full px-3 text-xs sm:h-10 sm:px-4 sm:text-sm">
+          <Plus className="size-3.5 sm:size-4" /> <span className="sm:hidden">Nova</span><span className="hidden sm:inline">Nova promoção</span>
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-h-[92dvh] w-[calc(100%-1rem)] overflow-y-auto rounded-2xl p-5 sm:max-w-lg sm:p-6">
         <DialogHeader><DialogTitle>Nova promoção</DialogTitle><DialogDescription>Defina a oferta e, se desejar, um período.</DialogDescription></DialogHeader>
         <div className="grid gap-4 py-2 sm:grid-cols-2">
           <div className="sm:col-span-2"><Field label="Título"><Input value={titleValue} onChange={(e) => setTitleValue(e.target.value)} /></Field></div>
@@ -622,7 +752,7 @@ function PromotionEditor({ services, onSaved }: any) {
           <Field label="Início"><Input type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} /></Field>
           <Field label="Fim"><Input type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} /></Field>
         </div>
-        <DialogFooter><Button disabled={busy} onClick={save}>{busy ? "Criando..." : "Criar promoção"}</Button></DialogFooter>
+        <DialogFooter><Button className="w-full sm:w-auto" disabled={busy} onClick={save}>{busy ? "Criando..." : "Criar promoção"}</Button></DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -648,11 +778,15 @@ function AdminEmailEditor({ onSaved }: any) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild><Button><Plus className="size-4" /> Adicionar acesso</Button></DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogTrigger asChild>
+        <Button size="sm" className="h-9 rounded-full px-3 text-xs sm:h-10 sm:px-4 sm:text-sm">
+          <Plus className="size-3.5 sm:size-4" /> <span className="sm:hidden">Adicionar</span><span className="hidden sm:inline">Adicionar acesso</span>
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="w-[calc(100%-1rem)] rounded-2xl p-5 sm:max-w-md sm:p-6">
         <DialogHeader><DialogTitle>Autorizar e-mail</DialogTitle><DialogDescription>O usuário ainda precisará entrar na própria conta.</DialogDescription></DialogHeader>
         <Field label="E-mail"><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="nome@empresa.com" /></Field>
-        <DialogFooter><Button disabled={busy} onClick={save}>{busy ? "Salvando..." : "Autorizar"}</Button></DialogFooter>
+        <DialogFooter><Button className="w-full sm:w-auto" disabled={busy} onClick={save}>{busy ? "Salvando..." : "Autorizar"}</Button></DialogFooter>
       </DialogContent>
     </Dialog>
   );
