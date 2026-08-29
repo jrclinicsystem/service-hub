@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -19,6 +19,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
+import { supabase } from "@/integrations/supabase/client";
 import { createAppointment, getBookingCatalog } from "@/lib/clinic.functions";
 import { formatPrice } from "@/lib/clinic";
 
@@ -76,12 +77,32 @@ function Agendar() {
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
 
+  useEffect(() => {
+    if (!user) return;
+
+    setEmail((current) => current || user.email || "");
+    const metadataName =
+      typeof user.user_metadata?.full_name === "string" ? user.user_metadata.full_name : "";
+    setName((current) => current || metadataName);
+
+    void supabase
+      .from("profiles")
+      .select("full_name, phone")
+      .eq("id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!data) return;
+        if (data.full_name) setName((current) => current || data.full_name || "");
+        if (data.phone) setPhone((current) => current || data.phone || "");
+      });
+  }, [user]);
+
   const canConfirm = Boolean(day && time && name.trim() && email.trim());
 
   const confirm = async () => {
     if (!user) {
       toast.info("Entre na sua conta para confirmar o agendamento.");
-      await authNavigate({ to: "/auth" });
+      await authNavigate({ to: "/auth", search: { next: "/agendar" } });
       return;
     }
     if (!time) return;
@@ -110,10 +131,10 @@ function Agendar() {
   };
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen overflow-x-hidden">
       <SiteHeader />
 
-      <main className="mx-auto max-w-[1440px] px-4 pb-28 pt-6 sm:px-8 sm:pb-12 sm:pt-10">
+      <main className="mx-auto w-full min-w-0 max-w-[1440px] px-4 pb-28 pt-6 sm:px-8 sm:pb-12 sm:pt-10">
         <span className="eyebrow text-muted-foreground max-sm:text-[10px]">Agendamento</span>
         <h1 className="mt-1 text-[28px] font-semibold leading-tight sm:mt-2 sm:text-4xl">Reserve seu horário</h1>
         <p className="mt-2 max-w-[52ch] text-sm leading-relaxed text-muted-foreground sm:mt-3 sm:text-base">
@@ -127,20 +148,20 @@ function Agendar() {
           <StepChip number="3" label="Dados" />
         </div>
 
-        <div className="mt-5 grid gap-4 sm:mt-10 sm:gap-8 lg:grid-cols-[1.15fr_0.85fr]">
-          <div className="space-y-4 sm:space-y-8">
-            <section className="rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-6">
+        <div className="mt-5 grid min-w-0 gap-4 sm:mt-10 sm:gap-8 lg:grid-cols-[1.15fr_0.85fr]">
+          <div className="min-w-0 space-y-4 sm:space-y-8">
+            <section className="min-w-0 rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-6">
               <div className="flex items-center gap-2">
                 <span className="grid size-6 place-items-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground sm:hidden">1</span>
                 <h2 className="text-base font-semibold sm:text-lg">Serviço</h2>
               </div>
-              <div className="mt-3 sm:mt-4">
+              <div className="mt-3 min-w-0 sm:mt-4">
                 <Label htmlFor="servico" className="text-xs sm:text-sm">Escolha o atendimento</Label>
                 <Select
                   value={selectedSlug}
                   onValueChange={(value) => navigate({ search: { servico: value }, replace: true })}
                 >
-                  <SelectTrigger id="servico" className="mt-2 h-11 w-full rounded-xl">
+                  <SelectTrigger id="servico" className="mt-2 h-11 w-full max-w-full rounded-xl">
                     <SelectValue placeholder="Selecione um serviço" />
                   </SelectTrigger>
                   <SelectContent>
@@ -152,7 +173,7 @@ function Agendar() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="mt-3 flex items-center justify-between rounded-xl bg-secondary/60 px-3 py-2.5 sm:hidden">
+              <div className="mt-3 flex min-w-0 items-center justify-between gap-3 rounded-xl bg-secondary/60 px-3 py-2.5 sm:hidden">
                 <div className="min-w-0">
                   <p className="truncate text-xs font-medium">{service.professional}</p>
                   <p className="mt-0.5 text-[10px] text-muted-foreground">{service.duration_min} min</p>
@@ -161,14 +182,14 @@ function Agendar() {
               </div>
             </section>
 
-            <section className="rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-6">
+            <section className="min-w-0 overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-6">
               <div className="flex items-center gap-2">
                 <span className="grid size-6 place-items-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground sm:hidden">2</span>
                 <h2 className="text-base font-semibold sm:text-lg">Data e horário</h2>
               </div>
 
               <p className="mt-3 text-xs font-medium text-muted-foreground sm:hidden">Escolha o dia</p>
-              <div className="-mx-4 mt-2 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:mt-4 sm:grid sm:grid-cols-7 sm:px-0 sm:pb-0">
+              <div className="mt-2 flex w-full max-w-full gap-2 overflow-x-auto pb-1 sm:mt-4 sm:grid sm:grid-cols-7 sm:overflow-visible sm:pb-0">
                 {days.map((item) => (
                   <button
                     key={item.key}
@@ -197,7 +218,7 @@ function Agendar() {
                       type="button"
                       disabled={disabled}
                       onClick={() => setTime(slot.slot)}
-                      className={`rounded-xl border px-1.5 py-2.5 text-xs font-medium transition-colors disabled:opacity-35 sm:px-3 sm:text-sm ${
+                      className={`min-w-0 rounded-xl border px-1 py-2.5 text-xs font-medium transition-colors disabled:opacity-35 sm:px-3 sm:text-sm ${
                         time === slot.slot
                           ? "border-primary bg-primary text-primary-foreground"
                           : "border-border bg-background hover:bg-secondary"
@@ -210,23 +231,23 @@ function Agendar() {
               </div>
             </section>
 
-            <section className="rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-6">
+            <section className="min-w-0 rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-6">
               <div className="flex items-center gap-2">
                 <span className="grid size-6 place-items-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground sm:hidden">3</span>
                 <h2 className="text-base font-semibold sm:text-lg">Seus dados</h2>
               </div>
-              <div className="mt-3 grid gap-3 sm:mt-4 sm:grid-cols-2 sm:gap-4">
-                <div>
+              <div className="mt-3 grid min-w-0 gap-3 sm:mt-4 sm:grid-cols-2 sm:gap-4">
+                <div className="min-w-0">
                   <Label htmlFor="nome" className="text-xs sm:text-sm">Nome completo</Label>
                   <Input
                     id="nome"
                     value={name}
                     onChange={(event) => setName(event.target.value)}
                     placeholder="Como no documento"
-                    className="mt-1.5 h-11 rounded-xl sm:mt-2"
+                    className="mt-1.5 h-11 max-w-full rounded-xl sm:mt-2"
                   />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <Label htmlFor="email" className="text-xs sm:text-sm">E-mail</Label>
                   <Input
                     id="email"
@@ -234,27 +255,27 @@ function Agendar() {
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
                     placeholder="voce@email.com"
-                    className="mt-1.5 h-11 rounded-xl sm:mt-2"
+                    className="mt-1.5 h-11 max-w-full rounded-xl sm:mt-2"
                   />
                 </div>
-                <div className="sm:col-span-2">
+                <div className="min-w-0 sm:col-span-2">
                   <Label htmlFor="telefone" className="text-xs sm:text-sm">Telefone/WhatsApp <span className="font-normal text-muted-foreground">(opcional)</span></Label>
                   <Input
                     id="telefone"
                     value={phone}
                     onChange={(event) => setPhone(event.target.value)}
                     placeholder="(85) 99999-9999"
-                    className="mt-1.5 h-11 rounded-xl sm:mt-2"
+                    className="mt-1.5 h-11 max-w-full rounded-xl sm:mt-2"
                   />
                 </div>
-                <div className="sm:col-span-2">
+                <div className="min-w-0 sm:col-span-2">
                   <Label htmlFor="obs" className="text-xs sm:text-sm">Observações <span className="font-normal text-muted-foreground">(opcional)</span></Label>
                   <Textarea
                     id="obs"
                     value={notes}
                     onChange={(event) => setNotes(event.target.value)}
                     placeholder="Informações úteis para a equipe"
-                    className="mt-1.5 min-h-[82px] rounded-xl sm:mt-2"
+                    className="mt-1.5 min-h-[82px] max-w-full rounded-xl sm:mt-2"
                     rows={3}
                   />
                 </div>
@@ -266,63 +287,36 @@ function Agendar() {
             <div className="rounded-2xl border border-border bg-card p-6 shadow-soft lg:sticky lg:top-24">
               <h2 className="text-lg font-semibold">Resumo</h2>
               <dl className="mt-4 space-y-3 text-sm">
-                <div className="flex justify-between gap-4">
-                  <dt className="text-muted-foreground">Serviço</dt>
-                  <dd className="text-right font-medium">{service.name}</dd>
-                </div>
-                <div className="flex justify-between gap-4">
-                  <dt className="text-muted-foreground">Profissional</dt>
-                  <dd className="text-right font-medium">{service.professional}</dd>
-                </div>
-                <div className="flex justify-between gap-4">
-                  <dt className="text-muted-foreground">Data</dt>
-                  <dd className="text-right font-medium">
-                    {new Date(`${day}T12:00:00`).toLocaleDateString("pt-BR")} · {time ?? "—"}
-                  </dd>
-                </div>
-                <div className="flex justify-between gap-4">
-                  <dt className="text-muted-foreground">Duração</dt>
-                  <dd className="text-right font-medium">{service.duration_min} min</dd>
-                </div>
+                <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Serviço</dt><dd className="text-right font-medium">{service.name}</dd></div>
+                <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Profissional</dt><dd className="text-right font-medium">{service.professional}</dd></div>
+                <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Data</dt><dd className="text-right font-medium">{new Date(`${day}T12:00:00`).toLocaleDateString("pt-BR")} · {time ?? "—"}</dd></div>
+                <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Duração</dt><dd className="text-right font-medium">{service.duration_min} min</dd></div>
               </dl>
 
               <Separator className="my-5" />
 
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Total</span>
-                <span className="font-sans text-2xl font-semibold tracking-tight text-primary lining-nums tabular-nums">
-                  {formatPrice(Number(service.price))}
-                </span>
+                <span className="font-sans text-2xl font-semibold tracking-tight text-primary lining-nums tabular-nums">{formatPrice(Number(service.price))}</span>
               </div>
 
-              <Button
-                size="lg"
-                className="mt-6 w-full rounded-full"
-                disabled={!canConfirm || busy}
-                onClick={confirm}
-              >
+              <Button size="lg" className="mt-6 w-full rounded-full" disabled={!canConfirm || busy} onClick={confirm}>
                 {busy ? "Enviando..." : "Confirmar agendamento"}
               </Button>
-              <p className="mt-3 text-center text-xs text-muted-foreground">
-                Nenhuma cobrança é feita nesta etapa.
-              </p>
+              <p className="mt-3 text-center text-xs text-muted-foreground">Nenhuma cobrança é feita nesta etapa.</p>
             </div>
           </aside>
         </div>
       </main>
 
-      <div className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-card/95 px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_30px_rgba(0,0,0,0.06)] backdrop-blur-xl lg:hidden">
-        <div className="mx-auto flex max-w-lg items-center gap-3">
+      <div className="fixed inset-x-0 bottom-0 z-50 overflow-hidden border-t border-border bg-card/95 px-3 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_30px_rgba(0,0,0,0.06)] backdrop-blur-xl lg:hidden">
+        <div className="mx-auto flex w-full max-w-lg items-center gap-2.5">
           <div className="min-w-0 flex-1">
             <p className="truncate text-[10px] text-muted-foreground">{service.name}</p>
             <p className="text-base font-semibold leading-tight text-primary">{formatPrice(Number(service.price))}</p>
           </div>
-          <Button
-            className="h-11 min-w-[174px] rounded-full px-5"
-            disabled={!canConfirm || busy}
-            onClick={confirm}
-          >
-            {busy ? "Enviando..." : user ? "Confirmar" : "Entrar e confirmar"}
+          <Button className="h-11 min-w-[148px] shrink-0 rounded-full px-4" disabled={!canConfirm || busy} onClick={confirm}>
+            {busy ? "Enviando..." : "Confirmar"}
           </Button>
         </div>
       </div>
@@ -334,9 +328,9 @@ function Agendar() {
 
 function StepChip({ number, label }: { number: string; label: string }) {
   return (
-    <div className="flex items-center justify-center gap-1.5 rounded-xl bg-secondary/70 px-2 py-2">
-      <span className="grid size-4 place-items-center rounded-full bg-primary text-[9px] font-semibold text-primary-foreground">{number}</span>
-      <span className="text-[10px] font-medium">{label}</span>
+    <div className="flex min-w-0 items-center justify-center gap-1.5 rounded-xl bg-secondary/70 px-1.5 py-2">
+      <span className="grid size-4 shrink-0 place-items-center rounded-full bg-primary text-[9px] font-semibold text-primary-foreground">{number}</span>
+      <span className="truncate text-[10px] font-medium">{label}</span>
     </div>
   );
 }
