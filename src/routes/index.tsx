@@ -99,15 +99,15 @@ function Home() {
           </div>
         </section>
 
-        <section className="border-y border-border bg-surface">
+        <section className="border-y border-primary bg-primary text-primary-foreground">
           <div className="mx-auto grid max-w-[1440px] gap-8 px-5 py-14 sm:px-8 md:grid-cols-3">
             {highlights.map((item) => (
               <div key={item.title}>
-                <span className="grid size-10 place-items-center rounded-xl bg-primary-soft text-primary">
+                <span className="grid size-10 place-items-center rounded-xl bg-white/10 text-primary-foreground ring-1 ring-white/15">
                   <item.icon className="size-5" />
                 </span>
                 <h2 className="mt-4 text-lg font-semibold">{item.title}</h2>
-                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{item.text}</p>
+                <p className="mt-2 text-sm leading-relaxed text-primary-foreground/75">{item.text}</p>
               </div>
             ))}
           </div>
