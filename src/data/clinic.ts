@@ -351,7 +351,12 @@ export const weekLoad = [
 ];
 
 export const formatPrice = (value: number) =>
-  value.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 });
+  value.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 
 export const getService = (slug: string) => services.find((s) => s.slug === slug);
 

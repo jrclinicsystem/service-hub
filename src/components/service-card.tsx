@@ -41,18 +41,18 @@ export function ServiceCard({ service }: { service: Service }) {
         to="/agendar"
         search={{ servico: service.slug }}
         preload="intent"
-        className="mt-4 flex items-center justify-between gap-3"
+        className="group/booking mt-4 flex items-center justify-between gap-3"
         aria-label={`Agendar ${service.name} por ${formatPrice(service.price)}`}
       >
         <div>
           <p className="text-[9px] tracking-[0.14em] text-muted-foreground uppercase">
             A partir de
           </p>
-          <p className="font-sans text-xl leading-none font-semibold tracking-tight text-primary tabular-nums">
+          <p className="font-sans text-xl leading-none font-semibold tracking-tight text-primary lining-nums tabular-nums">
             {formatPrice(service.price)}
           </p>
         </div>
-        <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-accent px-3 py-2 text-xs font-semibold text-accent-foreground">
+        <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-transparent bg-accent px-3 py-2 text-xs font-semibold text-white transition-[border-color] duration-200 ease-out group-hover/booking:border-white/80 group-focus-visible/booking:border-white/80 motion-reduce:transition-none">
           Agendar
           <ArrowRight className="size-3.5" />
         </span>

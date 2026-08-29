@@ -126,7 +126,7 @@ function ServiceDetail() {
           <aside>
             <div className="rounded-2xl border border-border bg-card p-6 shadow-soft lg:sticky lg:top-24">
               <div className="flex items-baseline justify-between">
-                <span className="font-display text-3xl font-semibold text-primary">
+                <span className="font-sans text-3xl font-semibold tracking-tight text-primary lining-nums tabular-nums">
                   {formatPrice(Number(service.price))}
                 </span>
                 <span className="text-sm text-muted-foreground">{service.duration_min} min</span>

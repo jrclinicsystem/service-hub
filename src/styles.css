@@ -147,6 +147,7 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
+    font-variant-numeric: lining-nums tabular-nums;
     -webkit-font-smoothing: antialiased;
     background-image: radial-gradient(circle at 8% 0%, rgb(176 138 74 / 0.08), transparent 28rem);
   }

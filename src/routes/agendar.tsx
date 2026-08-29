@@ -267,7 +267,7 @@ function Agendar() {
 
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Total</span>
-                <span className="font-display text-2xl font-semibold text-primary">
+                <span className="font-sans text-2xl font-semibold tracking-tight text-primary lining-nums tabular-nums">
                   {formatPrice(Number(service.price))}
                 </span>
               </div>
