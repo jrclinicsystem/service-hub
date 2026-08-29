@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { Search } from "lucide-react";
 import { useState } from "react";
 import { z } from "zod";
 
@@ -75,31 +76,32 @@ function Catalogo() {
     <div className="min-h-screen">
       <SiteHeader />
 
-      <main className="mx-auto max-w-[1440px] px-5 py-14 sm:px-8 lg:py-20">
-        <span className="eyebrow text-accent">Catálogo</span>
-        <h1 className="mt-2 text-4xl font-semibold text-primary sm:text-5xl">
+      <main className="mx-auto max-w-[1440px] px-4 pb-10 pt-6 sm:px-8 sm:py-14 lg:py-20">
+        <span className="eyebrow text-accent max-sm:text-[10px]">Catálogo</span>
+        <h1 className="mt-1 text-[29px] font-semibold leading-tight text-primary sm:mt-2 sm:text-5xl">
           Serviços da JR Clinic
         </h1>
-        <p className="mt-3 max-w-[52ch] text-muted-foreground">
-          {services.length} serviços em {categories.length} especialidades. Filtre por categoria ou
-          busque pelo nome do serviço ou do profissional.
+        <p className="mt-2 max-w-[52ch] text-sm leading-relaxed text-muted-foreground sm:mt-3 sm:text-base">
+          {services.length} serviços em {categories.length} especialidades.
+          <span className="hidden sm:inline"> Filtre por categoria ou busque pelo nome do serviço ou do profissional.</span>
         </p>
 
-        <div className="mt-8 max-w-md">
+        <div className="relative mt-5 max-w-md sm:mt-8">
+          <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Buscar serviço ou profissional"
-            className="h-12 rounded-full border-border bg-card px-5 shadow-soft"
+            className="h-11 rounded-full border-border bg-card pl-10 pr-4 text-sm shadow-soft sm:h-12 sm:px-5 sm:pl-11"
             aria-label="Buscar serviço"
           />
         </div>
 
-        <div className="sticky top-16 z-30 -mx-5 mt-8 flex gap-2 overflow-x-auto border-b border-border bg-background/90 px-5 py-3 backdrop-blur sm:-mx-8 sm:px-8">
+        <div className="sticky top-14 z-30 -mx-4 mt-4 flex gap-2 overflow-x-auto border-b border-border bg-background/95 px-4 py-2.5 backdrop-blur-xl sm:top-16 sm:-mx-8 sm:mt-8 sm:px-8 sm:py-3">
           <Button
             variant={categoria ? "outline" : "default"}
             size="sm"
-            className="shrink-0 rounded-full"
+            className="h-8 shrink-0 rounded-full px-3 text-xs sm:h-9 sm:text-sm"
             onClick={() => setCategory(undefined)}
           >
             Todos
@@ -109,7 +111,7 @@ function Catalogo() {
               key={category.id}
               variant={categoria === category.id ? "default" : "outline"}
               size="sm"
-              className="shrink-0 rounded-full"
+              className="h-8 shrink-0 rounded-full px-3 text-xs sm:h-9 sm:text-sm"
               onClick={() => setCategory(category.id)}
             >
               {category.name}
@@ -117,12 +119,19 @@ function Catalogo() {
           ))}
         </div>
 
-        {filtered.length === 0 ? (
-          <p className="mt-12 text-sm text-muted-foreground">
-            Nenhum serviço encontrado para esta combinação de filtros.
+        <div className="mt-4 flex items-center justify-between sm:mt-6">
+          <p className="text-[11px] text-muted-foreground sm:text-xs">
+            {filtered.length === 1 ? "1 resultado" : `${filtered.length} resultados`}
           </p>
+        </div>
+
+        {filtered.length === 0 ? (
+          <div className="mt-8 rounded-2xl border border-dashed border-border bg-card px-5 py-8 text-center sm:mt-12">
+            <p className="text-sm font-medium">Nenhum serviço encontrado</p>
+            <p className="mt-1 text-xs text-muted-foreground">Tente outro termo ou categoria.</p>
+          </div>
         ) : (
-          <div className="mt-7 grid grid-cols-3 items-stretch gap-2 sm:mt-10 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5">
+          <div className="mt-3 grid grid-cols-3 items-stretch gap-2 sm:mt-4 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5">
             {filtered.map((service) => (
               <ServiceCard key={service.slug} service={service} compactMobile />
             ))}
