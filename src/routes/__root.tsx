@@ -13,6 +13,7 @@ import { useEffect, type ReactNode } from "react";
 
 import { jrClinicIconDataUrl } from "@/assets/jr-clinic-icon";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
+import { SupportWhatsapp } from "@/components/support-whatsapp";
 import { Toaster } from "@/components/ui/sonner";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -145,6 +146,7 @@ function SystemAccess() {
   return (
     <>
       <Outlet />
+      <SupportWhatsapp />
       <MobileBottomNav />
     </>
   );
