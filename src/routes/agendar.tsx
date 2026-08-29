@@ -131,40 +131,40 @@ function Agendar() {
   };
 
   return (
-    <div className="min-h-screen overflow-x-hidden">
+    <div className="min-h-screen w-full max-w-[100dvw] overflow-x-clip">
       <SiteHeader />
 
-      <main className="mx-auto w-full min-w-0 max-w-[1440px] px-4 pb-28 pt-6 sm:px-8 sm:pb-12 sm:pt-10">
+      <main className="mx-auto box-border w-full min-w-0 max-w-[1440px] px-4 pb-28 pt-6 max-sm:w-[calc(100dvw-24px)] max-sm:max-w-[calc(100dvw-24px)] max-sm:px-0 sm:px-8 sm:pb-12 sm:pt-10">
         <span className="eyebrow text-muted-foreground max-sm:text-[10px]">Agendamento</span>
-        <h1 className="mt-1 text-[28px] font-semibold leading-tight sm:mt-2 sm:text-4xl">Reserve seu horário</h1>
+        <h1 className="mt-1 max-w-full text-[28px] font-semibold leading-tight sm:mt-2 sm:text-4xl">Reserve seu horário</h1>
         <p className="mt-2 max-w-[52ch] text-sm leading-relaxed text-muted-foreground sm:mt-3 sm:text-base">
           Escolha o serviço, selecione data e horário e confirme seus dados.
           <span className="hidden sm:inline"> Nenhum pagamento é feito nesta etapa.</span>
         </p>
 
-        <div className="mt-5 grid grid-cols-3 gap-2 sm:hidden">
+        <div className="mt-5 grid w-full min-w-0 grid-cols-3 gap-2 sm:hidden">
           <StepChip number="1" label="Serviço" />
           <StepChip number="2" label="Horário" />
           <StepChip number="3" label="Dados" />
         </div>
 
-        <div className="mt-5 grid min-w-0 gap-4 sm:mt-10 sm:gap-8 lg:grid-cols-[1.15fr_0.85fr]">
-          <div className="min-w-0 space-y-4 sm:space-y-8">
-            <section className="min-w-0 rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-6">
-              <div className="flex items-center gap-2">
-                <span className="grid size-6 place-items-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground sm:hidden">1</span>
-                <h2 className="text-base font-semibold sm:text-lg">Serviço</h2>
+        <div className="mt-5 grid w-full min-w-0 max-w-full gap-4 sm:mt-10 sm:gap-8 lg:grid-cols-[1.15fr_0.85fr]">
+          <div className="w-full min-w-0 max-w-full space-y-4 sm:space-y-8">
+            <section className="box-border w-full min-w-0 max-w-full overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-6">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="grid size-6 shrink-0 place-items-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground sm:hidden">1</span>
+                <h2 className="min-w-0 truncate text-base font-semibold sm:text-lg">Serviço</h2>
               </div>
-              <div className="mt-3 min-w-0 sm:mt-4">
+              <div className="mt-3 w-full min-w-0 max-w-full sm:mt-4">
                 <Label htmlFor="servico" className="text-xs sm:text-sm">Escolha o atendimento</Label>
                 <Select
                   value={selectedSlug}
                   onValueChange={(value) => navigate({ search: { servico: value }, replace: true })}
                 >
-                  <SelectTrigger id="servico" className="mt-2 h-11 w-full max-w-full rounded-xl">
+                  <SelectTrigger id="servico" className="mt-2 h-11 w-full min-w-0 max-w-full overflow-hidden rounded-xl">
                     <SelectValue placeholder="Selecione um serviço" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="max-w-[calc(100dvw-24px)]">
                     {services.map((item) => (
                       <SelectItem key={item.slug} value={item.slug}>
                         {item.name} · {item.professional}
@@ -173,8 +173,8 @@ function Agendar() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="mt-3 flex min-w-0 items-center justify-between gap-3 rounded-xl bg-secondary/60 px-3 py-2.5 sm:hidden">
-                <div className="min-w-0">
+              <div className="mt-3 flex w-full min-w-0 max-w-full items-center justify-between gap-3 overflow-hidden rounded-xl bg-secondary/60 px-3 py-2.5 sm:hidden">
+                <div className="min-w-0 flex-1">
                   <p className="truncate text-xs font-medium">{service.professional}</p>
                   <p className="mt-0.5 text-[10px] text-muted-foreground">{service.duration_min} min</p>
                 </div>
@@ -182,14 +182,14 @@ function Agendar() {
               </div>
             </section>
 
-            <section className="min-w-0 overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-6">
-              <div className="flex items-center gap-2">
-                <span className="grid size-6 place-items-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground sm:hidden">2</span>
-                <h2 className="text-base font-semibold sm:text-lg">Data e horário</h2>
+            <section className="box-border w-full min-w-0 max-w-full overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-6">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="grid size-6 shrink-0 place-items-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground sm:hidden">2</span>
+                <h2 className="min-w-0 truncate text-base font-semibold sm:text-lg">Data e horário</h2>
               </div>
 
               <p className="mt-3 text-xs font-medium text-muted-foreground sm:hidden">Escolha o dia</p>
-              <div className="mt-2 flex w-full max-w-full gap-2 overflow-x-auto pb-1 sm:mt-4 sm:grid sm:grid-cols-7 sm:overflow-visible sm:pb-0">
+              <div className="mt-2 flex w-full min-w-0 max-w-full gap-2 overflow-x-auto overscroll-x-contain pb-1 sm:mt-4 sm:grid sm:grid-cols-7 sm:overflow-visible sm:pb-0">
                 {days.map((item) => (
                   <button
                     key={item.key}
@@ -209,7 +209,7 @@ function Agendar() {
               </div>
 
               <p className="mt-4 text-xs font-medium text-muted-foreground sm:mt-6 sm:text-sm sm:text-foreground">Horários disponíveis</p>
-              <div className="mt-2 grid grid-cols-4 gap-2 sm:mt-3 sm:grid-cols-4">
+              <div className="mt-2 grid w-full min-w-0 grid-cols-2 gap-2 sm:mt-3 sm:grid-cols-4">
                 {timeSlots.map((slot) => {
                   const disabled = !slot.is_available;
                   return (
@@ -218,7 +218,7 @@ function Agendar() {
                       type="button"
                       disabled={disabled}
                       onClick={() => setTime(slot.slot)}
-                      className={`min-w-0 rounded-xl border px-1 py-2.5 text-xs font-medium transition-colors disabled:opacity-35 sm:px-3 sm:text-sm ${
+                      className={`min-w-0 max-w-full rounded-xl border px-1 py-2.5 text-xs font-medium transition-colors disabled:opacity-35 sm:px-3 sm:text-sm ${
                         time === slot.slot
                           ? "border-primary bg-primary text-primary-foreground"
                           : "border-border bg-background hover:bg-secondary"
@@ -231,23 +231,23 @@ function Agendar() {
               </div>
             </section>
 
-            <section className="min-w-0 rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-6">
-              <div className="flex items-center gap-2">
-                <span className="grid size-6 place-items-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground sm:hidden">3</span>
-                <h2 className="text-base font-semibold sm:text-lg">Seus dados</h2>
+            <section className="box-border w-full min-w-0 max-w-full overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-6">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="grid size-6 shrink-0 place-items-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground sm:hidden">3</span>
+                <h2 className="min-w-0 truncate text-base font-semibold sm:text-lg">Seus dados</h2>
               </div>
-              <div className="mt-3 grid min-w-0 gap-3 sm:mt-4 sm:grid-cols-2 sm:gap-4">
-                <div className="min-w-0">
+              <div className="mt-3 grid w-full min-w-0 max-w-full gap-3 sm:mt-4 sm:grid-cols-2 sm:gap-4">
+                <div className="w-full min-w-0 max-w-full">
                   <Label htmlFor="nome" className="text-xs sm:text-sm">Nome completo</Label>
                   <Input
                     id="nome"
                     value={name}
                     onChange={(event) => setName(event.target.value)}
                     placeholder="Como no documento"
-                    className="mt-1.5 h-11 max-w-full rounded-xl sm:mt-2"
+                    className="mt-1.5 h-11 w-full min-w-0 max-w-full rounded-xl sm:mt-2"
                   />
                 </div>
-                <div className="min-w-0">
+                <div className="w-full min-w-0 max-w-full">
                   <Label htmlFor="email" className="text-xs sm:text-sm">E-mail</Label>
                   <Input
                     id="email"
@@ -255,27 +255,27 @@ function Agendar() {
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
                     placeholder="voce@email.com"
-                    className="mt-1.5 h-11 max-w-full rounded-xl sm:mt-2"
+                    className="mt-1.5 h-11 w-full min-w-0 max-w-full rounded-xl sm:mt-2"
                   />
                 </div>
-                <div className="min-w-0 sm:col-span-2">
+                <div className="w-full min-w-0 max-w-full sm:col-span-2">
                   <Label htmlFor="telefone" className="text-xs sm:text-sm">Telefone/WhatsApp <span className="font-normal text-muted-foreground">(opcional)</span></Label>
                   <Input
                     id="telefone"
                     value={phone}
                     onChange={(event) => setPhone(event.target.value)}
                     placeholder="(85) 99999-9999"
-                    className="mt-1.5 h-11 max-w-full rounded-xl sm:mt-2"
+                    className="mt-1.5 h-11 w-full min-w-0 max-w-full rounded-xl sm:mt-2"
                   />
                 </div>
-                <div className="min-w-0 sm:col-span-2">
+                <div className="w-full min-w-0 max-w-full sm:col-span-2">
                   <Label htmlFor="obs" className="text-xs sm:text-sm">Observações <span className="font-normal text-muted-foreground">(opcional)</span></Label>
                   <Textarea
                     id="obs"
                     value={notes}
                     onChange={(event) => setNotes(event.target.value)}
                     placeholder="Informações úteis para a equipe"
-                    className="mt-1.5 min-h-[82px] max-w-full rounded-xl sm:mt-2"
+                    className="mt-1.5 min-h-[82px] w-full min-w-0 max-w-full resize-none rounded-xl sm:mt-2"
                     rows={3}
                   />
                 </div>
@@ -283,7 +283,7 @@ function Agendar() {
             </section>
           </div>
 
-          <aside className="hidden lg:block">
+          <aside className="hidden min-w-0 lg:block">
             <div className="rounded-2xl border border-border bg-card p-6 shadow-soft lg:sticky lg:top-24">
               <h2 className="text-lg font-semibold">Resumo</h2>
               <dl className="mt-4 space-y-3 text-sm">
@@ -309,13 +309,13 @@ function Agendar() {
         </div>
       </main>
 
-      <div className="fixed inset-x-0 bottom-0 z-50 overflow-hidden border-t border-border bg-card/95 px-3 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_30px_rgba(0,0,0,0.06)] backdrop-blur-xl lg:hidden">
-        <div className="mx-auto flex w-full max-w-lg items-center gap-2.5">
+      <div className="fixed bottom-0 left-0 right-0 z-50 box-border w-[100dvw] max-w-[100dvw] overflow-hidden border-t border-border bg-card/95 px-3 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_30px_rgba(0,0,0,0.06)] backdrop-blur-xl lg:hidden">
+        <div className="mx-auto flex w-full min-w-0 max-w-lg items-center gap-2.5">
           <div className="min-w-0 flex-1">
             <p className="truncate text-[10px] text-muted-foreground">{service.name}</p>
             <p className="text-base font-semibold leading-tight text-primary">{formatPrice(Number(service.price))}</p>
           </div>
-          <Button className="h-11 min-w-[148px] shrink-0 rounded-full px-4" disabled={!canConfirm || busy} onClick={confirm}>
+          <Button className="h-11 min-w-[142px] shrink-0 rounded-full px-4" disabled={!canConfirm || busy} onClick={confirm}>
             {busy ? "Enviando..." : "Confirmar"}
           </Button>
         </div>
