@@ -4,13 +4,16 @@ import { ArrowRight } from "lucide-react";
 import heroImage from "@/assets/hero-clinic.jpg";
 import { SiteHeader } from "@/components/site-header";
 import { Button } from "@/components/ui/button";
-import { categories, services } from "@/data/clinic";
+import { getCatalog } from "@/lib/clinic.functions";
 
 const title = "JR Clinic — Consultas, exames e agendamento online";
 const description =
-  "Catálogo de serviços clínicos da JR Clinic: consultas, nutrição, psicologia, fisioterapia e exames com agendamento online em poucos passos.";
+  "Catálogo de serviços clínicos da JR Clinic com valores, detalhes e agendamento online em poucos passos.";
 
 export const Route = createFileRoute("/")({
+  loader: () => getCatalog(),
+  staleTime: 5 * 60 * 1000,
+  preloadStaleTime: 5 * 60 * 1000,
   head: () => ({
     meta: [
       { title },
@@ -23,6 +26,8 @@ export const Route = createFileRoute("/")({
 });
 
 function Home() {
+  const catalog = Route.useLoaderData();
+
   return (
     <div className="min-h-screen overflow-x-hidden bg-background">
       <SiteHeader />
@@ -54,11 +59,11 @@ function Home() {
             <dl className="mt-6 grid grid-cols-3 divide-x divide-border rounded-2xl border border-border bg-card py-3 shadow-soft sm:mt-10 sm:gap-6 sm:divide-x-0 sm:rounded-none sm:border-x-0 sm:border-b-0 sm:bg-transparent sm:pt-7 sm:shadow-none">
               <div className="px-2 text-center sm:px-0 sm:text-left">
                 <dt className="text-[10px] text-muted-foreground sm:text-sm">Serviços</dt>
-                <dd className="font-display text-xl font-semibold sm:text-2xl">{services.length}</dd>
+                <dd className="font-display text-xl font-semibold sm:text-2xl">{catalog.services.length}</dd>
               </div>
               <div className="px-2 text-center sm:px-0 sm:text-left">
                 <dt className="text-[10px] text-muted-foreground sm:text-sm">Especialidades</dt>
-                <dd className="font-display text-xl font-semibold sm:text-2xl">{categories.length}</dd>
+                <dd className="font-display text-xl font-semibold sm:text-2xl">{catalog.categories.length}</dd>
               </div>
               <div className="px-2 text-center sm:px-0 sm:text-left">
                 <dt className="text-[10px] text-muted-foreground sm:text-sm">Avaliação</dt>
