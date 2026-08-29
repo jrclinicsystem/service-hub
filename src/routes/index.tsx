@@ -140,7 +140,9 @@ function Home() {
                   {category.description}
                 </p>
                 <p className="mt-4 text-xs text-muted-foreground">
-                  {services.filter((s) => s.categoryId === category.id).length} serviços
+                  {services.filter((s) => s.categoryId === category.id).length === 1
+                    ? "1 serviço"
+                    : `${services.filter((s) => s.categoryId === category.id).length} serviços`}
                 </p>
               </Link>
             ))}
