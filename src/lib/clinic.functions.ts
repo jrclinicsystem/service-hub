@@ -19,24 +19,31 @@ function publicClient() {
 async function fetchCatalog() {
   const supabase = publicClient();
 
-  const [categories, services, slots] = await Promise.all([
-    supabase.from("categories").select("id, name, description, sort_order").order("sort_order"),
-    supabase.from("services").select(serviceColumns).order("name"),
-    supabase.from("time_slots").select("slot, is_available").order("sort_order"),
-  ]);
+  const { data, error } = await supabase
+    .from("services")
+    .select(`${serviceColumns}, category:categories(id, name, description, sort_order)`)
+    .eq("is_active", true)
+    .order("name");
 
-  if (categories.error) throw categories.error;
-  if (services.error) throw services.error;
-  if (slots.error) throw slots.error;
+  if (error) throw error;
+
+  const categoryMap = new Map<
+    string,
+    { id: string; name: string; description: string; sort_order: number }
+  >();
+
+  const services = (data ?? []).map(({ category, ...service }) => {
+    if (category) categoryMap.set(category.id, category);
+    return {
+      ...service,
+      price: Number(service.price),
+      rating: Number(service.rating),
+    };
+  });
 
   return {
-    categories: categories.data ?? [],
-    services: (services.data ?? []).map((s) => ({
-      ...s,
-      price: Number(s.price),
-      rating: Number(s.rating),
-    })),
-    timeSlots: slots.data ?? [],
+    categories: [...categoryMap.values()].sort((a, b) => a.sort_order - b.sort_order),
+    services,
   };
 }
 
@@ -44,18 +51,35 @@ type CatalogData = Awaited<ReturnType<typeof fetchCatalog>>;
 let catalogCache: { value: CatalogData; expiresAt: number } | undefined;
 let catalogRequest: Promise<CatalogData> | undefined;
 
-export const getCatalog = createServerFn({ method: "GET" }).handler(async () => {
+async function getCachedCatalog() {
   const now = Date.now();
   if (catalogCache && catalogCache.expiresAt > now) return catalogCache.value;
 
   catalogRequest ??= fetchCatalog();
   try {
     const value = await catalogRequest;
-    catalogCache = { value, expiresAt: now + 5 * 60 * 1000 };
+    catalogCache = { value, expiresAt: Date.now() + 5 * 60 * 1000 };
     return value;
+  } catch (error) {
+    if (catalogCache) return catalogCache.value;
+    throw error;
   } finally {
     catalogRequest = undefined;
   }
+}
+
+export const getCatalog = createServerFn({ method: "GET" }).handler(() => getCachedCatalog());
+
+export const getBookingCatalog = createServerFn({ method: "GET" }).handler(async () => {
+  const supabase = publicClient();
+  const [catalog, slots] = await Promise.all([
+    getCachedCatalog(),
+    supabase.from("time_slots").select("slot, is_available").order("sort_order"),
+  ]);
+
+  if (slots.error) throw slots.error;
+
+  return { ...catalog, timeSlots: slots.data ?? [] };
 });
 
 export const getServiceDetail = createServerFn({ method: "GET" })

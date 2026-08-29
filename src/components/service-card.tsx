@@ -41,12 +41,14 @@ export function ServiceCard({ service }: { service: Service }) {
         to="/agendar"
         search={{ servico: service.slug }}
         preload="intent"
-        className="mt-4 flex items-center justify-between gap-3 rounded-xl bg-primary px-3.5 py-3 text-primary-foreground transition-colors hover:bg-primary/90"
+        className="mt-4 flex items-center justify-between gap-3"
         aria-label={`Agendar ${service.name} por ${formatPrice(service.price)}`}
       >
         <div>
-          <p className="text-[9px] tracking-[0.14em] uppercase opacity-70">A partir de</p>
-          <p className="font-display text-xl leading-none font-semibold">
+          <p className="text-[9px] tracking-[0.14em] text-muted-foreground uppercase">
+            A partir de
+          </p>
+          <p className="font-sans text-xl leading-none font-semibold tracking-tight text-primary tabular-nums">
             {formatPrice(service.price)}
           </p>
         </div>

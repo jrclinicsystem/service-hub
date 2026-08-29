@@ -19,7 +19,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
-import { createAppointment, getCatalog } from "@/lib/clinic.functions";
+import { createAppointment, getBookingCatalog } from "@/lib/clinic.functions";
 import { formatPrice } from "@/lib/clinic";
 
 const title = "Agendar atendimento — JR Clinic";
@@ -32,7 +32,7 @@ const searchSchema = z.object({
 
 export const Route = createFileRoute("/agendar")({
   validateSearch: searchSchema,
-  loader: () => getCatalog(),
+  loader: () => getBookingCatalog(),
   head: () => ({
     meta: [
       { title },
