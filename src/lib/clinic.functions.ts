@@ -6,7 +6,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database } from "@/integrations/supabase/types";
 
 const serviceColumns =
-  "id, slug, name, category_id, professional, professional_role, duration_min, price, rating, reviews_count, summary, description, includes, preparation";
+  "id, slug, name, category_id, professional, professional_role, duration_min, price, rating, reviews_count, summary, description, includes, preparation, is_active";
 
 function publicClient() {
   return createClient<Database>(
@@ -47,33 +47,12 @@ async function fetchCatalog() {
   };
 }
 
-type CatalogData = Awaited<ReturnType<typeof fetchCatalog>>;
-let catalogCache: { value: CatalogData; expiresAt: number } | undefined;
-let catalogRequest: Promise<CatalogData> | undefined;
-
-async function getCachedCatalog() {
-  const now = Date.now();
-  if (catalogCache && catalogCache.expiresAt > now) return catalogCache.value;
-
-  catalogRequest ??= fetchCatalog();
-  try {
-    const value = await catalogRequest;
-    catalogCache = { value, expiresAt: Date.now() + 5 * 60 * 1000 };
-    return value;
-  } catch (error) {
-    if (catalogCache) return catalogCache.value;
-    throw error;
-  } finally {
-    catalogRequest = undefined;
-  }
-}
-
-export const getCatalog = createServerFn({ method: "GET" }).handler(() => getCachedCatalog());
+export const getCatalog = createServerFn({ method: "GET" }).handler(() => fetchCatalog());
 
 export const getBookingCatalog = createServerFn({ method: "GET" }).handler(async () => {
   const supabase = publicClient();
   const [catalog, slots] = await Promise.all([
-    getCachedCatalog(),
+    fetchCatalog(),
     supabase.from("time_slots").select("slot, is_available").order("sort_order"),
   ]);
 
@@ -163,43 +142,82 @@ export const getMyAppointments = createServerFn({ method: "GET" })
     return data ?? [];
   });
 
+async function isAdminContext(context: {
+  userId: string;
+  claims: Record<string, unknown>;
+  supabase: unknown;
+}) {
+  const db = context.supabase as any;
+  const { data: roles, error: roleError } = await db
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", context.userId);
+
+  if (roleError) throw roleError;
+  if ((roles ?? []).some((role: { role: string }) => role.role === "admin")) return true;
+
+  const email = typeof context.claims.email === "string" ? context.claims.email.trim().toLowerCase() : "";
+  if (!email) return false;
+
+  const { data: allowlisted, error: allowlistError } = await db
+    .from("admin_emails")
+    .select("email")
+    .eq("email", email)
+    .eq("enabled", true)
+    .maybeSingle();
+
+  if (allowlistError) throw allowlistError;
+  return Boolean(allowlisted);
+}
+
 export const getAdminOverview = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data: roles, error: roleError } = await context.supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", context.userId);
-
-    if (roleError) throw roleError;
-
-    const isAdmin = (roles ?? []).some((r) => r.role === "admin");
+    const isAdmin = await isAdminContext(context as any);
     if (!isAdmin) return { isAdmin: false as const };
 
-    const [appointments, services, categories] = await Promise.all([
-      context.supabase
+    const db = context.supabase as any;
+    const [appointments, services, categories, promotions, timeSlots, adminEmails] = await Promise.all([
+      db
         .from("appointments")
         .select(
           "id, patient_name, patient_email, scheduled_date, scheduled_time, status, service:services(name, price)",
         )
         .order("scheduled_date", { ascending: true }),
-      context.supabase.from("services").select(serviceColumns).order("name"),
-      context.supabase.from("categories").select("id, name").order("sort_order"),
+      db.from("services").select(serviceColumns).order("name"),
+      db.from("categories").select("id, name, description, sort_order").order("sort_order"),
+      db
+        .from("promotions")
+        .select(
+          "id, service_id, title, description, discount_percent, promotional_price, starts_at, ends_at, is_active, created_at, updated_at",
+        )
+        .order("created_at", { ascending: false }),
+      db.from("time_slots").select("id, slot, is_available, sort_order").order("sort_order"),
+      db.from("admin_emails").select("email, enabled, created_at").order("created_at"),
     ]);
 
-    if (appointments.error) throw appointments.error;
-    if (services.error) throw services.error;
-    if (categories.error) throw categories.error;
+    for (const result of [appointments, services, categories, promotions, timeSlots, adminEmails]) {
+      if (result.error) throw result.error;
+    }
 
     return {
       isAdmin: true as const,
       appointments: appointments.data ?? [],
-      services: (services.data ?? []).map((s) => ({
-        ...s,
-        price: Number(s.price),
-        rating: Number(s.rating),
+      services: (services.data ?? []).map((service: any) => ({
+        ...service,
+        price: Number(service.price),
+        rating: Number(service.rating),
       })),
       categories: categories.data ?? [],
+      promotions: (promotions.data ?? []).map((promotion: any) => ({
+        ...promotion,
+        discount_percent:
+          promotion.discount_percent === null ? null : Number(promotion.discount_percent),
+        promotional_price:
+          promotion.promotional_price === null ? null : Number(promotion.promotional_price),
+      })),
+      timeSlots: timeSlots.data ?? [],
+      adminEmails: adminEmails.data ?? [],
     };
   });
 
@@ -214,6 +232,8 @@ export const updateAppointmentStatus = createServerFn({ method: "POST" })
       .parse(data),
   )
   .handler(async ({ data, context }) => {
+    if (!(await isAdminContext(context as any))) throw new Error("Acesso administrativo necessário.");
+
     const { error } = await context.supabase
       .from("appointments")
       .update({ status: data.status })
