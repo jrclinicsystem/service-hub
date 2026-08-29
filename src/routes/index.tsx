@@ -29,7 +29,7 @@ function Home() {
 
       <main className="mx-auto flex min-h-[calc(100dvh-3.5rem)] max-w-[1440px] items-center px-4 pb-24 pt-6 sm:min-h-[calc(100dvh-4rem)] sm:px-8 sm:py-10 md:pb-10 lg:py-12">
         <section className="grid w-full items-center gap-7 sm:gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:gap-16">
-          <div className="min-w-0">
+          <div className="home-copy min-w-0">
             <span className="eyebrow text-accent-foreground max-sm:text-[10px]">
               Plataforma de serviços clínicos
             </span>
@@ -67,16 +67,16 @@ function Home() {
             </dl>
           </div>
 
-          <div className="relative min-w-0">
+          <div className="home-hero relative min-w-0">
             <img
               src={heroImage}
               alt="Recepção iluminada da JR Clinic com madeira clara e plantas"
               width={1280}
               height={1600}
-              className="aspect-[16/10] w-full rounded-2xl object-cover shadow-lift sm:aspect-4/5 sm:rounded-3xl lg:max-h-[640px]"
+              className="home-hero-image aspect-[16/10] w-full rounded-2xl object-cover shadow-lift sm:aspect-4/5 sm:rounded-3xl lg:max-h-[640px]"
             />
 
-            <div className="absolute -bottom-3 left-3 rounded-xl border border-border bg-card/95 px-3 py-2 shadow-soft backdrop-blur sm:-bottom-4 sm:left-4 sm:rounded-2xl sm:px-5 sm:py-4">
+            <div className="home-availability absolute -bottom-3 left-3 rounded-xl border border-border bg-card/95 px-3 py-2 shadow-soft backdrop-blur sm:-bottom-4 sm:left-4 sm:rounded-2xl sm:px-5 sm:py-4">
               <p className="text-[9px] text-muted-foreground sm:text-xs">Próxima disponibilidade</p>
               <p className="font-display text-sm font-semibold sm:text-lg">Hoje, 14:30</p>
             </div>
