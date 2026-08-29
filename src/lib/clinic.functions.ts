@@ -134,9 +134,10 @@ export const getMyAppointments = createServerFn({ method: "GET" })
     const { data, error } = await context.supabase
       .from("appointments")
       .select(
-        "id, patient_name, patient_email, scheduled_date, scheduled_time, status, service:services(name, price)",
+        "id, patient_name, patient_email, patient_phone, scheduled_date, scheduled_time, status, created_at, service:services(name, price, professional, professional_role, duration_min)",
       )
-      .order("scheduled_date", { ascending: true });
+      .order("scheduled_date", { ascending: false })
+      .order("scheduled_time", { ascending: false });
 
     if (error) throw error;
     return data ?? [];
