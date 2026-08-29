@@ -31,13 +31,17 @@ export const getCatalog = createServerFn({ method: "GET" }).handler(async () => 
 
   return {
     categories: categories.data ?? [],
-    services: (services.data ?? []).map((s) => ({ ...s, price: Number(s.price), rating: Number(s.rating) })),
+    services: (services.data ?? []).map((s) => ({
+      ...s,
+      price: Number(s.price),
+      rating: Number(s.rating),
+    })),
     timeSlots: slots.data ?? [],
   };
 });
 
 export const getServiceDetail = createServerFn({ method: "GET" })
-  .inputValidator((data) => z.object({ slug: z.string().min(1) }).parse(data))
+  .validator((data) => z.object({ slug: z.string().min(1) }).parse(data))
   .handler(async ({ data }) => {
     const supabase = publicClient();
 
@@ -70,7 +74,7 @@ export const getServiceDetail = createServerFn({ method: "GET" })
 
 export const createAppointment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) =>
+  .validator((data) =>
     z
       .object({
         serviceId: z.string().uuid(),
@@ -148,14 +152,18 @@ export const getAdminOverview = createServerFn({ method: "GET" })
     return {
       isAdmin: true as const,
       appointments: appointments.data ?? [],
-      services: (services.data ?? []).map((s) => ({ ...s, price: Number(s.price), rating: Number(s.rating) })),
+      services: (services.data ?? []).map((s) => ({
+        ...s,
+        price: Number(s.price),
+        rating: Number(s.rating),
+      })),
       categories: categories.data ?? [],
     };
   });
 
 export const updateAppointmentStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) =>
+  .validator((data) =>
     z
       .object({
         id: z.string().uuid(),

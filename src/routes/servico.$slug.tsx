@@ -6,18 +6,22 @@ import { SiteHeader } from "@/components/site-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { formatPrice, getCategory, getService } from "@/data/clinic";
+import { getServiceDetail } from "@/lib/clinic.functions";
+import { formatPrice } from "@/lib/clinic";
 
 export const Route = createFileRoute("/servico/$slug")({
-  loader: ({ params }) => {
-    const service = getService(params.slug);
-    if (!service) throw notFound();
-    return { service };
+  loader: async ({ params }) => {
+    const detail = await getServiceDetail({ data: { slug: params.slug } });
+    if (!detail) throw notFound();
+    return detail;
   },
   head: ({ loaderData }) => {
     if (!loaderData) {
       return {
-        meta: [{ title: "Serviço não encontrado — JR Clinic" }, { name: "robots", content: "noindex" }],
+        meta: [
+          { title: "Serviço não encontrado — JR Clinic" },
+          { name: "robots", content: "noindex" },
+        ],
       };
     }
     const { service } = loaderData;
@@ -35,8 +39,7 @@ export const Route = createFileRoute("/servico/$slug")({
 });
 
 function ServiceDetail() {
-  const { service } = Route.useLoaderData();
-  const category = getCategory(service.categoryId);
+  const { service, reviews, categoryName } = Route.useLoaderData();
 
   return (
     <div className="min-h-screen">
@@ -54,7 +57,7 @@ function ServiceDetail() {
         <div className="mt-8 grid gap-10 lg:grid-cols-[1.15fr_0.85fr]">
           <div>
             <Badge variant="secondary" className="rounded-full font-normal">
-              {category?.name}
+              {categoryName}
             </Badge>
             <h1 className="mt-4 text-3xl font-semibold sm:text-4xl">{service.name}</h1>
             <p className="mt-4 max-w-[56ch] leading-relaxed text-muted-foreground">
@@ -64,11 +67,11 @@ function ServiceDetail() {
             <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
               <span className="flex items-center gap-1.5">
                 <Clock className="size-4" />
-                {service.durationMin} minutos
+                {service.duration_min} minutos
               </span>
               <span className="flex items-center gap-1.5">
                 <Star className="size-4 fill-accent text-accent" />
-                {service.rating.toFixed(1)} · {service.reviewsCount} avaliações
+                {Number(service.rating).toFixed(1)} · {service.reviews_count} avaliações
               </span>
             </div>
 
@@ -100,9 +103,9 @@ function ServiceDetail() {
             <section>
               <h2 className="text-xl font-semibold">Avaliações de pacientes</h2>
               <div className="mt-4 space-y-4">
-                {service.reviews.map((review) => (
+                {reviews.map((review) => (
                   <figure
-                    key={review.author}
+                    key={review.id}
                     className="rounded-2xl border border-border bg-card p-5 shadow-soft"
                   >
                     <div className="flex items-center gap-1">
@@ -110,9 +113,9 @@ function ServiceDetail() {
                         <Star key={index} className="size-3.5 fill-accent text-accent" />
                       ))}
                     </div>
-                    <blockquote className="mt-3 text-sm leading-relaxed">{review.text}</blockquote>
+                    <blockquote className="mt-3 text-sm leading-relaxed">{review.body}</blockquote>
                     <figcaption className="mt-3 text-xs text-muted-foreground">
-                      {review.author} · {review.when}
+                      {review.author} · {review.when_label}
                     </figcaption>
                   </figure>
                 ))}
@@ -124,14 +127,14 @@ function ServiceDetail() {
             <div className="rounded-2xl border border-border bg-card p-6 shadow-soft lg:sticky lg:top-24">
               <div className="flex items-baseline justify-between">
                 <span className="font-display text-3xl font-semibold text-primary">
-                  {formatPrice(service.price)}
+                  {formatPrice(Number(service.price))}
                 </span>
-                <span className="text-sm text-muted-foreground">{service.durationMin} min</span>
+                <span className="text-sm text-muted-foreground">{service.duration_min} min</span>
               </div>
 
               <div className="mt-6 rounded-xl bg-surface p-4">
                 <p className="text-sm font-medium">{service.professional}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{service.professionalRole}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{service.professional_role}</p>
               </div>
 
               <Button asChild size="lg" className="mt-6 w-full rounded-full">

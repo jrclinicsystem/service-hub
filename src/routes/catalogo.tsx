@@ -7,7 +7,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { categories, services } from "@/data/clinic";
+import { getCatalog } from "@/lib/clinic.functions";
 
 const title = "Catálogo de serviços — JR Clinic";
 const description =
@@ -19,6 +19,7 @@ const searchSchema = z.object({
 
 export const Route = createFileRoute("/catalogo")({
   validateSearch: searchSchema,
+  loader: () => getCatalog(),
   head: () => ({
     meta: [
       { title },
@@ -31,9 +32,28 @@ export const Route = createFileRoute("/catalogo")({
 });
 
 function Catalogo() {
+  const catalog = Route.useLoaderData();
   const { categoria } = Route.useSearch();
   const navigate = Route.useNavigate();
   const [query, setQuery] = useState("");
+
+  const services = catalog.services.map((service) => ({
+    slug: service.slug,
+    name: service.name,
+    categoryId: service.category_id,
+    professional: service.professional,
+    professionalRole: service.professional_role,
+    durationMin: service.duration_min,
+    price: Number(service.price),
+    rating: Number(service.rating),
+    reviewsCount: service.reviews_count,
+    summary: service.summary,
+    description: service.description,
+    includes: service.includes,
+    preparation: service.preparation,
+    reviews: [],
+  }));
+  const categories = catalog.categories;
 
   const filtered = services.filter((service) => {
     const matchesCategory = !categoria || service.categoryId === categoria;

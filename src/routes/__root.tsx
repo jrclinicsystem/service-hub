@@ -80,10 +80,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "JR Clinic — Plataforma de serviços clínicos" },
-      { name: "description", content: "Consultas, exames e terapias com agendamento online na JR Clinic." },
+      {
+        name: "description",
+        content: "Consultas, exames e terapias com agendamento online na JR Clinic.",
+      },
       { name: "author", content: "JR Clinic" },
       { property: "og:title", content: "JR Clinic — Plataforma de serviços clínicos" },
-      { property: "og:description", content: "Consultas, exames e terapias com agendamento online na JR Clinic." },
+      {
+        property: "og:description",
+        content: "Consultas, exames e terapias com agendamento online na JR Clinic.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: "@Lovable" },

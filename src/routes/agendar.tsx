@@ -1,4 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -8,10 +9,18 @@ import { SiteHeader } from "@/components/site-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-import { formatPrice, services, timeSlots, unavailableSlots } from "@/data/clinic";
+import { useAuth } from "@/hooks/use-auth";
+import { createAppointment, getCatalog } from "@/lib/clinic.functions";
+import { formatPrice } from "@/lib/clinic";
 
 const title = "Agendar atendimento — JR Clinic";
 const description =
@@ -23,6 +32,7 @@ const searchSchema = z.object({
 
 export const Route = createFileRoute("/agendar")({
   validateSearch: searchSchema,
+  loader: () => getCatalog(),
   head: () => ({
     meta: [
       { title },
@@ -37,9 +47,10 @@ export const Route = createFileRoute("/agendar")({
 const weekDays = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
 const days = Array.from({ length: 14 }).map((_, index) => {
-  const date = new Date(2026, 8, 1 + index);
+  const date = new Date();
+  date.setDate(date.getDate() + index);
   return {
-    key: `${date.getDate()}`,
+    key: date.toISOString().slice(0, 10),
     label: `${date.getDate()}`.padStart(2, "0"),
     weekday: weekDays[date.getDay()],
     disabled: date.getDay() === 0,
@@ -48,17 +59,55 @@ const days = Array.from({ length: 14 }).map((_, index) => {
 
 function Agendar() {
   const { servico } = Route.useSearch();
+  const { services, timeSlots } = Route.useLoaderData();
   const navigate = Route.useNavigate();
+  const authNavigate = useNavigate();
+  const { user } = useAuth();
+  const submitAppointment = useServerFn(createAppointment);
 
   const selectedSlug = servico ?? services[0]!.slug;
   const service = services.find((s) => s.slug === selectedSlug) ?? services[0]!;
 
-  const [day, setDay] = useState(days[1]!.key);
+  const [day, setDay] = useState(days.find((item) => !item.disabled)?.key ?? days[0]!.key);
   const [time, setTime] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [notes, setNotes] = useState("");
+  const [busy, setBusy] = useState(false);
 
   const canConfirm = Boolean(day && time && name.trim() && email.trim());
+
+  const confirm = async () => {
+    if (!user) {
+      toast.info("Entre na sua conta para confirmar o agendamento.");
+      await authNavigate({ to: "/auth" });
+      return;
+    }
+    if (!time) return;
+    setBusy(true);
+    try {
+      await submitAppointment({
+        data: {
+          serviceId: service.id,
+          patientName: name,
+          patientEmail: email,
+          patientPhone: phone,
+          notes,
+          scheduledDate: day,
+          scheduledTime: time,
+        },
+      });
+      toast.success("Agendamento enviado", {
+        description: "A equipe da JR Clinic poderá confirmar o horário pelo painel.",
+      });
+      await authNavigate({ to: "/minha-conta" });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível agendar.");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <div className="min-h-screen">
@@ -80,9 +129,7 @@ function Agendar() {
                 <Label htmlFor="servico">Escolha o atendimento</Label>
                 <Select
                   value={selectedSlug}
-                  onValueChange={(value) =>
-                    navigate({ search: { servico: value }, replace: true })
-                  }
+                  onValueChange={(value) => navigate({ search: { servico: value }, replace: true })}
                 >
                   <SelectTrigger id="servico" className="mt-2 w-full">
                     <SelectValue placeholder="Selecione um serviço" />
@@ -123,20 +170,20 @@ function Agendar() {
               <p className="mt-6 text-sm font-medium">Horários disponíveis</p>
               <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
                 {timeSlots.map((slot) => {
-                  const disabled = unavailableSlots.includes(slot);
+                  const disabled = !slot.is_available;
                   return (
                     <button
-                      key={slot}
+                      key={slot.slot}
                       type="button"
                       disabled={disabled}
-                      onClick={() => setTime(slot)}
+                      onClick={() => setTime(slot.slot)}
                       className={`rounded-xl border px-3 py-2.5 text-sm transition-colors disabled:opacity-40 ${
                         time === slot
                           ? "border-primary bg-primary text-primary-foreground"
                           : "border-border bg-background hover:bg-secondary"
                       }`}
                     >
-                      {slot}
+                      {slot.slot}
                     </button>
                   );
                 })}
@@ -168,9 +215,21 @@ function Agendar() {
                   />
                 </div>
                 <div className="sm:col-span-2">
+                  <Label htmlFor="telefone">Telefone/WhatsApp (opcional)</Label>
+                  <Input
+                    id="telefone"
+                    value={phone}
+                    onChange={(event) => setPhone(event.target.value)}
+                    placeholder="(85) 99999-9999"
+                    className="mt-2"
+                  />
+                </div>
+                <div className="sm:col-span-2">
                   <Label htmlFor="obs">Observações (opcional)</Label>
                   <Textarea
                     id="obs"
+                    value={notes}
+                    onChange={(event) => setNotes(event.target.value)}
                     placeholder="Sintomas, preferências ou informações úteis para a equipe"
                     className="mt-2"
                     rows={3}
@@ -194,11 +253,13 @@ function Agendar() {
                 </div>
                 <div className="flex justify-between gap-4">
                   <dt className="text-muted-foreground">Data</dt>
-                  <dd className="text-right font-medium">{day} set · {time ?? "—"}</dd>
+                  <dd className="text-right font-medium">
+                    {new Date(`${day}T12:00:00`).toLocaleDateString("pt-BR")} · {time ?? "—"}
+                  </dd>
                 </div>
                 <div className="flex justify-between gap-4">
                   <dt className="text-muted-foreground">Duração</dt>
-                  <dd className="text-right font-medium">{service.durationMin} min</dd>
+                  <dd className="text-right font-medium">{service.duration_min} min</dd>
                 </div>
               </dl>
 
@@ -207,24 +268,20 @@ function Agendar() {
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Total</span>
                 <span className="font-display text-2xl font-semibold text-primary">
-                  {formatPrice(service.price)}
+                  {formatPrice(Number(service.price))}
                 </span>
               </div>
 
               <Button
                 size="lg"
                 className="mt-6 w-full rounded-full"
-                disabled={!canConfirm}
-                onClick={() =>
-                  toast.success("Agendamento confirmado", {
-                    description: `${service.name} em ${day} de setembro às ${time}.`,
-                  })
-                }
+                disabled={!canConfirm || busy}
+                onClick={confirm}
               >
-                Confirmar agendamento
+                {busy ? "Enviando..." : "Confirmar agendamento"}
               </Button>
               <p className="mt-3 text-center text-xs text-muted-foreground">
-                Demonstração: nada é cobrado e nenhum dado é enviado.
+                Nenhuma cobrança é feita nesta etapa.
               </p>
             </div>
           </aside>
