@@ -9,7 +9,6 @@ const nav = [
   { to: "/", label: "Início" },
   { to: "/catalogo", label: "Catálogo" },
   { to: "/agendar", label: "Agendar" },
-  { to: "/admin", label: "Painel" },
 ] as const;
 
 export function SiteHeader() {
