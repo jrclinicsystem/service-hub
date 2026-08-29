@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AgendarRouteImport } from './routes/agendar'
+import { Route as AuthRouteImport } from './routes/auth'
 import { Route as CatalogoRouteImport } from './routes/catalogo'
 import { Route as ServicoSlugRouteImport } from './routes/servico.$slug'
 
@@ -30,6 +31,11 @@ const AgendarRoute = AgendarRouteImport.update({
   path: '/agendar',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CatalogoRoute = CatalogoRouteImport.update({
   id: '/catalogo',
   path: '/catalogo',
@@ -45,6 +51,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/agendar': typeof AgendarRoute
+  '/auth': typeof AuthRoute
   '/catalogo': typeof CatalogoRoute
   '/servico/$slug': typeof ServicoSlugRoute
 }
@@ -52,6 +59,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/agendar': typeof AgendarRoute
+  '/auth': typeof AuthRoute
   '/catalogo': typeof CatalogoRoute
   '/servico/$slug': typeof ServicoSlugRoute
 }
@@ -60,21 +68,31 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/agendar': typeof AgendarRoute
+  '/auth': typeof AuthRoute
   '/catalogo': typeof CatalogoRoute
   '/servico/$slug': typeof ServicoSlugRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/admin' | '/agendar' | '/catalogo' | '/servico/$slug'
+  fullPaths:
+    '/' | '/admin' | '/agendar' | '/auth' | '/catalogo' | '/servico/$slug'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/admin' | '/agendar' | '/catalogo' | '/servico/$slug'
-  id: '__root__' | '/' | '/admin' | '/agendar' | '/catalogo' | '/servico/$slug'
+  to: '/' | '/admin' | '/agendar' | '/auth' | '/catalogo' | '/servico/$slug'
+  id:
+    | '__root__'
+    | '/'
+    | '/admin'
+    | '/agendar'
+    | '/auth'
+    | '/catalogo'
+    | '/servico/$slug'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
   AgendarRoute: typeof AgendarRoute
+  AuthRoute: typeof AuthRoute
   CatalogoRoute: typeof CatalogoRoute
   ServicoSlugRoute: typeof ServicoSlugRoute
 }
@@ -102,6 +120,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AgendarRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/catalogo': {
       id: '/catalogo'
       path: '/catalogo'
@@ -123,6 +148,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
   AgendarRoute: AgendarRoute,
+  AuthRoute: AuthRoute,
   CatalogoRoute: CatalogoRoute,
   ServicoSlugRoute: ServicoSlugRoute,
 }
