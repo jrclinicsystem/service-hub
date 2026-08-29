@@ -36,7 +36,7 @@ export const Route = createFileRoute("/admin")({
       { property: "og:description", content: description },
     ],
   }),
-  component: Admin;
+  component: Admin,
 });
 
 const metrics = [
