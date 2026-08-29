@@ -50,10 +50,10 @@ function Agendar() {
   const { servico } = Route.useSearch();
   const navigate = Route.useNavigate();
 
-  const selectedSlug = servico ?? services[0].slug;
-  const service = services.find((s) => s.slug === selectedSlug) ?? services[0];
+  const selectedSlug = servico ?? services[0]!.slug;
+  const service = services.find((s) => s.slug === selectedSlug) ?? services[0]!;
 
-  const [day, setDay] = useState(days[1].key);
+  const [day, setDay] = useState(days[1]!.key);
   const [time, setTime] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
