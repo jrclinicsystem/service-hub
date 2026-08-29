@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Clock, Star } from "lucide-react";
+import { ArrowRight, Clock, Star } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { formatPrice, getCategory, type Service } from "@/data/clinic";
@@ -8,37 +8,53 @@ export function ServiceCard({ service }: { service: Service }) {
   const category = getCategory(service.categoryId);
 
   return (
-    <Link
-      to="/servico/$slug"
-      params={{ slug: service.slug }}
-      preload="intent"
-      className="card-lift flex min-h-[340px] flex-col rounded-2xl border border-border bg-card p-5 shadow-soft"
-    >
-      <div className="flex items-center justify-between gap-3">
-        <Badge variant="secondary" className="rounded-full font-normal">
-          {category?.name}
-        </Badge>
-        <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Clock className="size-3.5" />
-          {service.durationMin} min
-        </span>
-      </div>
+    <article className="card-lift flex min-h-[350px] flex-col rounded-2xl border border-border bg-card p-5 shadow-soft">
+      <Link
+        to="/servico/$slug"
+        params={{ slug: service.slug }}
+        preload="intent"
+        className="flex flex-1 flex-col"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <Badge variant="secondary" className="rounded-full font-normal">
+            {category?.name}
+          </Badge>
+          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Clock className="size-3.5" />
+            {service.durationMin} min
+          </span>
+        </div>
 
-      <h3 className="mt-4 text-xl font-semibold">{service.name}</h3>
-      <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{service.summary}</p>
+        <h3 className="mt-4 text-xl font-semibold">{service.name}</h3>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{service.summary}</p>
 
-      <div className="mt-auto flex items-end justify-between gap-3 border-t border-border pt-4">
-        <div>
+        <div className="mt-auto border-t border-border pt-4">
           <p className="text-sm font-medium leading-tight">{service.professional}</p>
           <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
             <Star className="size-3 fill-accent text-accent" />
             {service.rating.toFixed(1)} · {service.reviewsCount} avaliações
           </p>
         </div>
-        <span className="shrink-0 font-display text-lg font-semibold text-primary">
-          {formatPrice(service.price)}
+      </Link>
+
+      <Link
+        to="/agendar"
+        search={{ servico: service.slug }}
+        preload="intent"
+        className="mt-4 flex items-center justify-between gap-3 rounded-xl bg-primary px-3.5 py-3 text-primary-foreground transition-colors hover:bg-primary/90"
+        aria-label={`Agendar ${service.name} por ${formatPrice(service.price)}`}
+      >
+        <div>
+          <p className="text-[9px] tracking-[0.14em] uppercase opacity-70">A partir de</p>
+          <p className="font-display text-xl leading-none font-semibold">
+            {formatPrice(service.price)}
+          </p>
+        </div>
+        <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-accent px-3 py-2 text-xs font-semibold text-accent-foreground">
+          Agendar
+          <ArrowRight className="size-3.5" />
         </span>
-      </div>
-    </Link>
+      </Link>
+    </article>
   );
 }

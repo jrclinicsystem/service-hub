@@ -97,7 +97,7 @@ function Admin() {
     <div className="min-h-screen">
       <SiteHeader />
 
-      <main className="mx-auto max-w-6xl px-5 py-12 sm:px-8">
+      <main className="mx-auto max-w-[1440px] px-5 py-12 sm:px-8">
         <span className="eyebrow text-muted-foreground">Painel</span>
         <h1 className="mt-2 text-3xl font-semibold sm:text-4xl">Visão administrativa</h1>
         <p className="mt-3 max-w-[52ch] text-muted-foreground">

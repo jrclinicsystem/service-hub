@@ -75,7 +75,7 @@ function Catalogo() {
     <div className="min-h-screen">
       <SiteHeader />
 
-      <main className="mx-auto max-w-6xl px-5 py-14 sm:px-8 lg:py-20">
+      <main className="mx-auto max-w-[1440px] px-5 py-14 sm:px-8 lg:py-20">
         <span className="eyebrow text-accent">Catálogo</span>
         <h1 className="mt-2 text-4xl font-semibold text-primary sm:text-5xl">
           Serviços da JR Clinic

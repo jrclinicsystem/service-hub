@@ -15,7 +15,7 @@ const nav = [
 export function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/85 backdrop-blur">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:px-8">
+      <div className="mx-auto flex h-16 max-w-[1440px] items-center justify-between px-5 sm:px-8">
         <Link to="/" preload="intent" className="flex items-center">
           <img src={logo} alt="JR Clinic" className="h-10 w-auto sm:h-11" />
         </Link>

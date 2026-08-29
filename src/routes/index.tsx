@@ -48,7 +48,7 @@ function Home() {
       <SiteHeader />
 
       <main>
-        <section className="mx-auto grid max-w-6xl items-center gap-12 px-5 py-16 sm:px-8 lg:grid-cols-[1.1fr_0.9fr] lg:py-24">
+        <section className="mx-auto grid max-w-[1440px] items-center gap-12 px-5 py-16 sm:px-8 lg:grid-cols-[1.1fr_0.9fr] lg:py-24">
           <div>
             <span className="eyebrow text-accent-foreground">Plataforma de serviços clínicos</span>
             <h1 className="mt-5 max-w-[20ch] text-4xl leading-[1.05] font-semibold text-balance sm:text-5xl">
@@ -100,7 +100,7 @@ function Home() {
         </section>
 
         <section className="border-y border-border bg-surface">
-          <div className="mx-auto grid max-w-6xl gap-8 px-5 py-14 sm:px-8 md:grid-cols-3">
+          <div className="mx-auto grid max-w-[1440px] gap-8 px-5 py-14 sm:px-8 md:grid-cols-3">
             {highlights.map((item) => (
               <div key={item.title}>
                 <span className="grid size-10 place-items-center rounded-xl bg-primary-soft text-primary">
@@ -113,7 +113,7 @@ function Home() {
           </div>
         </section>
 
-        <section className="mx-auto max-w-6xl px-5 py-16 sm:px-8">
+        <section className="mx-auto max-w-[1440px] px-5 py-16 sm:px-8">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
               <span className="eyebrow text-muted-foreground">Especialidades</span>
@@ -149,7 +149,7 @@ function Home() {
           </div>
         </section>
 
-        <section className="mx-auto max-w-6xl px-5 pb-8 sm:px-8">
+        <section className="mx-auto max-w-[1440px] px-5 pb-8 sm:px-8">
           <span className="eyebrow text-muted-foreground">Em destaque</span>
           <h2 className="mt-2 text-3xl font-semibold">Serviços mais agendados</h2>
           <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">

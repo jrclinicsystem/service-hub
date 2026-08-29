@@ -45,7 +45,7 @@ function ServiceDetail() {
     <div className="min-h-screen">
       <SiteHeader />
 
-      <main className="mx-auto max-w-6xl px-5 py-10 sm:px-8">
+      <main className="mx-auto max-w-[1440px] px-5 py-10 sm:px-8">
         <Link
           to="/catalogo"
           className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
