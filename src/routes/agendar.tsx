@@ -113,25 +113,34 @@ function Agendar() {
     <div className="min-h-screen">
       <SiteHeader />
 
-      <main className="mx-auto max-w-[1440px] px-5 py-12 sm:px-8">
-        <span className="eyebrow text-muted-foreground">Agendamento</span>
-        <h1 className="mt-2 text-3xl font-semibold sm:text-4xl">Reserve seu horário</h1>
-        <p className="mt-3 max-w-[52ch] text-muted-foreground">
-          Três passos: escolha o serviço, selecione data e horário e confirme seus dados. Nenhum
-          pagamento é feito nesta etapa.
+      <main className="mx-auto max-w-[1440px] px-4 pb-28 pt-6 sm:px-8 sm:pb-12 sm:pt-10">
+        <span className="eyebrow text-muted-foreground max-sm:text-[10px]">Agendamento</span>
+        <h1 className="mt-1 text-[28px] font-semibold leading-tight sm:mt-2 sm:text-4xl">Reserve seu horário</h1>
+        <p className="mt-2 max-w-[52ch] text-sm leading-relaxed text-muted-foreground sm:mt-3 sm:text-base">
+          Escolha o serviço, selecione data e horário e confirme seus dados.
+          <span className="hidden sm:inline"> Nenhum pagamento é feito nesta etapa.</span>
         </p>
 
-        <div className="mt-10 grid gap-8 lg:grid-cols-[1.15fr_0.85fr]">
-          <div className="space-y-8">
-            <section className="rounded-2xl border border-border bg-card p-6 shadow-soft">
-              <h2 className="text-lg font-semibold">1. Serviço</h2>
-              <div className="mt-4">
-                <Label htmlFor="servico">Escolha o atendimento</Label>
+        <div className="mt-5 grid grid-cols-3 gap-2 sm:hidden">
+          <StepChip number="1" label="Serviço" />
+          <StepChip number="2" label="Horário" />
+          <StepChip number="3" label="Dados" />
+        </div>
+
+        <div className="mt-5 grid gap-4 sm:mt-10 sm:gap-8 lg:grid-cols-[1.15fr_0.85fr]">
+          <div className="space-y-4 sm:space-y-8">
+            <section className="rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-6">
+              <div className="flex items-center gap-2">
+                <span className="grid size-6 place-items-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground sm:hidden">1</span>
+                <h2 className="text-base font-semibold sm:text-lg">Serviço</h2>
+              </div>
+              <div className="mt-3 sm:mt-4">
+                <Label htmlFor="servico" className="text-xs sm:text-sm">Escolha o atendimento</Label>
                 <Select
                   value={selectedSlug}
                   onValueChange={(value) => navigate({ search: { servico: value }, replace: true })}
                 >
-                  <SelectTrigger id="servico" className="mt-2 w-full">
+                  <SelectTrigger id="servico" className="mt-2 h-11 w-full rounded-xl">
                     <SelectValue placeholder="Selecione um serviço" />
                   </SelectTrigger>
                   <SelectContent>
@@ -143,32 +152,43 @@ function Agendar() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="mt-3 flex items-center justify-between rounded-xl bg-secondary/60 px-3 py-2.5 sm:hidden">
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-medium">{service.professional}</p>
+                  <p className="mt-0.5 text-[10px] text-muted-foreground">{service.duration_min} min</p>
+                </div>
+                <p className="shrink-0 text-sm font-semibold text-primary">{formatPrice(Number(service.price))}</p>
+              </div>
             </section>
 
-            <section className="rounded-2xl border border-border bg-card p-6 shadow-soft">
-              <h2 className="text-lg font-semibold">2. Data e horário</h2>
+            <section className="rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-6">
+              <div className="flex items-center gap-2">
+                <span className="grid size-6 place-items-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground sm:hidden">2</span>
+                <h2 className="text-base font-semibold sm:text-lg">Data e horário</h2>
+              </div>
 
-              <div className="mt-4 grid grid-cols-4 gap-2 sm:grid-cols-7">
+              <p className="mt-3 text-xs font-medium text-muted-foreground sm:hidden">Escolha o dia</p>
+              <div className="-mx-4 mt-2 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:mt-4 sm:grid sm:grid-cols-7 sm:px-0 sm:pb-0">
                 {days.map((item) => (
                   <button
                     key={item.key}
                     type="button"
                     disabled={item.disabled}
                     onClick={() => setDay(item.key)}
-                    className={`rounded-xl border px-2 py-3 text-center transition-colors disabled:opacity-40 ${
+                    className={`w-[54px] shrink-0 rounded-xl border px-2 py-2.5 text-center transition-colors disabled:opacity-35 sm:w-auto sm:py-3 ${
                       day === item.key
                         ? "border-primary bg-primary text-primary-foreground"
                         : "border-border bg-background hover:bg-secondary"
                     }`}
                   >
-                    <span className="block text-[11px] opacity-70">{item.weekday}</span>
-                    <span className="mt-0.5 block text-sm font-medium">{item.label}</span>
+                    <span className="block text-[9px] opacity-70 sm:text-[11px]">{item.weekday}</span>
+                    <span className="mt-0.5 block text-sm font-semibold">{item.label}</span>
                   </button>
                 ))}
               </div>
 
-              <p className="mt-6 text-sm font-medium">Horários disponíveis</p>
-              <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
+              <p className="mt-4 text-xs font-medium text-muted-foreground sm:mt-6 sm:text-sm sm:text-foreground">Horários disponíveis</p>
+              <div className="mt-2 grid grid-cols-4 gap-2 sm:mt-3 sm:grid-cols-4">
                 {timeSlots.map((slot) => {
                   const disabled = !slot.is_available;
                   return (
@@ -177,8 +197,8 @@ function Agendar() {
                       type="button"
                       disabled={disabled}
                       onClick={() => setTime(slot.slot)}
-                      className={`rounded-xl border px-3 py-2.5 text-sm transition-colors disabled:opacity-40 ${
-                        time === slot
+                      className={`rounded-xl border px-1.5 py-2.5 text-xs font-medium transition-colors disabled:opacity-35 sm:px-3 sm:text-sm ${
+                        time === slot.slot
                           ? "border-primary bg-primary text-primary-foreground"
                           : "border-border bg-background hover:bg-secondary"
                       }`}
@@ -190,48 +210,51 @@ function Agendar() {
               </div>
             </section>
 
-            <section className="rounded-2xl border border-border bg-card p-6 shadow-soft">
-              <h2 className="text-lg font-semibold">3. Seus dados</h2>
-              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <section className="rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-6">
+              <div className="flex items-center gap-2">
+                <span className="grid size-6 place-items-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground sm:hidden">3</span>
+                <h2 className="text-base font-semibold sm:text-lg">Seus dados</h2>
+              </div>
+              <div className="mt-3 grid gap-3 sm:mt-4 sm:grid-cols-2 sm:gap-4">
                 <div>
-                  <Label htmlFor="nome">Nome completo</Label>
+                  <Label htmlFor="nome" className="text-xs sm:text-sm">Nome completo</Label>
                   <Input
                     id="nome"
                     value={name}
                     onChange={(event) => setName(event.target.value)}
                     placeholder="Como no documento"
-                    className="mt-2"
+                    className="mt-1.5 h-11 rounded-xl sm:mt-2"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="email">E-mail</Label>
+                  <Label htmlFor="email" className="text-xs sm:text-sm">E-mail</Label>
                   <Input
                     id="email"
                     type="email"
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
                     placeholder="voce@email.com"
-                    className="mt-2"
+                    className="mt-1.5 h-11 rounded-xl sm:mt-2"
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <Label htmlFor="telefone">Telefone/WhatsApp (opcional)</Label>
+                  <Label htmlFor="telefone" className="text-xs sm:text-sm">Telefone/WhatsApp <span className="font-normal text-muted-foreground">(opcional)</span></Label>
                   <Input
                     id="telefone"
                     value={phone}
                     onChange={(event) => setPhone(event.target.value)}
                     placeholder="(85) 99999-9999"
-                    className="mt-2"
+                    className="mt-1.5 h-11 rounded-xl sm:mt-2"
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <Label htmlFor="obs">Observações (opcional)</Label>
+                  <Label htmlFor="obs" className="text-xs sm:text-sm">Observações <span className="font-normal text-muted-foreground">(opcional)</span></Label>
                   <Textarea
                     id="obs"
                     value={notes}
                     onChange={(event) => setNotes(event.target.value)}
-                    placeholder="Sintomas, preferências ou informações úteis para a equipe"
-                    className="mt-2"
+                    placeholder="Informações úteis para a equipe"
+                    className="mt-1.5 min-h-[82px] rounded-xl sm:mt-2"
                     rows={3}
                   />
                 </div>
@@ -239,7 +262,7 @@ function Agendar() {
             </section>
           </div>
 
-          <aside>
+          <aside className="hidden lg:block">
             <div className="rounded-2xl border border-border bg-card p-6 shadow-soft lg:sticky lg:top-24">
               <h2 className="text-lg font-semibold">Resumo</h2>
               <dl className="mt-4 space-y-3 text-sm">
@@ -288,7 +311,32 @@ function Agendar() {
         </div>
       </main>
 
+      <div className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-card/95 px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_30px_rgba(0,0,0,0.06)] backdrop-blur-xl lg:hidden">
+        <div className="mx-auto flex max-w-lg items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[10px] text-muted-foreground">{service.name}</p>
+            <p className="text-base font-semibold leading-tight text-primary">{formatPrice(Number(service.price))}</p>
+          </div>
+          <Button
+            className="h-11 min-w-[174px] rounded-full px-5"
+            disabled={!canConfirm || busy}
+            onClick={confirm}
+          >
+            {busy ? "Enviando..." : user ? "Confirmar" : "Entrar e confirmar"}
+          </Button>
+        </div>
+      </div>
+
       <SiteFooter />
+    </div>
+  );
+}
+
+function StepChip({ number, label }: { number: string; label: string }) {
+  return (
+    <div className="flex items-center justify-center gap-1.5 rounded-xl bg-secondary/70 px-2 py-2">
+      <span className="grid size-4 place-items-center rounded-full bg-primary text-[9px] font-semibold text-primary-foreground">{number}</span>
+      <span className="text-[10px] font-medium">{label}</span>
     </div>
   );
 }
