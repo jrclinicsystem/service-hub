@@ -125,6 +125,8 @@ function SystemAccess() {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
   const requiresLogin = location.pathname === "/agendar";
+  const isInternalArea = location.pathname.startsWith("/admin") || location.pathname === "/profissional";
+  const showTeamAgendaShortcut = location.pathname === "/admin";
 
   useEffect(() => {
     if (!requiresLogin || loading || user) return;
@@ -146,8 +148,16 @@ function SystemAccess() {
   return (
     <>
       <Outlet />
-      <SupportWhatsapp />
-      <MobileBottomNav />
+      {showTeamAgendaShortcut ? (
+        <Link
+          to="/admin/equipe"
+          className="fixed bottom-4 left-4 z-[80] inline-flex h-11 items-center justify-center rounded-full border border-primary/15 bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-lg transition-transform hover:-translate-y-0.5 sm:bottom-6 sm:left-6 sm:px-5 sm:text-sm"
+        >
+          Agenda da equipe
+        </Link>
+      ) : null}
+      {!isInternalArea ? <SupportWhatsapp /> : null}
+      {!isInternalArea ? <MobileBottomNav /> : null}
     </>
   );
 }
