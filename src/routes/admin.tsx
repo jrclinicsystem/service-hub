@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import logo from "@/assets/jr-clinic-logo.png";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -116,13 +117,24 @@ async function loadAdminOverview() {
       appointments: [],
       services: [],
       categories: [],
+      professionals: [],
+      serviceProfessionalLinks: [],
       promotions: [],
       timeSlots: [],
       adminEmails: [],
     };
   }
 
-  const [appointments, services, categories, promotions, timeSlots, adminEmails] = await Promise.all([
+  const [
+    appointments,
+    services,
+    categories,
+    professionals,
+    serviceProfessionalLinks,
+    promotions,
+    timeSlots,
+    adminEmails,
+  ] = await Promise.all([
     db
       .from("appointments")
       .select(
@@ -137,6 +149,12 @@ async function loadAdminOverview() {
       .order("name"),
     db.from("categories").select("id, name, description, sort_order").order("sort_order"),
     db
+      .from("professionals")
+      .select("id, name, specialty, is_active, sort_order")
+      .order("sort_order")
+      .order("name"),
+    db.from("service_professionals").select("service_id, professional_id"),
+    db
       .from("promotions")
       .select(
         "id, service_id, title, description, discount_percent, promotional_price, starts_at, ends_at, is_active, created_at",
@@ -150,6 +168,8 @@ async function loadAdminOverview() {
     ["agendamentos", appointments],
     ["serviços", services],
     ["categorias", categories],
+    ["profissionais", professionals],
+    ["vínculos de profissionais", serviceProfessionalLinks],
     ["promoções", promotions],
     ["horários", timeSlots],
     ["acessos", adminEmails],
@@ -169,6 +189,8 @@ async function loadAdminOverview() {
       rating: Number(service.rating),
     })),
     categories: categories.data ?? [],
+    professionals: professionals.data ?? [],
+    serviceProfessionalLinks: serviceProfessionalLinks.data ?? [],
     promotions: (promotions.data ?? []).map((promotion: any) => ({
       ...promotion,
       discount_percent:
@@ -409,7 +431,14 @@ function Admin() {
             <SectionHeader
               title="Catálogo de serviços"
               subtitle="Crie, edite ou retire serviços do catálogo."
-              action={<ServiceEditor categories={data.categories} onSaved={refresh} />}
+              action={
+                <ServiceEditor
+                  categories={data.categories}
+                  professionals={data.professionals}
+                  serviceProfessionalLinks={data.serviceProfessionalLinks}
+                  onSaved={refresh}
+                />
+              }
             />
 
             <div className="space-y-2.5 md:hidden">
@@ -420,7 +449,13 @@ function Admin() {
                       <p className="truncate text-sm font-semibold">{service.name}</p>
                       <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{categoryName(service)} · {service.professional || "Sem profissional"}</p>
                     </div>
-                    <ServiceEditor service={service} categories={data.categories} onSaved={refresh} />
+                    <ServiceEditor
+                      service={service}
+                      categories={data.categories}
+                      professionals={data.professionals}
+                      serviceProfessionalLinks={data.serviceProfessionalLinks}
+                      onSaved={refresh}
+                    />
                   </div>
                   <div className="mt-3 flex items-center justify-between border-t border-border/70 pt-3">
                     <div>
@@ -465,7 +500,13 @@ function Admin() {
                         />
                       </TableCell>
                       <TableCell className="text-right">
-                        <ServiceEditor service={service} categories={data.categories} onSaved={refresh} />
+                        <ServiceEditor
+                          service={service}
+                          categories={data.categories}
+                          professionals={data.professionals}
+                          serviceProfessionalLinks={data.serviceProfessionalLinks}
+                          onSaved={refresh}
+                        />
                       </TableCell>
                     </TableRow>
                   ))}
@@ -620,27 +661,70 @@ function EmptyCard({ icon: Icon, text }: any) {
   );
 }
 
-function ServiceEditor({ service, categories, onSaved }: any) {
+function ServiceEditor({
+  service,
+  categories,
+  professionals,
+  serviceProfessionalLinks,
+  onSaved,
+}: any) {
+  const linkedProfessionalIds = service?.id
+    ? (serviceProfessionalLinks ?? [])
+        .filter((link: any) => link.service_id === service.id)
+        .map((link: any) => link.professional_id)
+    : [];
+  const fallbackProfessionalIds =
+    linkedProfessionalIds.length > 0 || !service?.professional
+      ? linkedProfessionalIds
+      : (professionals ?? [])
+          .filter((item: any) => service.professional.includes(item.name))
+          .map((item: any) => item.id);
+
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(service?.name ?? "");
   const [categoryId, setCategoryId] = useState(service?.category_id ?? categories[0]?.id ?? "");
-  const [professional, setProfessional] = useState(service?.professional ?? "");
-  const [professionalRole, setProfessionalRole] = useState(service?.professional_role ?? "");
+  const [selectedProfessionalIds, setSelectedProfessionalIds] = useState<string[]>(fallbackProfessionalIds);
   const [duration, setDuration] = useState(String(service?.duration_min ?? 30));
   const [price, setPrice] = useState(String(service?.price ?? ""));
   const [summary, setSummary] = useState(service?.summary ?? "");
   const [descriptionText, setDescriptionText] = useState(service?.description ?? "");
   const [busy, setBusy] = useState(false);
 
+  const toggleProfessional = (professionalId: string, checked: boolean) => {
+    setSelectedProfessionalIds((current) =>
+      checked
+        ? current.includes(professionalId)
+          ? current
+          : [...current, professionalId]
+        : current.filter((id) => id !== professionalId),
+    );
+  };
+
   const save = async () => {
-    if (!name.trim() || !categoryId || !price) { toast.error("Preencha nome, categoria e valor."); return; }
+    if (!name.trim() || !categoryId || !price) {
+      toast.error("Preencha nome, categoria e valor.");
+      return;
+    }
+    if (selectedProfessionalIds.length === 0) {
+      toast.error("Selecione pelo menos um profissional para este serviço.");
+      return;
+    }
+
     setBusy(true);
+    const selectedProfessionals = (professionals ?? []).filter((item: any) =>
+      selectedProfessionalIds.includes(item.id),
+    );
+    const professionalNames = selectedProfessionals.map((item: any) => item.name).join(", ");
+    const professionalRoles = [...new Set(
+      selectedProfessionals.map((item: any) => item.specialty).filter(Boolean),
+    )].join(" · ");
+
     const payload = {
       name: name.trim(),
       slug: service?.slug ?? slugify(name),
       category_id: categoryId,
-      professional: professional.trim(),
-      professional_role: professionalRole.trim(),
+      professional: professionalNames,
+      professional_role: professionalRoles,
       duration_min: Number(duration) || 30,
       price: Number(price.replace(",", ".")) || 0,
       summary: summary.trim(),
@@ -649,13 +733,74 @@ function ServiceEditor({ service, categories, onSaved }: any) {
       preparation: service?.preparation ?? [],
       is_active: service?.is_active ?? true,
     };
-    const result = service?.id
-      ? await db.from("services").update(payload).eq("id", service.id)
-      : await db.from("services").insert(payload);
+
+    let serviceId = service?.id as string | undefined;
+    if (serviceId) {
+      const { error: serviceError } = await db.from("services").update(payload).eq("id", serviceId);
+      if (serviceError) {
+        setBusy(false);
+        toast.error(serviceError.message);
+        return;
+      }
+    } else {
+      const { data: created, error: serviceError } = await db
+        .from("services")
+        .insert(payload)
+        .select("id")
+        .single();
+      if (serviceError || !created?.id) {
+        setBusy(false);
+        toast.error(serviceError?.message ?? "Não foi possível criar o serviço.");
+        return;
+      }
+      serviceId = created.id;
+    }
+
+    const linkRows = selectedProfessionalIds.map((professionalId) => ({
+      service_id: serviceId,
+      professional_id: professionalId,
+    }));
+    const { error: linkError } = await db
+      .from("service_professionals")
+      .upsert(linkRows, { onConflict: "service_id,professional_id" });
+
+    if (linkError) {
+      if (!service?.id && serviceId) await db.from("services").delete().eq("id", serviceId);
+      setBusy(false);
+      toast.error(`Serviço salvo, mas não foi possível vincular o profissional: ${linkError.message}`);
+      return;
+    }
+
+    const removedProfessionalIds = linkedProfessionalIds.filter(
+      (professionalId: string) => !selectedProfessionalIds.includes(professionalId),
+    );
+    if (removedProfessionalIds.length > 0 && serviceId) {
+      const { error: unlinkError } = await db
+        .from("service_professionals")
+        .delete()
+        .eq("service_id", serviceId)
+        .in("professional_id", removedProfessionalIds);
+      if (unlinkError) {
+        setBusy(false);
+        toast.error(`Serviço salvo, mas um vínculo antigo não pôde ser removido: ${unlinkError.message}`);
+        return;
+      }
+    }
+
     setBusy(false);
-    if (result.error) { toast.error(result.error.message); return; }
-    toast.success(service?.id ? "Serviço atualizado." : "Serviço criado.");
+    toast.success(service?.id ? "Serviço atualizado." : "Serviço criado e vinculado à equipe.");
     setOpen(false);
+
+    if (!service?.id) {
+      setName("");
+      setCategoryId(categories[0]?.id ?? "");
+      setSelectedProfessionalIds([]);
+      setDuration("30");
+      setPrice("");
+      setSummary("");
+      setDescriptionText("");
+    }
+
     onSaved();
   };
 
@@ -672,27 +817,95 @@ function ServiceEditor({ service, categories, onSaved }: any) {
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="max-h-[92dvh] w-[calc(100%-1rem)] overflow-y-auto rounded-2xl p-5 sm:max-w-xl sm:p-6">
+      <DialogContent className="max-h-[92dvh] w-[calc(100%-1rem)] overflow-y-auto rounded-2xl p-5 sm:max-w-2xl sm:p-6">
         <DialogHeader>
           <DialogTitle>{service ? "Editar serviço" : "Novo serviço"}</DialogTitle>
-          <DialogDescription>As alterações refletem no catálogo da JR Clinic.</DialogDescription>
+          <DialogDescription>
+            Preencha os dados abaixo. O profissional selecionado também será disponibilizado na etapa de agendamento.
+          </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-2 sm:grid-cols-2">
-          <Field label="Nome"><Input value={name} onChange={(e) => setName(e.target.value)} /></Field>
-          <Field label="Categoria">
+          <Field label="Nome do serviço" hint="Nome que o cliente verá no catálogo.">
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex.: Limpeza dental" />
+          </Field>
+          <Field label="Categoria" hint="Define em qual seção do catálogo o serviço aparece.">
             <Select value={categoryId} onValueChange={setCategoryId}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Selecione a categoria" /></SelectTrigger>
               <SelectContent>{categories.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
             </Select>
           </Field>
-          <Field label="Profissional"><Input value={professional} onChange={(e) => setProfessional(e.target.value)} /></Field>
-          <Field label="Função / registro"><Input value={professionalRole} onChange={(e) => setProfessionalRole(e.target.value)} /></Field>
-          <Field label="Duração (min)"><Input type="number" value={duration} onChange={(e) => setDuration(e.target.value)} /></Field>
-          <Field label="Valor (R$)"><Input inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} /></Field>
-          <div className="sm:col-span-2"><Field label="Resumo"><Textarea value={summary} onChange={(e) => setSummary(e.target.value)} /></Field></div>
-          <div className="sm:col-span-2"><Field label="Descrição"><Textarea value={descriptionText} onChange={(e) => setDescriptionText(e.target.value)} /></Field></div>
+
+          <div className="sm:col-span-2">
+            <Field
+              label="Profissionais que realizam este serviço"
+              hint="Selecione uma ou mais profissionais cadastradas. Elas serão as opções disponíveis para o cliente no agendamento."
+            >
+              <div className="grid gap-2 sm:grid-cols-2">
+                {(professionals ?? []).length === 0 ? (
+                  <div className="sm:col-span-2 rounded-xl border border-dashed border-border bg-secondary/30 px-4 py-3 text-xs text-muted-foreground">
+                    Nenhum profissional cadastrado. Cadastre a equipe antes de criar o serviço.
+                  </div>
+                ) : (
+                  (professionals ?? []).map((item: any) => {
+                    const checked = selectedProfessionalIds.includes(item.id);
+                    return (
+                      <label
+                        key={item.id}
+                        className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors ${
+                          checked ? "border-primary bg-primary-soft/60" : "border-border bg-background hover:bg-secondary/40"
+                        } ${item.is_active ? "" : "opacity-60"}`}
+                      >
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={(value) => toggleProfessional(item.id, value === true)}
+                          className="mt-0.5"
+                        />
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-medium">{item.name}</span>
+                          <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                            {item.specialty || "Profissional da clínica"}{item.is_active ? "" : " · inativo"}
+                          </span>
+                        </span>
+                      </label>
+                    );
+                  })
+                )}
+              </div>
+              {selectedProfessionalIds.length > 0 ? (
+                <p className="mt-2 text-[11px] font-medium text-primary">
+                  {selectedProfessionalIds.length} profissional{selectedProfessionalIds.length > 1 ? "is" : ""} selecionado{selectedProfessionalIds.length > 1 ? "s" : ""}.
+                </p>
+              ) : null}
+            </Field>
+          </div>
+
+          <Field label="Duração" hint="Tempo médio do atendimento, em minutos.">
+            <Input type="number" min="1" value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="Ex.: 60" />
+          </Field>
+          <Field label="Valor do serviço" hint="Preço integral antes de promoções ou sinal de pagamento.">
+            <Input inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Ex.: 150,00" />
+          </Field>
+          <div className="sm:col-span-2">
+            <Field label="Resumo" hint="Texto curto exibido no cartão do serviço no catálogo.">
+              <Textarea
+                value={summary}
+                onChange={(e) => setSummary(e.target.value)}
+                placeholder="Ex.: Limpeza profissional para remoção de placa e tártaro."
+              />
+            </Field>
+          </div>
+          <div className="sm:col-span-2">
+            <Field label="Descrição completa" hint="Explique com mais detalhes o procedimento, benefícios e informações importantes.">
+              <Textarea
+                value={descriptionText}
+                onChange={(e) => setDescriptionText(e.target.value)}
+                placeholder="Descreva como funciona o atendimento e o que o cliente pode esperar."
+                className="min-h-[110px]"
+              />
+            </Field>
+          </div>
         </div>
-        <DialogFooter><Button className="w-full sm:w-auto" disabled={busy} onClick={save}>{busy ? "Salvando..." : "Salvar"}</Button></DialogFooter>
+        <DialogFooter><Button className="w-full sm:w-auto" disabled={busy} onClick={save}>{busy ? "Salvando..." : "Salvar serviço"}</Button></DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -792,6 +1005,20 @@ function AdminEmailEditor({ onSaved }: any) {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div><Label className="mb-2 block">{label}</Label>{children}</div>;
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <Label className="mb-2 block">{label}</Label>
+      {children}
+      {hint ? <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">{hint}</p> : null}
+    </div>
+  );
 }
