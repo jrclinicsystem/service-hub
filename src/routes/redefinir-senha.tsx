@@ -9,16 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 
-function safeNext(value: unknown) {
-  if (typeof value !== "string") return "/auth";
-  if (!value.startsWith("/") || value.startsWith("//")) return "/auth";
-  return value;
-}
+const RECOVERY_TARGET_KEY = "jrclinic:password-recovery-target";
 
 export const Route = createFileRoute("/redefinir-senha")({
-  validateSearch: (search: Record<string, unknown>) => ({
-    next: safeNext(search["next"]),
-  }),
   head: () => ({
     meta: [
       { title: "Redefinir senha — JR Clinic" },
@@ -29,54 +22,66 @@ export const Route = createFileRoute("/redefinir-senha")({
 });
 
 type RecoveryStatus = "checking" | "ready" | "invalid";
+type RecoveryTarget = "/admin" | "/minha-conta";
 
 function RedefinirSenha() {
-  const { next } = Route.useSearch();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [status, setStatus] = useState<RecoveryStatus>("checking");
   const [busy, setBusy] = useState(false);
+  const [recoveryTarget, setRecoveryTarget] = useState<RecoveryTarget>("/minha-conta");
 
   useEffect(() => {
     let mounted = true;
+
+    const storedTarget = window.localStorage.getItem(RECOVERY_TARGET_KEY);
+    if (storedTarget === "/admin") setRecoveryTarget("/admin");
 
     const cleanRecoveryUrl = () => {
       const cleanUrl = new URL(window.location.href);
       cleanUrl.hash = "";
       cleanUrl.searchParams.delete("code");
+      cleanUrl.searchParams.delete("error");
+      cleanUrl.searchParams.delete("error_code");
+      cleanUrl.searchParams.delete("error_description");
       window.history.replaceState({}, document.title, `${cleanUrl.pathname}${cleanUrl.search}`);
     };
 
     const establishRecoverySession = async () => {
-      // Supabase may have already consumed the recovery URL automatically.
-      const existing = await supabase.auth.getSession();
-      if (existing.data.session) {
-        if (mounted) setStatus("ready");
-        cleanRecoveryUrl();
-        return;
-      }
-
       const url = new URL(window.location.href);
       const authCode = url.searchParams.get("code");
+      const queryError = url.searchParams.get("error_description") || url.searchParams.get("error");
       const hash = new URLSearchParams(url.hash.replace(/^#/, ""));
       const accessToken = hash.get("access_token");
       const refreshToken = hash.get("refresh_token");
       const recoveryType = hash.get("type");
+      const hashError = hash.get("error_description") || hash.get("error");
+
+      if (queryError || hashError) {
+        console.error("[JR Clinic] Password recovery URL error:", queryError || hashError);
+        if (mounted) setStatus("invalid");
+        return;
+      }
 
       let recoveryError: Error | null = null;
 
-      // PKCE recovery links return ?code=...
+      // Process the recovery payload before considering any pre-existing session.
+      // This prevents an older login session from masking the password-recovery session.
       if (authCode) {
         const { error } = await supabase.auth.exchangeCodeForSession(authCode);
         recoveryError = error;
-      }
-      // Implicit recovery links return tokens in the URL fragment.
-      else if (accessToken && refreshToken && recoveryType === "recovery") {
+      } else if (accessToken && refreshToken && recoveryType === "recovery") {
         const { error } = await supabase.auth.setSession({
           access_token: accessToken,
           refresh_token: refreshToken,
         });
         recoveryError = error;
+      } else {
+        const { data } = await supabase.auth.getSession();
+        if (!data.session) {
+          if (mounted) setStatus("invalid");
+          return;
+        }
       }
 
       if (recoveryError) {
@@ -85,13 +90,15 @@ function RedefinirSenha() {
         return;
       }
 
-      const verified = await supabase.auth.getSession();
-      if (verified.data.session) {
-        cleanRecoveryUrl();
-        if (mounted) setStatus("ready");
-      } else if (mounted) {
-        setStatus("invalid");
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError || !userData.user) {
+        console.error("[JR Clinic] Password recovery user validation error:", userError);
+        if (mounted) setStatus("invalid");
+        return;
       }
+
+      cleanRecoveryUrl();
+      if (mounted) setStatus("ready");
     };
 
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
@@ -125,10 +132,8 @@ function RedefinirSenha() {
 
     setBusy(true);
 
-    // Revalidate immediately before changing the password so the UI can never
-    // submit against a missing/expired recovery session.
-    const { data: sessionData } = await supabase.auth.getSession();
-    if (!sessionData.session) {
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData.user) {
       setBusy(false);
       setStatus("invalid");
       toast.error("Sua sessão de recuperação expirou. Solicite um novo link.");
@@ -136,9 +141,9 @@ function RedefinirSenha() {
     }
 
     const { error } = await supabase.auth.updateUser({ password });
-    setBusy(false);
 
     if (error) {
+      setBusy(false);
       if (error.message.toLowerCase().includes("auth session missing")) {
         setStatus("invalid");
         toast.error("Sua sessão de recuperação expirou. Solicite um novo link.");
@@ -148,8 +153,12 @@ function RedefinirSenha() {
       return;
     }
 
+    const { data: isAdmin } = await (supabase as any).rpc("is_current_user_admin");
+    window.localStorage.removeItem(RECOVERY_TARGET_KEY);
+    setBusy(false);
+
     toast.success("Senha alterada com sucesso.");
-    window.location.replace(next === "/admin" ? "/admin" : next || "/minha-conta");
+    window.location.replace(isAdmin || recoveryTarget === "/admin" ? "/admin" : "/minha-conta");
   };
 
   return (
@@ -175,7 +184,7 @@ function RedefinirSenha() {
                 Volte ao login e solicite um novo link de recuperação. Use sempre o link mais recente recebido no e-mail.
               </p>
               <Button asChild variant="outline" className="mt-5 rounded-full">
-                <a href={next === "/admin" ? "/auth?next=%2Fadmin" : "/auth"}>Solicitar novo link</a>
+                <a href={recoveryTarget === "/admin" ? "/auth?next=%2Fadmin" : "/auth"}>Solicitar novo link</a>
               </Button>
             </div>
           ) : (
