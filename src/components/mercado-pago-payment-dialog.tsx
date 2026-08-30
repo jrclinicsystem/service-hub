@@ -10,6 +10,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { formatPrice } from "@/lib/clinic";
 
@@ -69,6 +71,48 @@ function paymentErrorMessage(error: unknown) {
   return "Não foi possível processar o pagamento. Tente novamente.";
 }
 
+async function invokeErrorMessage(error: any) {
+  let payload: any = null;
+  const response = error?.context;
+
+  if (response?.clone) {
+    try {
+      payload = await response.clone().json();
+    } catch {
+      payload = null;
+    }
+  }
+
+  const code = String(payload?.error ?? "");
+  if (code === "payer_identification_required") return "Informe o CPF do pagador para gerar o Pix.";
+  if (code === "payer_email_required") return "Informe um e-mail válido para o pagamento.";
+  if (code === "nothing_to_pay") return "Este agendamento não possui saldo pendente.";
+
+  const cause = Array.isArray(payload?.details?.cause)
+    ? payload.details.cause.find((item: any) => item?.description)?.description
+    : null;
+
+  return String(
+    payload?.message ||
+      payload?.details?.message ||
+      cause ||
+      error?.message ||
+      "O Mercado Pago não conseguiu processar esta tentativa.",
+  );
+}
+
+function onlyDigits(value: string) {
+  return value.replace(/\D/g, "").slice(0, 11);
+}
+
+function formatCpf(value: string) {
+  const digits = onlyDigits(value);
+  return digits
+    .replace(/^(\d{3})(\d)/, "$1.$2")
+    .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
+    .replace(/\.(\d{3})(\d)/, ".$1-$2");
+}
+
 export function MercadoPagoPaymentDialog({
   open,
   onOpenChange,
@@ -81,11 +125,20 @@ export function MercadoPagoPaymentDialog({
   onPaid: () => void;
 }) {
   const controllerRef = useRef<any>(null);
+  const payerDocumentRef = useRef("");
   const [loading, setLoading] = useState(false);
   const [ready, setReady] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [result, setResult] = useState<PaymentResult | null>(null);
   const [checking, setChecking] = useState(false);
+  const [isTest, setIsTest] = useState(false);
+  const [payerDocument, setPayerDocument] = useState("");
+
+  const updatePayerDocument = (value: string) => {
+    const digits = onlyDigits(value);
+    payerDocumentRef.current = digits;
+    setPayerDocument(digits);
+  };
 
   const finishApproved = () => {
     toast.success("Pagamento aprovado", {
@@ -118,9 +171,8 @@ export function MercadoPagoPaymentDialog({
     }
 
     if (!silent) {
-      toast.info("Pagamento ainda não confirmado", {
-        description: "Assim que o Mercado Pago aprovar, o agendamento será liberado automaticamente.",
-      });
+      const detail = data?.status_detail ? String(data.status_detail) : "Assim que o Mercado Pago aprovar, o agendamento será liberado automaticamente.";
+      toast.info("Pagamento ainda não confirmado", { description: detail });
     }
   };
 
@@ -146,6 +198,12 @@ export function MercadoPagoPaymentDialog({
         if (configError) throw configError;
         if (!config?.publicKey) throw new Error("A chave pública do Mercado Pago não foi encontrada.");
 
+        const testEnvironment = Boolean(config.isTest);
+        setIsTest(testEnvironment);
+        if (testEnvironment && !payerDocumentRef.current) {
+          updatePayerDocument("12345678909");
+        }
+
         await ensureMercadoPagoSdk();
         if (cancelled) return;
 
@@ -163,6 +221,7 @@ export function MercadoPagoPaymentDialog({
               bankTransfer: "all",
               creditCard: "all",
               debitCard: "all",
+              prepaidCard: "all",
             },
             visual: {
               style: { theme: "default" },
@@ -176,50 +235,64 @@ export function MercadoPagoPaymentDialog({
             },
             onSubmit: async ({ formData }: any) => {
               setErrorMessage("");
-              const attemptId = crypto.randomUUID();
-              const { data, error } = await supabase.functions.invoke("mercado-pago-create-payment", {
-                body: {
-                  appointmentId: session.appointmentId,
-                  attemptId,
-                  kind: session.kind,
-                  formData,
-                },
-              });
 
-              if (error) throw error;
-              if (data?.error) {
-                const detail = data?.details?.message || data?.details?.cause?.[0]?.description || data.error;
-                throw new Error(String(detail));
+              try {
+                const method = String(formData?.payment_method_id ?? "");
+                if (method === "pix" && payerDocumentRef.current.length !== 11) {
+                  throw new Error("Informe um CPF com 11 dígitos para gerar o Pix.");
+                }
+
+                const attemptId = crypto.randomUUID();
+                const { data, error } = await supabase.functions.invoke("mercado-pago-create-payment", {
+                  body: {
+                    appointmentId: session.appointmentId,
+                    attemptId,
+                    kind: session.kind,
+                    payerDocument: payerDocumentRef.current,
+                    formData,
+                  },
+                });
+
+                if (error) throw new Error(await invokeErrorMessage(error));
+                if (data?.error) {
+                  const detail = data?.message || data?.details?.message || data?.details?.cause?.[0]?.description || data.error;
+                  throw new Error(String(detail));
+                }
+
+                const paymentResult = data as PaymentResult;
+                const status = String(paymentResult.status ?? "pending");
+
+                if (status === "approved") {
+                  await controllerRef.current?.unmount?.();
+                  controllerRef.current = null;
+                  setResult(paymentResult);
+                  finishApproved();
+                  return paymentResult;
+                }
+
+                if (["pending", "in_process"].includes(status)) {
+                  await controllerRef.current?.unmount?.();
+                  controllerRef.current = null;
+                  setResult(paymentResult);
+                  return paymentResult;
+                }
+
+                const rejection = paymentResult.status_detail
+                  ? `Pagamento não aprovado: ${paymentResult.status_detail}`
+                  : "Pagamento não aprovado. Revise os dados e tente novamente.";
+                throw new Error(rejection);
+              } catch (error) {
+                const message = paymentErrorMessage(error);
+                setErrorMessage(message);
+                toast.error("Pagamento não processado", { description: message });
+                throw error instanceof Error ? error : new Error(message);
               }
-
-              const paymentResult = data as PaymentResult;
-              const status = String(paymentResult.status ?? "pending");
-
-              if (status === "approved") {
-                await controllerRef.current?.unmount?.();
-                controllerRef.current = null;
-                setResult(paymentResult);
-                finishApproved();
-                return paymentResult;
-              }
-
-              if (["pending", "in_process"].includes(status)) {
-                await controllerRef.current?.unmount?.();
-                controllerRef.current = null;
-                setResult(paymentResult);
-                return paymentResult;
-              }
-
-              const rejection = paymentResult.status_detail
-                ? `Pagamento não aprovado: ${paymentResult.status_detail}`
-                : "Pagamento não aprovado. Revise os dados e tente novamente.";
-              setErrorMessage(rejection);
-              throw new Error(rejection);
             },
             onError: (error: unknown) => {
               console.error("Mercado Pago Brick", error);
               setLoading(false);
-              setErrorMessage(paymentErrorMessage(error));
+              const message = paymentErrorMessage(error);
+              setErrorMessage((current) => current || message);
             },
           },
         };
@@ -252,6 +325,9 @@ export function MercadoPagoPaymentDialog({
       setErrorMessage("");
       setReady(false);
       setLoading(false);
+      setIsTest(false);
+      payerDocumentRef.current = "";
+      setPayerDocument("");
     }
   }, [open]);
 
@@ -338,6 +414,28 @@ export function MercadoPagoPaymentDialog({
               <span>Pix e cartões são processados pelo ambiente seguro do Mercado Pago.</span>
             </div>
 
+            {isTest ? (
+              <div className="mt-3 rounded-xl border border-border bg-secondary/35 px-3 py-2.5 text-[11px] leading-relaxed text-muted-foreground">
+                Ambiente de teste. Para cartões, use os dados oficiais de teste do Mercado Pago e um e-mail diferente do e-mail da conta vendedora.
+              </div>
+            ) : null}
+
+            <div className="mt-4">
+              <Label htmlFor="payment-cpf" className="text-xs">CPF do pagador</Label>
+              <Input
+                id="payment-cpf"
+                inputMode="numeric"
+                autoComplete="off"
+                value={formatCpf(payerDocument)}
+                onChange={(event) => updatePayerDocument(event.target.value)}
+                placeholder="000.000.000-00"
+                className="mt-1.5 h-11 rounded-xl"
+              />
+              <p className="mt-1.5 text-[10px] leading-relaxed text-muted-foreground">
+                Necessário para gerar Pix. Este dado é enviado ao Mercado Pago e não é salvo no cadastro da clínica.
+              </p>
+            </div>
+
             {loading ? (
               <div className="grid min-h-48 place-items-center">
                 <div className="text-center">
@@ -350,7 +448,7 @@ export function MercadoPagoPaymentDialog({
             <div id="jrclinic-payment-brick" className={ready ? "mt-4" : "min-h-0"} />
 
             {errorMessage ? (
-              <div className="mt-3 rounded-xl border border-destructive/25 bg-destructive/5 px-3 py-2.5 text-xs text-destructive">
+              <div className="mt-3 rounded-xl border border-destructive/25 bg-destructive/5 px-3 py-2.5 text-xs leading-relaxed text-destructive">
                 {errorMessage}
               </div>
             ) : null}
