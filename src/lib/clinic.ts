@@ -59,6 +59,7 @@ export const formatDate = (iso: string) =>
 export const statusVariant = {
   confirmado: "default",
   pendente: "secondary",
+  aguardando_pagamento: "outline",
   cancelado: "destructive",
 } as const;
 
