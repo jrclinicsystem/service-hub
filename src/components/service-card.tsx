@@ -12,7 +12,7 @@ export function ServiceCard({
 }: {
   service: Service;
   compactMobile?: boolean;
-  categoryName?: string;
+  categoryName?: string | undefined;
 }) {
   const category = categoryName
     ? { name: categoryName }
