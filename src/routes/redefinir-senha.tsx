@@ -17,7 +17,7 @@ function safeNext(value: unknown) {
 
 export const Route = createFileRoute("/redefinir-senha")({
   validateSearch: (search: Record<string, unknown>) => ({
-    next: safeNext(search['next']),
+    next: safeNext(search["next"]),
   }),
   head: () => ({
     meta: [
@@ -28,27 +28,80 @@ export const Route = createFileRoute("/redefinir-senha")({
   component: RedefinirSenha,
 });
 
+type RecoveryStatus = "checking" | "ready" | "invalid";
+
 function RedefinirSenha() {
   const { next } = Route.useSearch();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [ready, setReady] = useState(false);
+  const [status, setStatus] = useState<RecoveryStatus>("checking");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     let mounted = true;
 
-    const checkSession = async () => {
-      const { data } = await supabase.auth.getSession();
-      if (mounted && data.session) setReady(true);
+    const cleanRecoveryUrl = () => {
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.hash = "";
+      cleanUrl.searchParams.delete("code");
+      window.history.replaceState({}, document.title, `${cleanUrl.pathname}${cleanUrl.search}`);
     };
 
-    void checkSession();
+    const establishRecoverySession = async () => {
+      // Supabase may have already consumed the recovery URL automatically.
+      const existing = await supabase.auth.getSession();
+      if (existing.data.session) {
+        if (mounted) setStatus("ready");
+        cleanRecoveryUrl();
+        return;
+      }
+
+      const url = new URL(window.location.href);
+      const authCode = url.searchParams.get("code");
+      const hash = new URLSearchParams(url.hash.replace(/^#/, ""));
+      const accessToken = hash.get("access_token");
+      const refreshToken = hash.get("refresh_token");
+      const recoveryType = hash.get("type");
+
+      let recoveryError: Error | null = null;
+
+      // PKCE recovery links return ?code=...
+      if (authCode) {
+        const { error } = await supabase.auth.exchangeCodeForSession(authCode);
+        recoveryError = error;
+      }
+      // Implicit recovery links return tokens in the URL fragment.
+      else if (accessToken && refreshToken && recoveryType === "recovery") {
+        const { error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+        recoveryError = error;
+      }
+
+      if (recoveryError) {
+        console.error("[JR Clinic] Password recovery session error:", recoveryError);
+        if (mounted) setStatus("invalid");
+        return;
+      }
+
+      const verified = await supabase.auth.getSession();
+      if (verified.data.session) {
+        cleanRecoveryUrl();
+        if (mounted) setStatus("ready");
+      } else if (mounted) {
+        setStatus("invalid");
+      }
+    };
 
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
-      if (event === "PASSWORD_RECOVERY" || session) setReady(true);
+      if (event === "PASSWORD_RECOVERY" && session) {
+        setStatus("ready");
+      }
     });
+
+    void establishRecoverySession();
 
     return () => {
       mounted = false;
@@ -57,6 +110,10 @@ function RedefinirSenha() {
   }, []);
 
   const updatePassword = async () => {
+    if (status !== "ready") {
+      toast.error("O link de recuperação não está mais válido. Solicite um novo link.");
+      return;
+    }
     if (password.length < 6) {
       toast.error("A nova senha precisa ter pelo menos 6 caracteres.");
       return;
@@ -67,11 +124,27 @@ function RedefinirSenha() {
     }
 
     setBusy(true);
+
+    // Revalidate immediately before changing the password so the UI can never
+    // submit against a missing/expired recovery session.
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData.session) {
+      setBusy(false);
+      setStatus("invalid");
+      toast.error("Sua sessão de recuperação expirou. Solicite um novo link.");
+      return;
+    }
+
     const { error } = await supabase.auth.updateUser({ password });
     setBusy(false);
 
     if (error) {
-      toast.error(error.message);
+      if (error.message.toLowerCase().includes("auth session missing")) {
+        setStatus("invalid");
+        toast.error("Sua sessão de recuperação expirou. Solicite um novo link.");
+      } else {
+        toast.error(error.message);
+      }
       return;
     }
 
@@ -90,17 +163,19 @@ function RedefinirSenha() {
         </p>
 
         <div className="mt-7 rounded-2xl border border-border bg-card p-5 shadow-soft sm:p-6">
-          {!ready ? (
+          {status === "checking" ? (
             <div className="py-6 text-center">
               <div className="mx-auto size-8 animate-pulse rounded-full bg-primary/10" />
-              <p className="mt-3 text-sm text-muted-foreground">
-                Validando seu link de recuperação...
-              </p>
-              <p className="mt-2 text-xs text-muted-foreground">
-                Se este link expirou, volte ao login e solicite outro.
+              <p className="mt-3 text-sm text-muted-foreground">Validando seu link de recuperação...</p>
+            </div>
+          ) : status === "invalid" ? (
+            <div className="py-6 text-center">
+              <p className="text-sm font-medium">Este link não possui mais uma sessão válida.</p>
+              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                Volte ao login e solicite um novo link de recuperação. Use sempre o link mais recente recebido no e-mail.
               </p>
               <Button asChild variant="outline" className="mt-5 rounded-full">
-                <a href={next === "/admin" ? "/auth?next=%2Fadmin" : "/auth"}>Voltar ao login</a>
+                <a href={next === "/admin" ? "/auth?next=%2Fadmin" : "/auth"}>Solicitar novo link</a>
               </Button>
             </div>
           ) : (
@@ -128,11 +203,7 @@ function RedefinirSenha() {
                   className="mt-2 h-11 rounded-xl"
                 />
               </div>
-              <Button
-                className="h-11 w-full rounded-full"
-                onClick={updatePassword}
-                disabled={busy}
-              >
+              <Button className="h-11 w-full rounded-full" onClick={updatePassword} disabled={busy}>
                 {busy ? "Alterando..." : "Salvar nova senha"}
               </Button>
             </div>
