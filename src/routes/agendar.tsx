@@ -147,7 +147,7 @@ function Agendar() {
     <div className="min-h-screen w-full max-w-[100dvw] overflow-x-clip">
       <SiteHeader />
 
-      <main className="mx-auto box-border w-full min-w-0 max-w-[1440px] px-4 pb-28 pt-6 max-sm:w-[calc(100dvw-24px)] max-sm:max-w-[calc(100dvw-24px)] max-sm:px-0 sm:px-8 sm:pb-12 sm:pt-10">
+      <main className="mx-auto box-border w-full min-w-0 max-w-[1440px] px-4 pb-44 pt-6 max-sm:w-[calc(100dvw-24px)] max-sm:max-w-[calc(100dvw-24px)] max-sm:px-0 sm:px-8 sm:pb-32 sm:pt-10 lg:pb-12">
         <span className="eyebrow text-muted-foreground max-sm:text-[10px]">Agendamento</span>
         <h1 className="mt-1 max-w-full text-[28px] font-semibold leading-tight sm:mt-2 sm:text-4xl">Reserve seu horário</h1>
         <p className="mt-2 max-w-[52ch] text-sm leading-relaxed text-muted-foreground sm:mt-3 sm:text-base">
@@ -289,6 +289,22 @@ function Agendar() {
                   <Textarea id="obs" value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Informações úteis para a equipe" className="mt-1.5 min-h-[82px] w-full min-w-0 max-w-full resize-none rounded-xl sm:mt-2" rows={3} />
                 </div>
               </div>
+
+              <div className="mt-4 border-t border-border/70 pt-4 sm:hidden">
+                <div className="mb-3 flex items-end justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-[10px] text-muted-foreground">{service.name}</p>
+                    <p className="truncate text-xs font-medium">{selectedProfessional?.name ?? "Escolha o profissional"}</p>
+                  </div>
+                  <p className="shrink-0 text-lg font-semibold text-primary">{formatPrice(Number(service.price))}</p>
+                </div>
+                <Button className="h-12 w-full rounded-full" disabled={!canConfirm || busy} onClick={confirm}>
+                  {busy ? "Enviando..." : "Confirmar agendamento"}
+                </Button>
+                {!canConfirm && (
+                  <p className="mt-2 text-center text-[10px] text-muted-foreground">Preencha os dados e selecione profissional, dia e horário.</p>
+                )}
+              </div>
             </section>
           </div>
 
@@ -318,7 +334,7 @@ function Agendar() {
         </div>
       </main>
 
-      <div className="fixed bottom-0 left-0 right-0 z-50 box-border w-[100dvw] max-w-[100dvw] overflow-hidden border-t border-border bg-card/95 px-3 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_30px_rgba(0,0,0,0.06)] backdrop-blur-xl lg:hidden">
+      <div className="fixed bottom-[calc(63px+env(safe-area-inset-bottom))] left-0 right-0 z-[60] box-border w-[100dvw] max-w-[100dvw] overflow-hidden border-t border-border bg-card/95 px-3 py-3 shadow-[0_-8px_30px_rgba(0,0,0,0.06)] backdrop-blur-xl md:bottom-0 lg:hidden">
         <div className="mx-auto flex w-full min-w-0 max-w-lg items-center gap-2.5">
           <div className="min-w-0 flex-1">
             <p className="truncate text-[10px] text-muted-foreground">{service.name} · {selectedProfessional?.name ?? "Escolha quem atende"}</p>
