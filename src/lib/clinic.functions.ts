@@ -180,7 +180,7 @@ async function isAdminContext(context: {
   if (roleError) throw roleError;
   if ((roles ?? []).some((role: { role: string }) => role.role === "admin")) return true;
 
-  const email = typeof context.claims.email === "string" ? context.claims.email.trim().toLowerCase() : "";
+  const email = typeof context.claims['email'] === "string" ? context.claims['email'].trim().toLowerCase() : "";
   if (!email) return false;
 
   const { data: allowlisted, error: allowlistError } = await db

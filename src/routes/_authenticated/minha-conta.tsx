@@ -77,12 +77,12 @@ function MinhaConta() {
 
   const avatarUrl =
     profileQuery.data?.avatar_url ||
-    (typeof user?.user_metadata?.avatar_url === "string" ? user.user_metadata.avatar_url : "");
+    (typeof user?.user_metadata?.['avatar_url'] === "string" ? user.user_metadata['avatar_url'] : "");
 
   const displayName =
     fullName.trim() ||
     profileQuery.data?.full_name ||
-    (typeof user?.user_metadata?.full_name === "string" ? user.user_metadata.full_name : "") ||
+    (typeof user?.user_metadata?.['full_name'] === "string" ? user.user_metadata['full_name'] : "") ||
     user?.email?.split("@")[0] ||
     "Paciente JR Clinic";
 
@@ -97,7 +97,7 @@ function MinhaConta() {
   const { upcoming, history } = useMemo(() => {
     const now = Date.now();
     return appointments.reduce(
-      (groups, item) => {
+      (groups: { upcoming: typeof appointments; history: typeof appointments }, item: (typeof appointments)[number]) => {
         const future = appointmentDate(item).getTime() >= now && item.status !== "cancelado";
         groups[future ? "upcoming" : "history"].push(item);
         return groups;

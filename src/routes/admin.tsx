@@ -194,7 +194,7 @@ function Admin() {
 
   const signOut = async () => {
     await supabase.auth.signOut();
-    navigate({ to: "/auth", search: {} });
+    navigate({ to: "/auth", search: { next: undefined } });
   };
 
   if (isLoading) {
