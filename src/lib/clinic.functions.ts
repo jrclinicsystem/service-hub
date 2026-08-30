@@ -55,6 +55,21 @@ async function fetchCatalog() {
 
 export const getCatalog = createServerFn({ method: "GET" }).handler(() => fetchCatalog());
 
+export const getHomeOverview = createServerFn({ method: "GET" }).handler(async () => {
+  const supabase = publicClient();
+  const [catalog, professionals] = await Promise.all([
+    fetchCatalog(),
+    supabase.from("professionals").select("id", { count: "exact", head: true }).eq("is_active", true),
+  ]);
+
+  if (professionals.error) throw professionals.error;
+
+  return {
+    ...catalog,
+    activeProfessionals: professionals.count ?? 0,
+  };
+});
+
 export const getBookingCatalog = createServerFn({ method: "GET" }).handler(async () => {
   const supabase = publicClient();
   const db = supabase as any;
