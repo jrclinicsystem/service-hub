@@ -3,25 +3,23 @@ import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import {
+  JR_CLINIC_SUPABASE_PUBLISHABLE_KEY,
+  JR_CLINIC_SUPABASE_URL,
+} from "@/integrations/supabase/project";
 import type { Database } from "@/integrations/supabase/types";
 
 const serviceColumns =
   "id, slug, name, category_id, professional, professional_role, duration_min, price, rating, reviews_count, summary, description, includes, preparation, is_active";
 
 function publicClient() {
-  const supabaseUrl =
-    import.meta.env["VITE_SUPABASE_URL"] || process.env["SUPABASE_URL"];
-  const supabasePublishableKey =
-    import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"] ||
-    process.env["SUPABASE_PUBLISHABLE_KEY"];
-
-  if (!supabaseUrl || !supabasePublishableKey) {
-    throw new Error("Supabase não configurado no ambiente publicado.");
-  }
-
-  return createClient<Database>(supabaseUrl, supabasePublishableKey, {
-    auth: { storage: undefined, persistSession: false, autoRefreshToken: false },
-  });
+  return createClient<Database>(
+    JR_CLINIC_SUPABASE_URL,
+    JR_CLINIC_SUPABASE_PUBLISHABLE_KEY,
+    {
+      auth: { storage: undefined, persistSession: false, autoRefreshToken: false },
+    },
+  );
 }
 
 async function fetchCatalog() {
