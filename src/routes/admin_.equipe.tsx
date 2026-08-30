@@ -8,6 +8,7 @@ import {
   ExternalLink,
   LogOut,
   Mail,
+  Plus,
   RefreshCw,
   ShieldCheck,
   UserRound,
@@ -38,6 +39,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDate } from "@/lib/clinic";
 
@@ -80,7 +82,7 @@ async function loadTeamAgenda() {
   const isAdmin = (roles.data ?? []).some((item: any) => item.role === "admin");
   if (!isAdmin) return { isAdmin: false as const, currentEmail: userData.user.email ?? "" };
 
-  const [professionals, access, appointments] = await Promise.all([
+  const [professionals, access, appointments, services, serviceProfessionals] = await Promise.all([
     db
       .from("professionals")
       .select("id, name, specialty, is_active, sort_order")
@@ -97,12 +99,16 @@ async function loadTeamAgenda() {
       )
       .order("scheduled_date", { ascending: true })
       .order("scheduled_time", { ascending: true }),
+    db.from("services").select("id, name, duration_min, is_active").eq("is_active", true).order("name"),
+    db.from("service_professionals").select("service_id, professional_id"),
   ]);
 
   for (const [name, result] of [
     ["profissionais", professionals],
     ["acessos", access],
     ["agenda", appointments],
+    ["serviços", services],
+    ["vínculos", serviceProfessionals],
   ] as const) {
     if (result.error) throw new Error(`Falha ao carregar ${name}: ${result.error.message}`);
   }
@@ -113,6 +119,8 @@ async function loadTeamAgenda() {
     professionals: professionals.data ?? [],
     access: access.data ?? [],
     appointments: appointments.data ?? [],
+    services: services.data ?? [],
+    serviceProfessionals: serviceProfessionals.data ?? [],
   };
 }
 
@@ -149,9 +157,7 @@ function TeamAgendaPage() {
     });
   }, [appointments, professionalFilter, dateFilter]);
 
-  if (isLoading) {
-    return <CenteredMessage title="Carregando agenda da equipe..." />;
-  }
+  if (isLoading) return <CenteredMessage title="Carregando agenda da equipe..." />;
 
   if (error) {
     return (
@@ -209,12 +215,20 @@ function TeamAgendaPage() {
             <span className="eyebrow text-muted-foreground">Agenda interna</span>
             <h1 className="mt-2 text-3xl font-semibold sm:text-4xl">Agenda da equipe</h1>
             <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-              A recepção acompanha todos os atendimentos e enxerga quando cada profissional confirma o próprio compromisso.
+              A recepção cria os compromissos, escolhe quem vai atender e acompanha a confirmação de cada profissional.
             </p>
           </div>
-          <Button variant="outline" className="rounded-full" onClick={() => refetch()}>
-            <RefreshCw className="size-4" /> Atualizar
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <NewAppointmentEditor
+              professionals={data.professionals}
+              services={data.services}
+              serviceProfessionals={data.serviceProfessionals}
+              onSaved={refresh}
+            />
+            <Button variant="outline" className="rounded-full" onClick={() => refetch()}>
+              <RefreshCw className="size-4" /> Atualizar
+            </Button>
+          </div>
         </div>
 
         <div className="mt-6 grid grid-cols-2 gap-2.5 lg:grid-cols-5">
@@ -242,12 +256,7 @@ function TeamAgendaPage() {
                   ))}
                 </SelectContent>
               </Select>
-              <Input
-                type="date"
-                value={dateFilter}
-                onChange={(event) => setDateFilter(event.target.value)}
-                className="h-10 rounded-xl"
-              />
+              <Input type="date" value={dateFilter} onChange={(event) => setDateFilter(event.target.value)} className="h-10 rounded-xl" />
             </div>
           </div>
 
@@ -272,9 +281,7 @@ function TeamAgendaPage() {
               </p>
             </div>
             <Button variant="outline" className="rounded-full" asChild>
-              <Link to="/profissional" target="_blank">
-                Abrir portal da equipe <ExternalLink className="size-3.5" />
-              </Link>
+              <Link to="/profissional" target="_blank">Abrir portal da equipe <ExternalLink className="size-3.5" /></Link>
             </Button>
           </div>
 
@@ -308,6 +315,168 @@ function TeamAgendaPage() {
   );
 }
 
+function NewAppointmentEditor({ professionals, services, serviceProfessionals, onSaved }: any) {
+  const [open, setOpen] = useState(false);
+  const [professionalId, setProfessionalId] = useState("");
+  const [serviceId, setServiceId] = useState("");
+  const [patientName, setPatientName] = useState("");
+  const [patientEmail, setPatientEmail] = useState("");
+  const [patientPhone, setPatientPhone] = useState("");
+  const [scheduledDate, setScheduledDate] = useState(todayIso());
+  const [scheduledTime, setScheduledTime] = useState("");
+  const [notes, setNotes] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const availableServices = useMemo(() => {
+    if (!professionalId) return [];
+    const linked = new Set(
+      serviceProfessionals
+        .filter((item: any) => item.professional_id === professionalId)
+        .map((item: any) => item.service_id),
+    );
+    return services.filter((service: any) => linked.has(service.id));
+  }, [professionalId, services, serviceProfessionals]);
+
+  const reset = () => {
+    setProfessionalId("");
+    setServiceId("");
+    setPatientName("");
+    setPatientEmail("");
+    setPatientPhone("");
+    setScheduledDate(todayIso());
+    setScheduledTime("");
+    setNotes("");
+  };
+
+  const save = async () => {
+    if (!professionalId || !serviceId || !patientName.trim() || !scheduledDate || !scheduledTime) {
+      toast.error("Preencha profissional, serviço, cliente, data e horário.");
+      return;
+    }
+
+    setBusy(true);
+    const conflict = await db
+      .from("appointments")
+      .select("id")
+      .eq("professional_id", professionalId)
+      .eq("scheduled_date", scheduledDate)
+      .eq("scheduled_time", scheduledTime)
+      .neq("status", "cancelado")
+      .limit(1);
+
+    if (conflict.error) {
+      setBusy(false);
+      toast.error(conflict.error.message);
+      return;
+    }
+    if ((conflict.data ?? []).length > 0) {
+      setBusy(false);
+      toast.error("Essa profissional já possui um compromisso nesse horário.");
+      return;
+    }
+
+    const { error } = await db.from("appointments").insert({
+      user_id: null,
+      professional_id: professionalId,
+      service_id: serviceId,
+      patient_name: patientName.trim(),
+      patient_email: patientEmail.trim().toLowerCase(),
+      patient_phone: patientPhone.trim(),
+      scheduled_date: scheduledDate,
+      scheduled_time: scheduledTime,
+      notes: notes.trim(),
+      status: "pendente",
+    });
+    setBusy(false);
+
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    toast.success("Compromisso adicionado à agenda da profissional.");
+    setOpen(false);
+    reset();
+    onSaved();
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button className="rounded-full"><Plus className="size-4" /> Novo compromisso</Button>
+      </DialogTrigger>
+      <DialogContent className="max-h-[92dvh] w-[calc(100%-1rem)] overflow-y-auto rounded-2xl p-5 sm:max-w-xl sm:p-6">
+        <DialogHeader>
+          <DialogTitle>Adicionar compromisso</DialogTitle>
+          <DialogDescription>
+            A recepção escolhe a profissional e o atendimento aparecerá imediatamente na agenda individual dela, aguardando confirmação.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid gap-4 py-2 sm:grid-cols-2">
+          <div>
+            <Label>Profissional</Label>
+            <Select value={professionalId} onValueChange={(value) => { setProfessionalId(value); setServiceId(""); }}>
+              <SelectTrigger className="mt-2"><SelectValue placeholder="Selecione" /></SelectTrigger>
+              <SelectContent>
+                {professionals.filter((p: any) => p.is_active).map((professional: any) => (
+                  <SelectItem key={professional.id} value={professional.id}>{professional.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label>Serviço</Label>
+            <Select value={serviceId} onValueChange={setServiceId} disabled={!professionalId || availableServices.length === 0}>
+              <SelectTrigger className="mt-2"><SelectValue placeholder={professionalId ? "Selecione" : "Escolha a profissional"} /></SelectTrigger>
+              <SelectContent>
+                {availableServices.map((service: any) => (
+                  <SelectItem key={service.id} value={service.id}>{service.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {professionalId && availableServices.length === 0 ? (
+              <p className="mt-1.5 text-[10px] text-muted-foreground">Esta profissional ainda não possui serviços vinculados.</p>
+            ) : null}
+          </div>
+
+          <div className="sm:col-span-2">
+            <Label>Cliente / paciente</Label>
+            <Input className="mt-2" value={patientName} onChange={(event) => setPatientName(event.target.value)} placeholder="Nome completo" />
+          </div>
+          <div>
+            <Label>Telefone / WhatsApp</Label>
+            <Input className="mt-2" value={patientPhone} onChange={(event) => setPatientPhone(event.target.value)} placeholder="(85) 99999-9999" />
+          </div>
+          <div>
+            <Label>E-mail <span className="font-normal text-muted-foreground">(opcional)</span></Label>
+            <Input className="mt-2" type="email" value={patientEmail} onChange={(event) => setPatientEmail(event.target.value)} placeholder="cliente@email.com" />
+          </div>
+          <div>
+            <Label>Data</Label>
+            <Input className="mt-2" type="date" value={scheduledDate} onChange={(event) => setScheduledDate(event.target.value)} />
+          </div>
+          <div>
+            <Label>Horário</Label>
+            <Input className="mt-2" type="time" value={scheduledTime} onChange={(event) => setScheduledTime(event.target.value)} />
+          </div>
+          <div className="sm:col-span-2">
+            <Label>Observações <span className="font-normal text-muted-foreground">(opcional)</span></Label>
+            <Textarea className="mt-2" value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Informações importantes para a profissional..." />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button className="w-full sm:w-auto" disabled={busy} onClick={save}>
+            {busy ? "Adicionando..." : "Adicionar à agenda"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function AppointmentCard({ appointment, onSaved, admin = false }: any) {
   const updateStatus = async (status: string) => {
     const { error } = await db.from("appointments").update({ status }).eq("id", appointment.id);
@@ -325,9 +494,7 @@ function AppointmentCard({ appointment, onSaved, admin = false }: any) {
           <div className="flex flex-wrap items-center gap-2">
             <p className="font-semibold">{appointment.patient_name}</p>
             <StatusBadge status={appointment.status} />
-            {appointment.professional_id ? (
-              <ProfessionalResponseBadge response={professionalResponse?.response} />
-            ) : null}
+            {appointment.professional_id ? <ProfessionalResponseBadge response={professionalResponse?.response} /> : null}
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
             {appointment.service?.name || "Serviço"} · {appointment.professional?.name || "Sem profissional definido"}
@@ -340,7 +507,7 @@ function AppointmentCard({ appointment, onSaved, admin = false }: any) {
       </div>
       <div className="mt-3 grid gap-1 border-t border-border/70 pt-3 text-xs text-muted-foreground sm:grid-cols-2">
         <p>{appointment.patient_phone || "Telefone não informado"}</p>
-        <p className="truncate sm:text-right">{appointment.patient_email}</p>
+        <p className="truncate sm:text-right">{appointment.patient_email || "E-mail não informado"}</p>
       </div>
       {appointment.notes ? <p className="mt-2 rounded-xl bg-secondary/60 px-3 py-2 text-xs text-muted-foreground">{appointment.notes}</p> : null}
       {professionalResponse?.response === "confirmado" && professionalResponse.responded_at ? (
@@ -383,9 +550,7 @@ function ProfessionalAccessEditor({ professional, access, onSaved }: any) {
       created_by: userData.user?.id ?? null,
       updated_at: new Date().toISOString(),
     };
-    const result = await db
-      .from("professional_access")
-      .upsert(payload, { onConflict: "professional_id" });
+    const result = await db.from("professional_access").upsert(payload, { onConflict: "professional_id" });
     setBusy(false);
 
     if (result.error) { toast.error(result.error.message); return; }
@@ -411,14 +576,7 @@ function ProfessionalAccessEditor({ professional, access, onSaved }: any) {
         <div className="space-y-4 py-2">
           <div>
             <Label htmlFor={`email-${professional.id}`}>E-mail da profissional</Label>
-            <Input
-              id={`email-${professional.id}`}
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="nome@email.com"
-              className="mt-2"
-            />
+            <Input id={`email-${professional.id}`} type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="nome@email.com" className="mt-2" />
           </div>
           <div className="flex items-center justify-between rounded-xl border border-border px-3 py-3">
             <div>
@@ -429,9 +587,7 @@ function ProfessionalAccessEditor({ professional, access, onSaved }: any) {
           </div>
         </div>
         <DialogFooter>
-          <Button className="w-full sm:w-auto" disabled={busy} onClick={save}>
-            {busy ? "Salvando..." : "Salvar acesso"}
-          </Button>
+          <Button className="w-full sm:w-auto" disabled={busy} onClick={save}>{busy ? "Salvando..." : "Salvar acesso"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
