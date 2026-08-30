@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Search } from "lucide-react";
+import { Search, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { z } from "zod";
 
@@ -8,6 +8,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { getCatalogPresentation } from "@/lib/catalog-presentation.functions";
 import { getCatalog } from "@/lib/clinic.functions";
 
 const title = "Catálogo de serviços — JR Clinic";
@@ -20,7 +21,13 @@ const searchSchema = z.object({
 
 export const Route = createFileRoute("/catalogo")({
   validateSearch: searchSchema,
-  loader: () => getCatalog(),
+  loader: async () => {
+    const [catalog, presentation] = await Promise.all([
+      getCatalog(),
+      getCatalogPresentation(),
+    ]);
+    return { ...catalog, ...presentation };
+  },
   staleTime: 5 * 60 * 1000,
   preloadStaleTime: 5 * 60 * 1000,
   head: () => ({
@@ -75,6 +82,15 @@ function Catalogo() {
       services: filtered.filter((service) => service.categoryId === category.id),
     }))
     .filter((category) => category.services.length > 0);
+
+  const effectiveFeaturedId =
+    catalog.featuredCategoryId ?? groupedCategories[0]?.id ?? null;
+
+  const displayCategories = [...groupedCategories].sort((a, b) => {
+    if (a.id === effectiveFeaturedId) return -1;
+    if (b.id === effectiveFeaturedId) return 1;
+    return a.sort_order - b.sort_order;
+  });
 
   const setCategory = (id?: string) =>
     navigate({ search: id ? { categoria: id } : {}, replace: true });
@@ -139,49 +155,69 @@ function Catalogo() {
           </div>
         ) : (
           <div className="mt-5 space-y-10 sm:mt-8 sm:space-y-14">
-            {groupedCategories.map((category, categoryIndex) => (
-              <section key={category.id} id={`categoria-${category.id}`} className="scroll-mt-36">
-                <div className="relative overflow-hidden rounded-[18px] border border-primary/15 bg-primary px-4 py-4 shadow-[0_14px_34px_-30px_rgba(15,77,62,0.65)] sm:px-5 sm:py-4.5">
-                  <div className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-white/22" />
-                  <div className="pointer-events-none absolute inset-y-0 right-0 w-16 border-l border-white/7 bg-white/[0.025]" />
+            {displayCategories.map((category, categoryIndex) => {
+              const isFeatured = category.id === effectiveFeaturedId && !categoria;
+              const compactThree = !isFeatured && categoryIndex % 2 === 1;
 
-                  <div className="relative flex min-w-0 items-center gap-3 sm:gap-4">
-                    <div className="flex size-9 shrink-0 items-center justify-center rounded-[10px] border border-white/14 bg-white/[0.07] text-[10px] font-semibold tracking-[0.08em] text-primary-foreground/80 sm:size-10 sm:text-[11px]">
-                      {String(categoryIndex + 1).padStart(2, "0")}
-                    </div>
+              return (
+                <section key={category.id} id={`categoria-${category.id}`} className="scroll-mt-36">
+                  <div className="relative overflow-hidden rounded-[18px] border border-primary/15 bg-primary px-4 py-4 shadow-[0_14px_34px_-30px_rgba(15,77,62,0.65)] sm:px-5 sm:py-4.5">
+                    <div className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-white/22" />
+                    <div className="pointer-events-none absolute inset-y-0 right-0 w-16 border-l border-white/7 bg-white/[0.025]" />
 
-                    <div className="min-w-0 flex-1 sm:flex sm:items-center sm:gap-5">
-                      <div className="min-w-0 flex-1">
-                        <span className="block text-[8px] font-semibold uppercase tracking-[0.2em] text-primary-foreground/50 sm:text-[9px]">
-                          Categoria
-                        </span>
-                        <h2 className="mt-0.5 truncate text-[19px] font-semibold leading-tight text-primary-foreground sm:text-[24px]">
-                          {category.name}
-                        </h2>
+                    <div className="relative flex min-w-0 items-center gap-3 sm:gap-4">
+                      <div className="flex size-9 shrink-0 items-center justify-center rounded-[10px] border border-white/14 bg-white/[0.07] text-[10px] font-semibold tracking-[0.08em] text-primary-foreground/80 sm:size-10 sm:text-[11px]">
+                        {String(categoryIndex + 1).padStart(2, "0")}
                       </div>
 
-                      <div className="mt-1.5 flex items-center gap-2 sm:mt-0 sm:shrink-0">
-                        <span className="hidden h-px w-10 bg-white/15 sm:block" />
-                        <span className="text-[10px] font-medium text-primary-foreground/62 sm:text-[11px]">
-                          {category.services.length} {category.services.length === 1 ? "serviço" : "serviços"}
-                        </span>
+                      <div className="min-w-0 flex-1 sm:flex sm:items-center sm:gap-5">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="block text-[8px] font-semibold uppercase tracking-[0.2em] text-primary-foreground/50 sm:text-[9px]">
+                              Categoria
+                            </span>
+                            {isFeatured ? (
+                              <span className="inline-flex items-center gap-1 rounded-full border border-white/14 bg-white/[0.08] px-2 py-0.5 text-[8px] font-semibold uppercase tracking-[0.12em] text-primary-foreground/75 sm:text-[9px]">
+                                <Sparkles className="size-2.5" />
+                                Em evidência
+                              </span>
+                            ) : null}
+                          </div>
+                          <h2 className="mt-0.5 truncate text-[19px] font-semibold leading-tight text-primary-foreground sm:text-[24px]">
+                            {category.name}
+                          </h2>
+                        </div>
+
+                        <div className="mt-1.5 flex items-center gap-2 sm:mt-0 sm:shrink-0">
+                          <span className="hidden h-px w-10 bg-white/15 sm:block" />
+                          <span className="text-[10px] font-medium text-primary-foreground/62 sm:text-[11px]">
+                            {category.services.length} {category.services.length === 1 ? "serviço" : "serviços"}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="mt-3 grid grid-cols-1 items-stretch gap-3 sm:mt-4 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5">
-                  {category.services.map((service) => (
-                    <ServiceCard
-                      key={service.slug}
-                      service={service}
-                      categoryName={category.name}
-                      compactMobile
-                    />
-                  ))}
-                </div>
-              </section>
-            ))}
+                  <div
+                    className={
+                      compactThree
+                        ? "mt-3 grid grid-cols-1 items-stretch gap-3 sm:mt-4 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3"
+                        : "mt-3 grid grid-cols-1 items-stretch gap-3 sm:mt-4 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5"
+                    }
+                  >
+                    {category.services.map((service) => (
+                      <ServiceCard
+                        key={service.slug}
+                        service={service}
+                        categoryName={category.name}
+                        compactMobile
+                        compactDesktop={compactThree}
+                      />
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
           </div>
         )}
       </main>
