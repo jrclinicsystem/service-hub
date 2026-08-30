@@ -30,7 +30,7 @@ import { formatDate, formatPrice } from "@/lib/clinic";
 
 const db = supabase as any;
 
-type Scope = "active" | "history" | "all";
+type Scope = "pending" | "accepted" | "history" | "all";
 
 function todayIso() {
   const date = new Date();
@@ -64,10 +64,10 @@ function paymentLabel(item: any) {
 }
 
 function statusLabel(status: string) {
-  if (status === "confirmado") return "Confirmado";
+  if (status === "confirmado") return "Aceito";
   if (status === "cancelado") return "Cancelado";
   if (status === "aguardando_pagamento") return "Aguardando pagamento";
-  return "Aguardando confirmação";
+  return "Pendente";
 }
 
 function formatDateTime(value?: string | null) {
@@ -75,25 +75,27 @@ function formatDateTime(value?: string | null) {
   return new Date(value).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 }
 
-function playNotificationSound(audioRef: React.MutableRefObject<AudioContext | null>) {
+function playNotificationSound(audioRef: { current: AudioContext | null }) {
   try {
     const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
     if (!AudioCtx) return;
     const ctx = audioRef.current ?? new AudioCtx();
     audioRef.current = ctx;
     if (ctx.state === "suspended") void ctx.resume();
-    const osc = ctx.createOscillator();
+    const oscillator = ctx.createOscillator();
     const gain = ctx.createGain();
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(740, ctx.currentTime);
-    osc.frequency.setValueAtTime(880, ctx.currentTime + 0.09);
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(740, ctx.currentTime);
+    oscillator.frequency.setValueAtTime(900, ctx.currentTime + 0.1);
     gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.16, ctx.currentTime + 0.015);
-    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.24);
-    osc.connect(gain); gain.connect(ctx.destination);
-    osc.start(); osc.stop(ctx.currentTime + 0.25);
+    gain.gain.exponentialRampToValueAtTime(0.14, ctx.currentTime + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.26);
+    oscillator.connect(gain);
+    gain.connect(ctx.destination);
+    oscillator.start();
+    oscillator.stop(ctx.currentTime + 0.27);
   } catch {
-    // O popup continua funcionando mesmo se o navegador bloquear áudio automático.
+    // O popup continua funcionando se o navegador bloquear áudio automático.
   }
 }
 
@@ -107,12 +109,16 @@ async function fetchAppointment(id: string) {
   return data;
 }
 
-export function AdminAppointmentsWorkspace({ appointments, onStatusChange, onRefresh }: {
+export function AdminAppointmentsWorkspace({
+  appointments,
+  onStatusChange,
+  onRefresh,
+}: {
   appointments: any[];
   onStatusChange: (id: string, status: "pendente" | "confirmado" | "cancelado") => Promise<boolean>;
   onRefresh: () => void;
 }) {
-  const [scope, setScope] = useState<Scope>("active");
+  const [scope, setScope] = useState<Scope>("pending");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<any | null>(null);
   const [incoming, setIncoming] = useState<any | null>(null);
@@ -153,29 +159,51 @@ export function AdminAppointmentsWorkspace({ appointments, onStatusChange, onRef
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "appointments" }, notify)
       .subscribe();
 
-    return () => { void supabase.removeChannel(channel); };
+    return () => {
+      void supabase.removeChannel(channel);
+    };
   }, [onRefresh]);
+
+  const counts = useMemo(() => {
+    const today = todayIso();
+    return appointments.reduce(
+      (result, item) => {
+        const futureOrToday = item.scheduled_date >= today;
+        if (futureOrToday && (item.status === "pendente" || item.status === "aguardando_pagamento")) result.pending += 1;
+        if (futureOrToday && item.status === "confirmado") result.accepted += 1;
+        if (!futureOrToday || item.status === "cancelado") result.history += 1;
+        result.all += 1;
+        return result;
+      },
+      { pending: 0, accepted: 0, history: 0, all: 0 },
+    );
+  }, [appointments]);
 
   const filtered = useMemo(() => {
     const today = todayIso();
     const term = search.trim().toLowerCase();
+
     return appointments
       .filter((item) => {
-        const last = latestPayment(item);
-        const failedUnpaid = item.status === "aguardando_pagamento" && last?.status === "failed";
-        const active = item.status !== "cancelado" && item.scheduled_date >= today && !failedUnpaid;
-        if (scope === "active" && !active) return false;
-        if (scope === "history" && active) return false;
+        const futureOrToday = item.scheduled_date >= today;
+        const pending = futureOrToday && (item.status === "pendente" || item.status === "aguardando_pagamento");
+        const accepted = futureOrToday && item.status === "confirmado";
+        const history = !futureOrToday || item.status === "cancelado";
+
+        if (scope === "pending" && !pending) return false;
+        if (scope === "accepted" && !accepted) return false;
+        if (scope === "history" && !history) return false;
+
         if (!term) return true;
         return [item.patient_name, item.patient_email, item.patient_phone, item.service?.name, item.professional?.name]
           .some((value) => String(value ?? "").toLowerCase().includes(term));
       })
-      .sort((a, b) => scope === "history"
-        ? `${b.scheduled_date} ${b.scheduled_time}`.localeCompare(`${a.scheduled_date} ${a.scheduled_time}`)
-        : `${a.scheduled_date} ${a.scheduled_time}`.localeCompare(`${b.scheduled_date} ${b.scheduled_time}`));
+      .sort((a, b) => {
+        const left = `${a.scheduled_date} ${a.scheduled_time}`;
+        const right = `${b.scheduled_date} ${b.scheduled_time}`;
+        return scope === "history" ? right.localeCompare(left) : left.localeCompare(right);
+      });
   }, [appointments, scope, search]);
-
-  const activeCount = appointments.filter((item) => item.status !== "cancelado" && item.scheduled_date >= todayIso()).length;
 
   const act = async (appointment: any, status: "confirmado" | "cancelado") => {
     setBusyAction(true);
@@ -184,38 +212,102 @@ export function AdminAppointmentsWorkspace({ appointments, onStatusChange, onRef
     if (!ok) return;
     setIncoming(null);
     setSelected((current: any) => current?.id === appointment.id ? { ...current, status } : current);
+    if (status === "confirmado") setScope("accepted");
   };
 
   return (
     <section>
       <div className="rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-5">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div><h2 className="text-lg font-semibold">Agenda da clínica</h2><p className="mt-1 text-xs text-muted-foreground">{activeCount} ativos · clique em qualquer card para abrir todos os dados.</p></div>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <div className="relative min-w-[260px]"><Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Paciente, e-mail, serviço..." className="h-10 rounded-xl pl-9" /></div>
-            <div className="grid grid-cols-3 rounded-xl bg-secondary/70 p-1">
-              {([['active','Ativos'],['history','Histórico'],['all','Todos']] as const).map(([value,label]) => <button key={value} type="button" onClick={() => setScope(value)} className={`h-8 rounded-lg px-3 text-xs font-medium ${scope === value ? "bg-card shadow-sm" : "text-muted-foreground"}`}>{label}</button>)}
-            </div>
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">Agendamentos</h2>
+            <p className="mt-1 text-xs text-muted-foreground">Separe rapidamente o que ainda precisa de decisão do que já foi aceito.</p>
           </div>
+          <div className="relative w-full xl:max-w-sm">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Paciente, serviço, profissional..." className="h-10 rounded-xl pl-9" />
+          </div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <CategoryButton active={scope === "pending"} label="Pendentes" count={counts.pending} onClick={() => setScope("pending")} />
+          <CategoryButton active={scope === "accepted"} label="Aceitos" count={counts.accepted} onClick={() => setScope("accepted")} />
+          <CategoryButton active={scope === "history"} label="Histórico" count={counts.history} onClick={() => setScope("history")} />
+          <CategoryButton active={scope === "all"} label="Todos" count={counts.all} onClick={() => setScope("all")} />
         </div>
       </div>
 
       <div className="mt-3 grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
-        {filtered.length === 0 ? <div className="lg:col-span-2 2xl:col-span-3 rounded-2xl border border-dashed border-border bg-card p-8 text-center"><CalendarDays className="mx-auto size-5 text-muted-foreground" /><p className="mt-3 text-sm text-muted-foreground">Nenhum agendamento neste filtro.</p></div> : filtered.map((appointment) => (
-          <button key={appointment.id} type="button" onClick={() => setSelected(appointment)} className="rounded-2xl border border-border bg-card p-4 text-left shadow-soft transition hover:border-primary/30 hover:shadow-md">
+        {filtered.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center lg:col-span-2 2xl:col-span-3">
+            <CalendarDays className="mx-auto size-5 text-muted-foreground" />
+            <p className="mt-3 text-sm text-muted-foreground">Nenhum agendamento nesta categoria.</p>
+          </div>
+        ) : filtered.map((appointment) => (
+          <button
+            key={appointment.id}
+            type="button"
+            onClick={() => setSelected(appointment)}
+            className="rounded-2xl border border-border bg-card p-4 text-left shadow-soft transition hover:border-primary/30 hover:shadow-md"
+          >
             <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0"><p className="truncate text-base font-semibold">{appointment.patient_name}</p><p className="mt-0.5 truncate text-xs text-muted-foreground">{appointment.patient_email}</p></div><AdminStatusBadge status={appointment.status} />
+              <div className="min-w-0">
+                <p className="truncate text-base font-semibold">{appointment.patient_name}</p>
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">{appointment.patient_email}</p>
+              </div>
+              <AdminStatusBadge status={appointment.status} />
             </div>
-            <div className="mt-3 rounded-xl bg-secondary/45 p-3"><p className="truncate text-sm font-medium">{appointment.service?.name ?? "Atendimento"}</p><p className="mt-1 truncate text-xs text-muted-foreground">{appointment.professional?.name ?? "Profissional não definido"} · {appointment.professional?.specialty ?? "Equipe"}</p></div>
-            <div className="mt-3 grid grid-cols-3 gap-2"><SmallInfo label="Data" value={formatDate(appointment.scheduled_date)} /><SmallInfo label="Horário" value={appointment.scheduled_time} /><SmallInfo label="Pagamento" value={paymentLabel(appointment)} accent /></div>
-            <div className="mt-3 flex items-center justify-between border-t border-border/70 pt-3"><p className="text-xs text-muted-foreground">{appointment.patient_phone || "Sem telefone"}</p><p className="text-xs font-semibold text-primary">{formatPrice(Number(appointment.service_price_snapshot ?? appointment.service?.price ?? 0))} · Detalhes →</p></div>
+
+            <div className="mt-3 rounded-xl bg-secondary/45 p-3">
+              <p className="truncate text-sm font-medium">{appointment.service?.name ?? "Atendimento"}</p>
+              <p className="mt-1 truncate text-xs text-muted-foreground">{appointment.professional?.name ?? "Profissional não definido"} · {appointment.professional?.specialty ?? "Equipe"}</p>
+            </div>
+
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              <SmallInfo label="Data" value={formatDate(appointment.scheduled_date)} />
+              <SmallInfo label="Horário" value={appointment.scheduled_time} />
+              <SmallInfo label="Pagamento" value={paymentLabel(appointment)} accent />
+            </div>
+
+            <div className="mt-3 flex items-center justify-between gap-3 border-t border-border/70 pt-3">
+              <p className="truncate text-xs text-muted-foreground">{appointment.patient_phone || "Sem telefone"}</p>
+              <p className="shrink-0 text-xs font-semibold text-primary">{formatPrice(Number(appointment.service_price_snapshot ?? appointment.service?.price ?? 0))} · Detalhes →</p>
+            </div>
           </button>
         ))}
       </div>
 
-      <AppointmentAdminDialog appointment={selected} open={Boolean(selected)} onOpenChange={(open) => !open && setSelected(null)} onConfirm={() => selected && act(selected, "confirmado")} onCancel={() => selected && act(selected, "cancelado")} busy={busyAction} />
-      <NewAppointmentAlert appointment={incoming} open={Boolean(incoming)} onLater={() => setIncoming(null)} onConfirm={() => incoming && act(incoming, "confirmado")} onCancel={() => incoming && act(incoming, "cancelado")} busy={busyAction} />
+      <AppointmentAdminDialog
+        appointment={selected}
+        open={Boolean(selected)}
+        onOpenChange={(open: boolean) => !open && setSelected(null)}
+        onConfirm={() => selected && act(selected, "confirmado")}
+        onCancel={() => selected && act(selected, "cancelado")}
+        busy={busyAction}
+      />
+
+      <NewAppointmentAlert
+        appointment={incoming}
+        open={Boolean(incoming)}
+        onLater={() => setIncoming(null)}
+        onConfirm={() => incoming && act(incoming, "confirmado")}
+        onCancel={() => incoming && act(incoming, "cancelado")}
+        busy={busyAction}
+      />
     </section>
+  );
+}
+
+function CategoryButton({ active, label, count, onClick }: { active: boolean; label: string; count: number; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex min-h-[54px] items-center justify-between rounded-xl border px-3 text-left transition ${active ? "border-primary bg-primary-soft/70 text-primary" : "border-border bg-background hover:bg-secondary/40"}`}
+    >
+      <span className="text-xs font-semibold sm:text-sm">{label}</span>
+      <span className={`grid min-w-7 place-items-center rounded-full px-2 py-1 text-[10px] font-semibold ${active ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>{count}</span>
+    </button>
   );
 }
 
@@ -229,7 +321,12 @@ function SmallInfo({ label, value, accent = false }: { label: string; value: str
 }
 
 function DetailBox({ icon: Icon, label, value }: any) {
-  return <div className="flex items-start gap-3 rounded-2xl border border-border bg-card p-3"><span className="grid size-8 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary"><Icon className="size-4" /></span><div className="min-w-0"><p className="text-[9px] uppercase tracking-wide text-muted-foreground">{label}</p><p className="mt-1 break-words text-sm font-medium">{value}</p></div></div>;
+  return (
+    <div className="flex items-start gap-3 rounded-2xl border border-border bg-card p-3">
+      <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary"><Icon className="size-4" /></span>
+      <div className="min-w-0"><p className="text-[9px] uppercase tracking-wide text-muted-foreground">{label}</p><p className="mt-1 break-words text-sm font-medium">{value}</p></div>
+    </div>
+  );
 }
 
 function AppointmentAdminDialog({ appointment, open, onOpenChange, onConfirm, onCancel, busy }: any) {
@@ -237,24 +334,79 @@ function AppointmentAdminDialog({ appointment, open, onOpenChange, onConfirm, on
   const approved = approvedPayment(appointment);
   const total = Number(appointment.service_price_snapshot ?? appointment.service?.price ?? 0);
   const paid = Number(approved?.amount ?? 0);
+  const canDecide = appointment.status !== "cancelado" && appointment.status !== "confirmado" && appointment.status !== "aguardando_pagamento";
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="max-h-[92dvh] w-[calc(100%-1rem)] overflow-y-auto rounded-3xl p-5 sm:max-w-2xl sm:p-6">
-      <DialogHeader><div className="flex flex-wrap items-center gap-2"><DialogTitle>{appointment.patient_name}</DialogTitle><AdminStatusBadge status={appointment.status} /></div><DialogDescription>{appointment.service?.name ?? "Atendimento"} · {formatDate(appointment.scheduled_date)} às {appointment.scheduled_time}</DialogDescription></DialogHeader>
-      <div className="mt-2 rounded-2xl bg-primary-soft/60 p-4"><div className="flex items-center gap-2 text-primary"><CreditCard className="size-4" /><p className="text-sm font-semibold">{paymentLabel(appointment)}</p></div><div className="mt-3 grid grid-cols-3 gap-2"><SmallInfo label="Total" value={formatPrice(total)} /><SmallInfo label="Pago" value={formatPrice(paid)} /><SmallInfo label="Restante" value={formatPrice(Number(appointment.balance_amount ?? Math.max(0,total-paid)))} /></div>{approved?.paid_at ? <p className="mt-3 text-[11px] text-muted-foreground">Pagamento em {formatDateTime(approved.paid_at)} · {approved.payment_method_id || approved.provider || "InfinitePay"}</p> : appointment.payment_choice === "onsite" ? <p className="mt-3 text-[11px] text-muted-foreground">Pagamento integral previsto para a clínica.</p> : null}</div>
-      <div className="mt-4 grid gap-2 sm:grid-cols-2"><DetailBox icon={CalendarDays} label="Data" value={formatDate(appointment.scheduled_date)} /><DetailBox icon={Clock3} label="Horário" value={appointment.scheduled_time} /><DetailBox icon={Stethoscope} label="Profissional" value={`${appointment.professional?.name ?? "—"} · ${appointment.professional?.specialty ?? "—"}`} /><DetailBox icon={Clock3} label="Duração" value={`${appointment.service?.duration_min ?? "—"} min`} /><DetailBox icon={Mail} label="E-mail" value={appointment.patient_email} /><DetailBox icon={Phone} label="Telefone" value={appointment.patient_phone || "Não informado"} /><DetailBox icon={UserRound} label="Criado em" value={formatDateTime(appointment.created_at)} /><DetailBox icon={CreditCard} label="Forma escolhida" value={appointment.payment_choice === "onsite" ? "Pagamento presencial" : appointment.payment_choice === "online_full" ? "Pagamento online integral" : "Sinal online"} /></div>
-      {appointment.notes ? <div className="mt-4 rounded-2xl bg-secondary/50 p-4"><p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Observações do cliente</p><p className="mt-2 text-sm leading-relaxed">{appointment.notes}</p></div> : null}
-      <DialogFooter className="mt-5 gap-2"><Button variant="outline" className="rounded-full" onClick={() => onOpenChange(false)}>Fechar</Button>{appointment.status !== "cancelado" ? <Button variant="outline" className="rounded-full text-destructive" onClick={onCancel} disabled={busy}><X className="size-4" /> Recusar / cancelar</Button> : null}{appointment.status !== "confirmado" && appointment.status !== "cancelado" ? <Button className="rounded-full" onClick={onConfirm} disabled={busy}><Check className="size-4" /> Confirmar</Button> : null}</DialogFooter>
-    </DialogContent></Dialog>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[92dvh] w-[calc(100%-1rem)] overflow-y-auto rounded-3xl p-5 sm:max-w-2xl sm:p-6">
+        <DialogHeader>
+          <div className="flex flex-wrap items-center gap-2"><DialogTitle>{appointment.patient_name}</DialogTitle><AdminStatusBadge status={appointment.status} /></div>
+          <DialogDescription>{appointment.service?.name ?? "Atendimento"} · {formatDate(appointment.scheduled_date)} às {appointment.scheduled_time}</DialogDescription>
+        </DialogHeader>
+
+        <div className="mt-2 rounded-2xl bg-primary-soft/60 p-4">
+          <div className="flex items-center gap-2 text-primary"><CreditCard className="size-4" /><p className="text-sm font-semibold">{paymentLabel(appointment)}</p></div>
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            <SmallInfo label="Total" value={formatPrice(total)} />
+            <SmallInfo label="Pago" value={formatPrice(paid)} />
+            <SmallInfo label="Restante" value={formatPrice(Number(appointment.balance_amount ?? Math.max(0, total - paid)))} />
+          </div>
+          {approved?.paid_at ? <p className="mt-3 text-[11px] text-muted-foreground">Pagamento confirmado em {formatDateTime(approved.paid_at)} · {approved.payment_method_id || approved.provider || "InfinitePay"}</p> : appointment.payment_choice === "onsite" ? <p className="mt-3 text-[11px] text-muted-foreground">Pagamento integral previsto para ser negociado e realizado presencialmente.</p> : null}
+        </div>
+
+        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+          <DetailBox icon={CalendarDays} label="Data do atendimento" value={formatDate(appointment.scheduled_date)} />
+          <DetailBox icon={Clock3} label="Horário" value={appointment.scheduled_time} />
+          <DetailBox icon={Stethoscope} label="Profissional" value={`${appointment.professional?.name ?? "Não definido"}${appointment.professional?.specialty ? ` · ${appointment.professional.specialty}` : ""}`} />
+          <DetailBox icon={UserRound} label="Paciente" value={appointment.patient_name} />
+          <DetailBox icon={Phone} label="Telefone" value={appointment.patient_phone || "Não informado"} />
+          <DetailBox icon={Mail} label="E-mail" value={appointment.patient_email} />
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-border p-4">
+          <div className="grid gap-3 text-xs sm:grid-cols-2">
+            <div><p className="text-[9px] uppercase tracking-wide text-muted-foreground">Agendamento criado em</p><p className="mt-1 font-medium">{formatDateTime(appointment.created_at)}</p></div>
+            <div><p className="text-[9px] uppercase tracking-wide text-muted-foreground">Última alteração de status</p><p className="mt-1 font-medium">{formatDateTime(appointment.status_updated_at)}</p></div>
+          </div>
+          {appointment.notes ? <div className="mt-3 border-t border-border pt-3"><p className="text-[9px] uppercase tracking-wide text-muted-foreground">Observações</p><p className="mt-1 text-sm leading-relaxed">{appointment.notes}</p></div> : null}
+        </div>
+
+        {canDecide ? (
+          <DialogFooter className="mt-4 grid grid-cols-2 gap-2 sm:flex">
+            <Button variant="destructive" disabled={busy} onClick={onCancel}><X className="size-4" /> Recusar</Button>
+            <Button disabled={busy} onClick={onConfirm}><Check className="size-4" /> Confirmar</Button>
+          </DialogFooter>
+        ) : null}
+      </DialogContent>
+    </Dialog>
   );
 }
 
 function NewAppointmentAlert({ appointment, open, onLater, onConfirm, onCancel, busy }: any) {
   if (!appointment) return null;
   return (
-    <Dialog open={open} onOpenChange={(value) => !value && onLater()}><DialogContent className="w-[calc(100%-1rem)] rounded-3xl p-5 sm:max-w-md sm:p-6">
-      <DialogHeader><span className="mb-2 grid size-11 place-items-center rounded-2xl bg-primary-soft text-primary"><BellRing className="size-5" /></span><DialogTitle>Novo agendamento realizado</DialogTitle><DialogDescription>Revise os dados e confirme agora ou deixe para decidir depois.</DialogDescription></DialogHeader>
-      <div className="mt-2 rounded-2xl border border-border bg-secondary/40 p-4"><p className="text-base font-semibold">{appointment.patient_name}</p><p className="mt-1 text-sm text-muted-foreground">{appointment.service?.name ?? "Atendimento"}</p><div className="mt-3 grid grid-cols-2 gap-2"><SmallInfo label="Quando" value={`${formatDate(appointment.scheduled_date)} · ${appointment.scheduled_time}`} /><SmallInfo label="Profissional" value={appointment.professional?.name ?? "—"} /><SmallInfo label="Pagamento" value={paymentLabel(appointment)} accent /><SmallInfo label="Valor" value={formatPrice(Number(appointment.service_price_snapshot ?? appointment.service?.price ?? 0))} /></div></div>
-      <DialogFooter className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3"><Button variant="outline" className="rounded-full" onClick={onLater} disabled={busy}>Depois</Button><Button variant="outline" className="rounded-full text-destructive" onClick={onCancel} disabled={busy}><X className="size-4" /> Recusar</Button><Button className="rounded-full" onClick={onConfirm} disabled={busy}><Check className="size-4" /> Confirmar</Button></DialogFooter>
-    </DialogContent></Dialog>
+    <Dialog open={open} onOpenChange={(next) => !next && onLater()}>
+      <DialogContent className="w-[calc(100%-1rem)] rounded-3xl p-5 sm:max-w-md sm:p-6">
+        <DialogHeader>
+          <span className="mb-2 grid size-12 place-items-center rounded-2xl bg-primary-soft text-primary"><BellRing className="size-5" /></span>
+          <DialogTitle>Novo agendamento realizado</DialogTitle>
+          <DialogDescription>Confira os dados e decida agora ou deixe para confirmar depois.</DialogDescription>
+        </DialogHeader>
+
+        <div className="mt-2 rounded-2xl border border-border bg-secondary/40 p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0"><p className="truncate font-semibold">{appointment.patient_name}</p><p className="mt-1 truncate text-xs text-muted-foreground">{appointment.service?.name ?? "Atendimento"}</p></div>
+            <AdminStatusBadge status={appointment.status} />
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2"><SmallInfo label="Data" value={formatDate(appointment.scheduled_date)} /><SmallInfo label="Horário" value={appointment.scheduled_time} /><SmallInfo label="Profissional" value={appointment.professional?.name ?? "—"} /><SmallInfo label="Pagamento" value={paymentLabel(appointment)} accent /></div>
+        </div>
+
+        <DialogFooter className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3 sm:space-x-0">
+          <Button variant="outline" disabled={busy} onClick={onLater}>Depois</Button>
+          <Button variant="destructive" disabled={busy} onClick={onCancel}>Recusar</Button>
+          <Button disabled={busy} onClick={onConfirm}>Confirmar</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
