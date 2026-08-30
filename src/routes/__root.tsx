@@ -126,7 +126,7 @@ function SystemAccess() {
   const { user, loading } = useAuth();
   const requiresLogin = location.pathname === "/agendar";
   const isInternalArea = location.pathname.startsWith("/admin") || location.pathname === "/profissional";
-  const showTeamAgendaShortcut = location.pathname === "/admin";
+  const showAdminShortcuts = location.pathname === "/admin";
 
   useEffect(() => {
     if (!requiresLogin || loading || user) return;
@@ -148,13 +148,21 @@ function SystemAccess() {
   return (
     <>
       <Outlet />
-      {showTeamAgendaShortcut ? (
-        <Link
-          to="/admin/equipe"
-          className="fixed bottom-4 left-4 z-[80] inline-flex h-11 items-center justify-center rounded-full border border-primary/15 bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-lg transition-transform hover:-translate-y-0.5 sm:bottom-6 sm:left-6 sm:px-5 sm:text-sm"
-        >
-          Agenda da equipe
-        </Link>
+      {showAdminShortcuts ? (
+        <>
+          <Link
+            to="/admin/catalogo"
+            className="fixed bottom-16 left-4 z-[80] inline-flex h-11 items-center justify-center rounded-full border border-primary/15 bg-card px-4 text-xs font-semibold text-primary shadow-lg transition-transform hover:-translate-y-0.5 sm:left-6 sm:px-5 sm:text-sm lg:bottom-[180px] lg:left-[18px] lg:w-[214px] lg:justify-start lg:rounded-xl lg:border-white/10 lg:bg-white/[0.08] lg:px-3 lg:text-white lg:shadow-none"
+          >
+            Destaque do catálogo
+          </Link>
+          <Link
+            to="/admin/equipe"
+            className="fixed bottom-4 left-4 z-[80] inline-flex h-11 items-center justify-center rounded-full border border-primary/15 bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-lg transition-transform hover:-translate-y-0.5 sm:bottom-6 sm:left-6 sm:px-5 sm:text-sm"
+          >
+            Agenda da equipe
+          </Link>
+        </>
       ) : null}
       {!isInternalArea ? <SupportWhatsapp /> : null}
       {!isInternalArea ? <MobileBottomNav /> : null}
