@@ -45,6 +45,7 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
+  const [resetBusy, setResetBusy] = useState(false);
   const [checkingAccess, setCheckingAccess] = useState(false);
 
   useEffect(() => {
@@ -57,23 +58,11 @@ function AuthPage() {
       }
 
       setCheckingAccess(true);
-      const normalizedEmail = user.email?.trim().toLowerCase() ?? "";
+      const { data: isAdmin, error: accessError } = await (supabase as any).rpc(
+        "is_current_user_admin",
+      );
 
-      if (!normalizedEmail) {
-        await supabase.auth.signOut();
-        toast.error("Não foi possível identificar o e-mail desta conta.");
-        setCheckingAccess(false);
-        return;
-      }
-
-      const { data: allowed, error: accessError } = await supabase
-        .from("admin_emails")
-        .select("email")
-        .eq("email", normalizedEmail)
-        .eq("enabled", true)
-        .maybeSingle();
-
-      if (accessError || !allowed) {
+      if (accessError || !isAdmin) {
         await supabase.auth.signOut();
         toast.error("Este e-mail não está autorizado a acessar o painel da JR Clinic.");
         setCheckingAccess(false);
@@ -87,7 +76,11 @@ function AuthPage() {
   }, [loading, user, next, checkingAccess]);
 
   const signIn = async () => {
-    if (!email.trim() || !password) { toast.error("Digite seu e-mail e senha."); return; }
+    if (!email.trim() || !password) {
+      toast.error("Digite seu e-mail e senha.");
+      return;
+    }
+
     setBusy(true);
     const { error } = await supabase.auth.signInWithPassword({
       email: email.trim(),
@@ -96,16 +89,46 @@ function AuthPage() {
     setBusy(false);
 
     if (error) {
-      toast.error(error.message);
+      if (error.message.toLowerCase().includes("invalid login credentials")) {
+        toast.error("E-mail ou senha incorretos. Se necessário, use ‘Esqueci minha senha’. ");
+      } else {
+        toast.error(error.message);
+      }
       return;
     }
 
     toast.success("Bem-vindo de volta!");
   };
 
+  const sendPasswordReset = async () => {
+    const normalizedEmail = email.trim();
+    if (!normalizedEmail) {
+      toast.error("Digite seu e-mail primeiro.");
+      return;
+    }
+
+    setResetBusy(true);
+    const recoveryNext = next === "/admin" ? "/admin" : "/minha-conta";
+    const redirectTo = `${window.location.origin}/redefinir-senha?next=${encodeURIComponent(recoveryNext)}`;
+    const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+      redirectTo,
+    });
+    setResetBusy(false);
+
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    toast.success("Link de recuperação enviado", {
+      description: "Confira seu e-mail e abra o link para criar uma nova senha.",
+    });
+  };
+
   const signUp = async () => {
     if (!name.trim() || !email.trim() || password.length < 6) {
-      { toast.error("Preencha nome, e-mail e uma senha de pelo menos 6 caracteres."); return; }
+      toast.error("Preencha nome, e-mail e uma senha de pelo menos 6 caracteres.");
+      return;
     }
 
     setBusy(true);
@@ -174,7 +197,17 @@ function AuthPage() {
                 />
               </div>
               <div>
-                <Label htmlFor="senha">Senha</Label>
+                <div className="flex items-center justify-between gap-3">
+                  <Label htmlFor="senha">Senha</Label>
+                  <button
+                    type="button"
+                    onClick={sendPasswordReset}
+                    disabled={resetBusy}
+                    className="text-xs font-medium text-primary transition-opacity hover:opacity-75 disabled:opacity-50"
+                  >
+                    {resetBusy ? "Enviando..." : "Esqueci minha senha"}
+                  </button>
+                </div>
                 <Input
                   id="senha"
                   type="password"
@@ -189,7 +222,7 @@ function AuthPage() {
                 disabled={busy || checkingAccess}
                 onClick={signIn}
               >
-                {busy ? "Entrando..." : "Entrar"}
+                {checkingAccess ? "Verificando acesso..." : busy ? "Entrando..." : "Entrar"}
               </Button>
             </TabsContent>
 
