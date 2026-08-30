@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Layers3, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { useState } from "react";
 import { z } from "zod";
 
@@ -141,28 +141,31 @@ function Catalogo() {
           <div className="mt-5 space-y-10 sm:mt-8 sm:space-y-14">
             {groupedCategories.map((category, categoryIndex) => (
               <section key={category.id} id={`categoria-${category.id}`} className="scroll-mt-36">
-                <div className="relative overflow-hidden rounded-[26px] border border-primary/10 bg-[linear-gradient(115deg,rgba(15,77,62,0.10),rgba(235,224,218,0.72)_58%,rgba(176,138,74,0.12))] px-4 py-4 shadow-[0_16px_38px_-34px_rgba(15,77,62,0.55)] sm:rounded-[30px] sm:px-6 sm:py-5">
-                  <div className="pointer-events-none absolute -right-9 -top-12 size-32 rounded-full border border-accent/15 bg-card/25" />
-                  <div className="pointer-events-none absolute -right-1 top-2 size-16 rounded-full border border-primary/10" />
+                <div className="relative overflow-hidden rounded-[18px] border border-primary/15 bg-primary px-4 py-4 shadow-[0_14px_34px_-30px_rgba(15,77,62,0.65)] sm:px-5 sm:py-4.5">
+                  <div className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-white/22" />
+                  <div className="pointer-events-none absolute inset-y-0 right-0 w-16 border-l border-white/7 bg-white/[0.025]" />
 
-                  <div className="relative flex items-center gap-3 sm:gap-4">
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm sm:size-12">
-                      <Layers3 className="size-[18px] sm:size-5" strokeWidth={1.8} />
+                  <div className="relative flex min-w-0 items-center gap-3 sm:gap-4">
+                    <div className="flex size-9 shrink-0 items-center justify-center rounded-[10px] border border-white/14 bg-white/[0.07] text-[10px] font-semibold tracking-[0.08em] text-primary-foreground/80 sm:size-10 sm:text-[11px]">
+                      {String(categoryIndex + 1).padStart(2, "0")}
                     </div>
 
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                        <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-accent sm:text-[10px]">
-                          Categoria {String(categoryIndex + 1).padStart(2, "0")}
+                    <div className="min-w-0 flex-1 sm:flex sm:items-center sm:gap-5">
+                      <div className="min-w-0 flex-1">
+                        <span className="block text-[8px] font-semibold uppercase tracking-[0.2em] text-primary-foreground/50 sm:text-[9px]">
+                          Categoria
                         </span>
-                        <span className="h-px w-8 bg-accent/35 sm:w-12" />
-                        <span className="text-[10px] font-medium text-muted-foreground sm:text-[11px]">
+                        <h2 className="mt-0.5 truncate text-[19px] font-semibold leading-tight text-primary-foreground sm:text-[24px]">
+                          {category.name}
+                        </h2>
+                      </div>
+
+                      <div className="mt-1.5 flex items-center gap-2 sm:mt-0 sm:shrink-0">
+                        <span className="hidden h-px w-10 bg-white/15 sm:block" />
+                        <span className="text-[10px] font-medium text-primary-foreground/62 sm:text-[11px]">
                           {category.services.length} {category.services.length === 1 ? "serviço" : "serviços"}
                         </span>
                       </div>
-                      <h2 className="mt-1 truncate text-xl font-semibold leading-tight text-primary sm:text-3xl">
-                        {category.name}
-                      </h2>
                     </div>
                   </div>
                 </div>
