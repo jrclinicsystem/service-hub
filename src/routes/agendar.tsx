@@ -26,11 +26,9 @@ import { formatPrice } from "@/lib/clinic";
 
 const title = "Agendar atendimento — JR Clinic";
 const description =
-  "Escolha o serviço, o profissional, a data, o horário e conclua a reserva com pagamento seguro.";
+  "Escolha o serviço, o profissional, a data, o horário e a forma de pagamento da sua reserva.";
 
-const searchSchema = z.object({
-  servico: z.string().optional(),
-});
+const searchSchema = z.object({ servico: z.string().optional() });
 
 export const Route = createFileRoute("/agendar")({
   validateSearch: searchSchema,
@@ -47,7 +45,6 @@ export const Route = createFileRoute("/agendar")({
 });
 
 const weekDays = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-
 const days = Array.from({ length: 14 }).map((_, index) => {
   const date = new Date();
   date.setDate(date.getDate() + index);
@@ -59,14 +56,13 @@ const days = Array.from({ length: 14 }).map((_, index) => {
   };
 });
 
-type PaymentChoice = "deposit" | "full";
-
+type PaymentChoice = "deposit" | "onsite";
 type BookingPaymentSession = {
   appointmentId: string;
   amount: number;
   total: number;
   balance: number;
-  kind: PaymentChoice;
+  kind: "deposit";
   serviceName: string;
   email: string;
 };
@@ -102,8 +98,8 @@ function Agendar() {
   const total = Number(service.price);
   const safeDepositPercent = Number.isFinite(Number(depositPercent)) ? Number(depositPercent) : 50;
   const depositValue = Math.round(total * safeDepositPercent) / 100;
-  const paymentNow = paymentChoice === "full" ? total : depositValue;
-  const remaining = paymentChoice === "full" ? 0 : Math.max(0, total - depositValue);
+  const paymentNow = paymentChoice === "deposit" ? depositValue : 0;
+  const remaining = paymentChoice === "deposit" ? Math.max(0, total - depositValue) : total;
   const depositLabel = Number.isInteger(safeDepositPercent)
     ? `${safeDepositPercent}%`
     : `${safeDepositPercent.toFixed(1).replace(".", ",")}%`;
@@ -118,10 +114,8 @@ function Agendar() {
 
   useEffect(() => {
     if (!user) return;
-
     setEmail((current) => current || user.email || "");
-    const metadataName =
-      typeof user.user_metadata?.['full_name'] === "string" ? user.user_metadata['full_name'] : "";
+    const metadataName = typeof user.user_metadata?.['full_name'] === "string" ? user.user_metadata['full_name'] : "";
     setName((current) => current || metadataName);
 
     void supabase
@@ -141,7 +135,9 @@ function Agendar() {
     ? "Preparando..."
     : paymentSession
       ? "Retomar pagamento"
-      : "Continuar para pagamento";
+      : paymentChoice === "onsite"
+        ? "Confirmar agendamento"
+        : "Ir para pagamento";
 
   const confirm = async () => {
     if (paymentSession) {
@@ -150,7 +146,7 @@ function Agendar() {
     }
 
     if (!user) {
-      toast.info("Entre na sua conta para continuar para o pagamento.");
+      toast.info("Entre na sua conta para concluir o agendamento.");
       await authNavigate({ to: "/auth", search: { next: "/agendar" } });
       return;
     }
@@ -172,18 +168,26 @@ function Agendar() {
         },
       });
 
+      if (!created.requiresOnlinePayment) {
+        toast.success("Agendamento enviado para a clínica.", {
+          description: "O pagamento será realizado presencialmente no atendimento.",
+        });
+        await authNavigate({ to: "/minha-conta" });
+        return;
+      }
+
       setPaymentSession({
         appointmentId: created.id,
         amount: Number(created.paymentAmount),
         total: Number(created.total),
         balance: Number(created.balanceAmount),
-        kind: paymentChoice,
+        kind: "deposit",
         serviceName: service.name,
         email,
       });
       setPaymentOpen(true);
-      toast.info("Última etapa: pagamento", {
-        description: "O horário será enviado para a profissional somente após a aprovação do pagamento.",
+      toast.info("Última etapa: pagar o sinal", {
+        description: `Pague ${depositLabel} para liberar a reserva para a profissional.`,
       });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Não foi possível preparar o agendamento.");
@@ -195,282 +199,117 @@ function Agendar() {
   return (
     <div className="min-h-screen w-full max-w-[100dvw] overflow-x-clip">
       <SiteHeader />
-
       <main className="mx-auto box-border w-full min-w-0 max-w-[1440px] px-4 pb-44 pt-6 max-sm:w-[calc(100dvw-24px)] max-sm:max-w-[calc(100dvw-24px)] max-sm:px-0 sm:px-8 sm:pb-32 sm:pt-10 lg:pb-12">
         <span className="eyebrow text-muted-foreground max-sm:text-[10px]">Agendamento</span>
-        <h1 className="mt-1 max-w-full text-[28px] font-semibold leading-tight sm:mt-2 sm:text-4xl">Reserve seu horário</h1>
-        <p className="mt-2 max-w-[58ch] text-sm leading-relaxed text-muted-foreground sm:mt-3 sm:text-base">
-          Escolha o atendimento e, no final, decida se prefere pagar {depositLabel} para reservar ou quitar o valor total.
+        <h1 className="mt-1 text-[28px] font-semibold leading-tight sm:mt-2 sm:text-4xl">Reserve seu horário</h1>
+        <p className="mt-2 max-w-[62ch] text-sm leading-relaxed text-muted-foreground sm:mt-3 sm:text-base">
+          Escolha o atendimento e, no final, pague {depositLabel} para reservar ou escolha pagar presencialmente na clínica.
         </p>
 
-        <div className="mt-5 grid w-full min-w-0 grid-cols-5 gap-1 sm:hidden">
-          <StepChip number="1" label="Serviço" />
-          <StepChip number="2" label="Prof." />
-          <StepChip number="3" label="Horário" />
-          <StepChip number="4" label="Dados" />
-          <StepChip number="5" label="Pagar" />
+        <div className="mt-5 grid grid-cols-5 gap-1 sm:hidden">
+          <StepChip number="1" label="Serviço" /><StepChip number="2" label="Prof." />
+          <StepChip number="3" label="Horário" /><StepChip number="4" label="Dados" /><StepChip number="5" label="Pagamento" />
         </div>
 
-        <div className="mt-5 grid w-full min-w-0 max-w-full gap-4 sm:mt-10 sm:gap-8 lg:grid-cols-[1.15fr_0.85fr]">
-          <div className="w-full min-w-0 max-w-full space-y-4 sm:space-y-8">
-            <section className="box-border w-full min-w-0 max-w-full overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-6">
-              <div className="flex min-w-0 items-center gap-2">
-                <span className="grid size-6 shrink-0 place-items-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground sm:hidden">1</span>
-                <h2 className="min-w-0 truncate text-base font-semibold sm:text-lg">Serviço e profissional</h2>
-              </div>
-
-              <div className="mt-3 w-full min-w-0 max-w-full sm:mt-4">
-                <Label htmlFor="servico" className="text-xs sm:text-sm">Escolha o atendimento</Label>
-                <Select
-                  value={selectedSlug}
-                  onValueChange={(value) => navigate({ search: { servico: value }, replace: true })}
-                >
-                  <SelectTrigger id="servico" className="mt-2 h-11 w-full min-w-0 max-w-full overflow-hidden rounded-xl">
-                    <SelectValue placeholder="Selecione um serviço" />
-                  </SelectTrigger>
-                  <SelectContent className="max-w-[calc(100dvw-24px)]">
-                    {services.map((item) => (
-                      <SelectItem key={item.slug} value={item.slug}>
-                        {item.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
+        <div className="mt-5 grid gap-4 sm:mt-10 sm:gap-8 lg:grid-cols-[1.15fr_0.85fr]">
+          <div className="space-y-4 sm:space-y-8">
+            <section className="rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-6">
+              <h2 className="text-base font-semibold sm:text-lg">Serviço e profissional</h2>
+              <div className="mt-4">
+                <Label htmlFor="servico">Escolha o atendimento</Label>
+                <Select value={selectedSlug} onValueChange={(value) => navigate({ search: { servico: value }, replace: true })}>
+                  <SelectTrigger id="servico" className="mt-2 h-11 rounded-xl"><SelectValue /></SelectTrigger>
+                  <SelectContent>{services.map((item) => <SelectItem key={item.slug} value={item.slug}>{item.name}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-
-              <div className="mt-4 w-full min-w-0 max-w-full">
-                <Label htmlFor="profissional" className="text-xs sm:text-sm">Quem você prefere?</Label>
+              <div className="mt-4">
+                <Label htmlFor="profissional">Quem você prefere?</Label>
                 <Select value={professionalId} onValueChange={(value) => { setProfessionalId(value); setTime(null); setPaymentSession(null); }}>
-                  <SelectTrigger id="profissional" className="mt-2 h-11 w-full min-w-0 max-w-full overflow-hidden rounded-xl">
-                    <SelectValue placeholder="Escolha o profissional" />
-                  </SelectTrigger>
-                  <SelectContent className="max-w-[calc(100dvw-24px)]">
-                    {professionals.map((item: any) => (
-                      <SelectItem key={item.id} value={item.id}>
-                        {item.name} · {item.specialty}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
+                  <SelectTrigger id="profissional" className="mt-2 h-11 rounded-xl"><SelectValue placeholder="Escolha o profissional" /></SelectTrigger>
+                  <SelectContent>{professionals.map((item: any) => <SelectItem key={item.id} value={item.id}>{item.name} · {item.specialty}</SelectItem>)}</SelectContent>
                 </Select>
-                {professionals.length === 0 && (
-                  <p className="mt-2 text-xs text-destructive">Nenhum profissional está vinculado a este serviço no momento.</p>
-                )}
+                {professionals.length === 0 ? <p className="mt-2 text-xs text-destructive">Nenhum profissional está vinculado a este serviço.</p> : null}
               </div>
-
-              <div className="mt-3 flex w-full min-w-0 max-w-full items-center justify-between gap-3 overflow-hidden rounded-xl bg-secondary/60 px-3 py-2.5 sm:hidden">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-medium">{selectedProfessional?.name ?? "Escolha o profissional"}</p>
-                  <p className="mt-0.5 text-[10px] text-muted-foreground">{service.duration_min} min</p>
-                </div>
-                <p className="shrink-0 text-sm font-semibold text-primary">{formatPrice(total)}</p>
+              <div className="mt-3 flex items-center justify-between rounded-xl bg-secondary/60 px-3 py-2.5 sm:hidden">
+                <div><p className="text-xs font-medium">{selectedProfessional?.name ?? "Escolha o profissional"}</p><p className="mt-0.5 text-[10px] text-muted-foreground">{service.duration_min} min</p></div>
+                <p className="text-sm font-semibold text-primary">{formatPrice(total)}</p>
               </div>
             </section>
 
-            <section className="box-border w-full min-w-0 max-w-full overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-6">
-              <div className="flex min-w-0 items-center gap-2">
-                <span className="grid size-6 shrink-0 place-items-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground sm:hidden">3</span>
-                <h2 className="min-w-0 truncate text-base font-semibold sm:text-lg">Data e horário</h2>
-              </div>
-
-              <p className="mt-3 text-xs font-medium text-muted-foreground sm:hidden">Escolha o dia</p>
-              <div className="mt-2 flex w-full min-w-0 max-w-full gap-2 overflow-x-auto overscroll-x-contain pb-1 sm:mt-4 sm:grid sm:grid-cols-7 sm:overflow-visible sm:pb-0">
+            <section className="rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-6">
+              <h2 className="text-base font-semibold sm:text-lg">Data e horário</h2>
+              <div className="mt-4 flex gap-2 overflow-x-auto pb-1 sm:grid sm:grid-cols-7 sm:overflow-visible">
                 {days.map((item) => (
-                  <button
-                    key={item.key}
-                    type="button"
-                    disabled={item.disabled}
-                    onClick={() => { setDay(item.key); setPaymentSession(null); }}
-                    className={`w-[54px] shrink-0 rounded-xl border px-2 py-2.5 text-center transition-colors disabled:opacity-35 sm:w-auto sm:py-3 ${
-                      day === item.key
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-border bg-background hover:bg-secondary"
-                    }`}
-                  >
-                    <span className="block text-[9px] opacity-70 sm:text-[11px]">{item.weekday}</span>
-                    <span className="mt-0.5 block text-sm font-semibold">{item.label}</span>
+                  <button key={item.key} type="button" disabled={item.disabled} onClick={() => { setDay(item.key); setPaymentSession(null); }} className={`w-[54px] shrink-0 rounded-xl border px-2 py-2.5 text-center disabled:opacity-35 sm:w-auto ${day === item.key ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background"}`}>
+                    <span className="block text-[9px] opacity-70">{item.weekday}</span><span className="mt-0.5 block text-sm font-semibold">{item.label}</span>
                   </button>
                 ))}
               </div>
-
-              <p className="mt-4 text-xs font-medium text-muted-foreground sm:mt-6 sm:text-sm sm:text-foreground">Horários disponíveis</p>
-              <div className="mt-2 grid w-full min-w-0 grid-cols-2 gap-2 sm:mt-3 sm:grid-cols-4">
-                {timeSlots.map((slot) => {
-                  const disabled = !slot.is_available || !professionalId;
-                  return (
-                    <button
-                      key={slot.slot}
-                      type="button"
-                      disabled={disabled}
-                      onClick={() => { setTime(slot.slot); setPaymentSession(null); }}
-                      className={`min-w-0 max-w-full rounded-xl border px-1 py-2.5 text-xs font-medium transition-colors disabled:opacity-35 sm:px-3 sm:text-sm ${
-                        time === slot.slot
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "border-border bg-background hover:bg-secondary"
-                      }`}
-                    >
-                      {slot.slot}
-                    </button>
-                  );
-                })}
+              <p className="mt-5 text-xs font-medium text-muted-foreground">Horários disponíveis</p>
+              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {timeSlots.map((slot) => (
+                  <button key={slot.slot} type="button" disabled={!slot.is_available || !professionalId} onClick={() => { setTime(slot.slot); setPaymentSession(null); }} className={`rounded-xl border px-2 py-2.5 text-xs font-medium disabled:opacity-35 sm:text-sm ${time === slot.slot ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background"}`}>
+                    {slot.slot}
+                  </button>
+                ))}
               </div>
             </section>
 
-            <section className="box-border w-full min-w-0 max-w-full overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-6">
-              <div className="flex min-w-0 items-center gap-2">
-                <span className="grid size-6 shrink-0 place-items-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground sm:hidden">4</span>
-                <h2 className="min-w-0 truncate text-base font-semibold sm:text-lg">Seus dados</h2>
-              </div>
-              <div className="mt-3 grid w-full min-w-0 max-w-full gap-3 sm:mt-4 sm:grid-cols-2 sm:gap-4">
-                <div className="w-full min-w-0 max-w-full">
-                  <Label htmlFor="nome" className="text-xs sm:text-sm">Nome completo</Label>
-                  <Input id="nome" value={name} onChange={(event) => { setName(event.target.value); setPaymentSession(null); }} placeholder="Como no documento" className="mt-1.5 h-11 w-full min-w-0 max-w-full rounded-xl sm:mt-2" />
-                </div>
-                <div className="w-full min-w-0 max-w-full">
-                  <Label htmlFor="email" className="text-xs sm:text-sm">E-mail</Label>
-                  <Input id="email" type="email" value={email} onChange={(event) => { setEmail(event.target.value); setPaymentSession(null); }} placeholder="voce@email.com" className="mt-1.5 h-11 w-full min-w-0 max-w-full rounded-xl sm:mt-2" />
-                </div>
-                <div className="w-full min-w-0 max-w-full sm:col-span-2">
-                  <Label htmlFor="telefone" className="text-xs sm:text-sm">Telefone/WhatsApp <span className="font-normal text-muted-foreground">(opcional)</span></Label>
-                  <Input id="telefone" value={phone} onChange={(event) => { setPhone(event.target.value); setPaymentSession(null); }} placeholder="(85) 99999-9999" className="mt-1.5 h-11 w-full min-w-0 max-w-full rounded-xl sm:mt-2" />
-                </div>
-                <div className="w-full min-w-0 max-w-full sm:col-span-2">
-                  <Label htmlFor="obs" className="text-xs sm:text-sm">Observações <span className="font-normal text-muted-foreground">(opcional)</span></Label>
-                  <Textarea id="obs" value={notes} onChange={(event) => { setNotes(event.target.value); setPaymentSession(null); }} placeholder="Informações úteis para a equipe" className="mt-1.5 min-h-[82px] w-full min-w-0 max-w-full resize-none rounded-xl sm:mt-2" rows={3} />
-                </div>
+            <section className="rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-6">
+              <h2 className="text-base font-semibold sm:text-lg">Seus dados</h2>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 sm:gap-4">
+                <div><Label htmlFor="nome">Nome completo</Label><Input id="nome" value={name} onChange={(e) => { setName(e.target.value); setPaymentSession(null); }} className="mt-2 h-11 rounded-xl" /></div>
+                <div><Label htmlFor="email">E-mail</Label><Input id="email" type="email" value={email} onChange={(e) => { setEmail(e.target.value); setPaymentSession(null); }} className="mt-2 h-11 rounded-xl" /></div>
+                <div className="sm:col-span-2"><Label htmlFor="telefone">Telefone/WhatsApp <span className="font-normal text-muted-foreground">(opcional)</span></Label><Input id="telefone" value={phone} onChange={(e) => { setPhone(e.target.value); setPaymentSession(null); }} className="mt-2 h-11 rounded-xl" /></div>
+                <div className="sm:col-span-2"><Label htmlFor="obs">Observações <span className="font-normal text-muted-foreground">(opcional)</span></Label><Textarea id="obs" value={notes} onChange={(e) => { setNotes(e.target.value); setPaymentSession(null); }} className="mt-2 min-h-[82px] resize-none rounded-xl" /></div>
               </div>
             </section>
 
-            <section className="box-border w-full min-w-0 max-w-full overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-6">
-              <div className="flex min-w-0 items-center gap-2">
-                <span className="grid size-6 shrink-0 place-items-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground sm:hidden">5</span>
-                <div>
-                  <h2 className="text-base font-semibold sm:text-lg">Como deseja pagar?</h2>
-                  <p className="mt-0.5 text-[11px] text-muted-foreground sm:text-xs">Escolha o valor que será pago agora pela InfinitePay.</p>
-                </div>
-              </div>
-
+            <section className="rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-6">
+              <div><h2 className="text-base font-semibold sm:text-lg">Como deseja pagar?</h2><p className="mt-1 text-xs text-muted-foreground">Escolha entre reservar com sinal online ou pagar tudo presencialmente.</p></div>
               <div className="mt-4 grid gap-2.5 sm:grid-cols-2 sm:gap-3">
-                <button
-                  type="button"
-                  disabled={Boolean(paymentSession)}
-                  onClick={() => setPaymentChoice("deposit")}
-                  className={`rounded-2xl border p-4 text-left transition disabled:cursor-not-allowed ${
-                    paymentChoice === "deposit"
-                      ? "border-primary bg-primary-soft/60 shadow-sm"
-                      : "border-border bg-background hover:bg-secondary/40"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold">Pagar {depositLabel} agora</p>
-                      <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">Reserva o horário e deixa o restante para a clínica.</p>
-                    </div>
-                    <span className="shrink-0 text-base font-semibold text-primary">{formatPrice(depositValue)}</span>
-                  </div>
-                  <p className="mt-3 text-xs font-medium">Restante: {formatPrice(Math.max(0, total - depositValue))}</p>
+                <button type="button" disabled={Boolean(paymentSession)} onClick={() => setPaymentChoice("deposit")} className={`rounded-2xl border p-4 text-left transition ${paymentChoice === "deposit" ? "border-primary bg-primary-soft/60 shadow-sm" : "border-border bg-background"}`}>
+                  <div className="flex items-start justify-between gap-3"><div><p className="text-sm font-semibold">Pagar {depositLabel} agora</p><p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">Pague pela InfinitePay e deixe o restante para a clínica.</p></div><span className="shrink-0 text-base font-semibold text-primary">{formatPrice(depositValue)}</span></div>
+                  <p className="mt-3 text-xs font-medium">Restante na clínica: {formatPrice(total - depositValue)}</p>
                 </button>
-
-                <button
-                  type="button"
-                  disabled={Boolean(paymentSession)}
-                  onClick={() => setPaymentChoice("full")}
-                  className={`rounded-2xl border p-4 text-left transition disabled:cursor-not-allowed ${
-                    paymentChoice === "full"
-                      ? "border-primary bg-primary-soft/60 shadow-sm"
-                      : "border-border bg-background hover:bg-secondary/40"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold">Pagar valor total</p>
-                      <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">Quita o serviço online e não deixa saldo pendente.</p>
-                    </div>
-                    <span className="shrink-0 text-base font-semibold text-primary">{formatPrice(total)}</span>
-                  </div>
-                  <p className="mt-3 text-xs font-medium">Restante: {formatPrice(0)}</p>
+                <button type="button" disabled={Boolean(paymentSession)} onClick={() => setPaymentChoice("onsite")} className={`rounded-2xl border p-4 text-left transition ${paymentChoice === "onsite" ? "border-primary bg-primary-soft/60 shadow-sm" : "border-border bg-background"}`}>
+                  <div className="flex items-start justify-between gap-3"><div><p className="text-sm font-semibold">Pagamento presencial</p><p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">Não paga nada agora. O valor integral fica para o atendimento.</p></div><span className="shrink-0 text-base font-semibold text-primary">R$ 0,00</span></div>
+                  <p className="mt-3 text-xs font-medium">Na clínica: {formatPrice(total)}</p>
                 </button>
-              </div>
-
-              <div className="mt-4 border-t border-border/70 pt-4 sm:hidden">
-                <div className="mb-3 flex items-end justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-[10px] text-muted-foreground">Pagar agora</p>
-                    <p className="truncate text-xs font-medium">{paymentChoice === "deposit" ? `${depositLabel} para reservar` : "Valor total"}</p>
-                  </div>
-                  <p className="shrink-0 text-lg font-semibold text-primary">{formatPrice(paymentNow)}</p>
-                </div>
-                <Button className="h-12 w-full rounded-full" disabled={!canConfirm || busy} onClick={confirm}>
-                  {buttonLabel}
-                </Button>
-                {!canConfirm && (
-                  <p className="mt-2 text-center text-[10px] text-muted-foreground">Preencha os dados e selecione profissional, dia e horário.</p>
-                )}
               </div>
             </section>
           </div>
 
-          <aside className="hidden min-w-0 lg:block">
-            <div className="rounded-2xl border border-border bg-card p-6 shadow-soft lg:sticky lg:top-24">
+          <aside className="hidden lg:block">
+            <div className="sticky top-24 rounded-2xl border border-border bg-card p-6 shadow-soft">
               <h2 className="text-lg font-semibold">Resumo</h2>
               <dl className="mt-4 space-y-3 text-sm">
                 <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Serviço</dt><dd className="text-right font-medium">{service.name}</dd></div>
                 <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Profissional</dt><dd className="text-right font-medium">{selectedProfessional?.name ?? "—"}</dd></div>
                 <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Data</dt><dd className="text-right font-medium">{new Date(`${day}T12:00:00`).toLocaleDateString("pt-BR")} · {time ?? "—"}</dd></div>
-                <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Duração</dt><dd className="text-right font-medium">{service.duration_min} min</dd></div>
+                <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Duração</dt><dd className="font-medium">{service.duration_min} min</dd></div>
               </dl>
-
               <Separator className="my-5" />
-
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Valor do serviço</span>
-                <span className="font-sans text-xl font-semibold tracking-tight lining-nums tabular-nums">{formatPrice(total)}</span>
-              </div>
-              <div className="mt-3 flex items-center justify-between rounded-xl bg-primary-soft/60 px-3 py-3">
-                <span className="text-sm font-medium text-primary">Pagar agora</span>
-                <span className="font-sans text-2xl font-semibold tracking-tight text-primary lining-nums tabular-nums">{formatPrice(paymentNow)}</span>
-              </div>
-              <div className="mt-2 flex items-center justify-between text-xs">
-                <span className="text-muted-foreground">Restante na clínica</span>
-                <span className="font-medium">{formatPrice(remaining)}</span>
-              </div>
-
-              <Button size="lg" className="mt-6 w-full rounded-full" disabled={!canConfirm || busy} onClick={confirm}>
-                {buttonLabel}
-              </Button>
-              <p className="mt-3 text-center text-xs leading-relaxed text-muted-foreground">O agendamento só é liberado para a profissional após a confirmação do pagamento.</p>
+              <div className="flex items-center justify-between"><span className="text-sm text-muted-foreground">Valor do serviço</span><span className="text-xl font-semibold">{formatPrice(total)}</span></div>
+              <div className="mt-3 flex items-center justify-between rounded-xl bg-primary-soft/60 px-3 py-3"><span className="text-sm font-medium text-primary">Pagar agora</span><span className="text-2xl font-semibold text-primary">{formatPrice(paymentNow)}</span></div>
+              <div className="mt-2 flex items-center justify-between text-xs"><span className="text-muted-foreground">Restante na clínica</span><span className="font-medium">{formatPrice(remaining)}</span></div>
+              <Button size="lg" className="mt-6 w-full rounded-full" disabled={!canConfirm || busy} onClick={confirm}>{buttonLabel}</Button>
+              <p className="mt-3 text-center text-xs leading-relaxed text-muted-foreground">{paymentChoice === "deposit" ? "O horário é liberado após a confirmação do sinal." : "A solicitação é enviada para confirmação da clínica sem cobrança online."}</p>
             </div>
           </aside>
         </div>
       </main>
 
-      <div className="fixed bottom-[calc(63px+env(safe-area-inset-bottom))] left-0 right-0 z-[60] box-border w-[100dvw] max-w-[100dvw] overflow-hidden border-t border-border bg-card/95 px-3 py-3 shadow-[0_-8px_30px_rgba(0,0,0,0.06)] backdrop-blur-xl md:bottom-0 lg:hidden">
-        <div className="mx-auto flex w-full min-w-0 max-w-lg items-center gap-2.5">
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[10px] text-muted-foreground">Pagar agora · {paymentChoice === "deposit" ? depositLabel : "100%"}</p>
-            <p className="text-base font-semibold leading-tight text-primary">{formatPrice(paymentNow)}</p>
-          </div>
-          <Button className="h-11 min-w-[162px] shrink-0 rounded-full px-4" disabled={!canConfirm || busy} onClick={confirm}>
-            {busy ? "Preparando..." : paymentSession ? "Retomar" : "Ir para pagamento"}
-          </Button>
-        </div>
+      <div className="fixed bottom-[calc(63px+env(safe-area-inset-bottom))] left-0 right-0 z-[60] border-t border-border bg-card/95 px-3 py-3 shadow-[0_-8px_30px_rgba(0,0,0,0.06)] backdrop-blur-xl md:bottom-0 lg:hidden">
+        <div className="mx-auto flex max-w-lg items-center gap-2.5"><div className="min-w-0 flex-1"><p className="truncate text-[10px] text-muted-foreground">{paymentChoice === "deposit" ? `Pagar agora · ${depositLabel}` : "Pagamento presencial"}</p><p className="text-base font-semibold text-primary">{formatPrice(paymentNow)}</p></div><Button className="h-11 min-w-[162px] rounded-full px-4" disabled={!canConfirm || busy} onClick={confirm}>{buttonLabel}</Button></div>
       </div>
 
-      <InfinitePayPaymentDialog
-        open={paymentOpen}
-        onOpenChange={setPaymentOpen}
-        session={paymentSession}
-      />
-
+      <InfinitePayPaymentDialog open={paymentOpen} onOpenChange={setPaymentOpen} session={paymentSession} />
       <SiteFooter />
     </div>
   );
 }
 
 function StepChip({ number, label }: { number: string; label: string }) {
-  return (
-    <div className="flex min-w-0 items-center justify-center gap-1 rounded-xl bg-secondary/70 px-1 py-2">
-      <span className="grid size-4 shrink-0 place-items-center rounded-full bg-primary text-[9px] font-semibold text-primary-foreground">{number}</span>
-      <span className="truncate text-[9px] font-medium">{label}</span>
-    </div>
-  );
+  return <div className="flex min-w-0 items-center justify-center gap-1 rounded-xl bg-secondary/70 px-1 py-2"><span className="grid size-4 place-items-center rounded-full bg-primary text-[9px] font-semibold text-primary-foreground">{number}</span><span className="truncate text-[9px] font-medium">{label}</span></div>;
 }
