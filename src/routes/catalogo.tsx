@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Search } from "lucide-react";
+import { Layers3, Search } from "lucide-react";
 import { useState } from "react";
 import { z } from "zod";
 
@@ -69,6 +69,13 @@ function Catalogo() {
     return matchesCategory && matchesQuery;
   });
 
+  const groupedCategories = categories
+    .map((category) => ({
+      ...category,
+      services: filtered.filter((service) => service.categoryId === category.id),
+    }))
+    .filter((category) => category.services.length > 0);
+
   const setCategory = (id?: string) =>
     navigate({ search: id ? { categoria: id } : {}, replace: true });
 
@@ -82,8 +89,8 @@ function Catalogo() {
           Serviços da JR Clinic
         </h1>
         <p className="mt-2 max-w-[52ch] text-sm leading-relaxed text-muted-foreground sm:mt-3 sm:text-base">
-          {services.length} serviços em {categories.length} especialidades.
-          <span className="hidden sm:inline"> Filtre por categoria ou busque pelo nome do serviço ou do profissional.</span>
+          {services.length} serviços organizados em {categories.length} categorias.
+          <span className="hidden sm:inline"> Navegue por especialidade ou busque pelo nome do serviço ou profissional.</span>
         </p>
 
         <div className="relative mt-5 max-w-md sm:mt-8">
@@ -104,7 +111,7 @@ function Catalogo() {
             className="h-8 shrink-0 rounded-full px-3 text-xs sm:h-9 sm:text-sm"
             onClick={() => setCategory(undefined)}
           >
-            Todos
+            Todas as categorias
           </Button>
           {categories.map((category) => (
             <Button
@@ -131,16 +138,46 @@ function Catalogo() {
             <p className="mt-1 text-xs text-muted-foreground">Tente outro termo ou categoria.</p>
           </div>
         ) : (
-          <div className="mt-3 grid grid-cols-3 items-stretch gap-2 sm:mt-4 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5">
-            {filtered.map((service) => (
-              <ServiceCard
-                key={service.slug}
-                service={service}
-                categoryName={
-                  categories.find((category) => category.id === service.categoryId)?.name
-                }
-                compactMobile
-              />
+          <div className="mt-5 space-y-10 sm:mt-8 sm:space-y-14">
+            {groupedCategories.map((category, categoryIndex) => (
+              <section key={category.id} id={`categoria-${category.id}`} className="scroll-mt-36">
+                <div className="relative overflow-hidden rounded-[26px] border border-primary/10 bg-[linear-gradient(115deg,rgba(15,77,62,0.10),rgba(235,224,218,0.72)_58%,rgba(176,138,74,0.12))] px-4 py-4 shadow-[0_16px_38px_-34px_rgba(15,77,62,0.55)] sm:rounded-[30px] sm:px-6 sm:py-5">
+                  <div className="pointer-events-none absolute -right-9 -top-12 size-32 rounded-full border border-accent/15 bg-card/25" />
+                  <div className="pointer-events-none absolute -right-1 top-2 size-16 rounded-full border border-primary/10" />
+
+                  <div className="relative flex items-center gap-3 sm:gap-4">
+                    <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm sm:size-12">
+                      <Layers3 className="size-[18px] sm:size-5" strokeWidth={1.8} />
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-accent sm:text-[10px]">
+                          Categoria {String(categoryIndex + 1).padStart(2, "0")}
+                        </span>
+                        <span className="h-px w-8 bg-accent/35 sm:w-12" />
+                        <span className="text-[10px] font-medium text-muted-foreground sm:text-[11px]">
+                          {category.services.length} {category.services.length === 1 ? "serviço" : "serviços"}
+                        </span>
+                      </div>
+                      <h2 className="mt-1 truncate text-xl font-semibold leading-tight text-primary sm:text-3xl">
+                        {category.name}
+                      </h2>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-3 grid grid-cols-1 items-stretch gap-3 sm:mt-4 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5">
+                  {category.services.map((service) => (
+                    <ServiceCard
+                      key={service.slug}
+                      service={service}
+                      categoryName={category.name}
+                      compactMobile
+                    />
+                  ))}
+                </div>
+              </section>
             ))}
           </div>
         )}
