@@ -108,7 +108,7 @@ function MinhaConta() {
 
   const saveProfile = async () => {
     if (!user) return;
-    if (fullName.trim().length < 2) return toast.error("Digite seu nome completo.");
+    if (fullName.trim().length < 2) { toast.error("Digite seu nome completo."); return; }
 
     setSaving(true);
     const { error } = await supabase.from("profiles").upsert({
@@ -123,7 +123,7 @@ function MinhaConta() {
     }
     setSaving(false);
 
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     await queryClient.invalidateQueries({ queryKey: ["my-profile", user.id] });
     toast.success("Perfil atualizado.");
   };
@@ -131,9 +131,9 @@ function MinhaConta() {
   const uploadAvatar = async (file?: File) => {
     if (!user || !file) return;
     if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-      return toast.error("Use uma imagem JPG, PNG ou WEBP.");
+      { toast.error("Use uma imagem JPG, PNG ou WEBP."); return; }
     }
-    if (file.size > 5 * 1024 * 1024) return toast.error("A foto deve ter no máximo 5 MB.");
+    if (file.size > 5 * 1024 * 1024) { toast.error("A foto deve ter no máximo 5 MB."); return; }
 
     setUploading(true);
     const path = `${user.id}/avatar`;
@@ -143,7 +143,7 @@ function MinhaConta() {
 
     if (uploadError) {
       setUploading(false);
-      return toast.error(uploadError.message);
+      { toast.error(uploadError.message); return; }
     }
 
     const { data: publicData } = supabase.storage.from("avatars").getPublicUrl(path);
@@ -157,7 +157,7 @@ function MinhaConta() {
     }
     setUploading(false);
 
-    if (profileError) return toast.error(profileError.message);
+    if (profileError) { toast.error(profileError.message); return; }
     await queryClient.invalidateQueries({ queryKey: ["my-profile", user.id] });
     toast.success("Foto de perfil atualizada.");
   };
