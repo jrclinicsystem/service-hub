@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 
-import { MercadoPagoPaymentDialog } from "@/components/mercado-pago-payment-dialog";
+import { InfinitePayPaymentDialog } from "@/components/infinitepay-payment-dialog";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { Button } from "@/components/ui/button";
@@ -192,12 +192,6 @@ function Agendar() {
     }
   };
 
-  const finishPayment = async () => {
-    setPaymentOpen(false);
-    setPaymentSession(null);
-    await authNavigate({ to: "/minha-conta" });
-  };
-
   return (
     <div className="min-h-screen w-full max-w-[100dvw] overflow-x-clip">
       <SiteHeader />
@@ -351,7 +345,7 @@ function Agendar() {
                 <span className="grid size-6 shrink-0 place-items-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground sm:hidden">5</span>
                 <div>
                   <h2 className="text-base font-semibold sm:text-lg">Como deseja pagar?</h2>
-                  <p className="mt-0.5 text-[11px] text-muted-foreground sm:text-xs">Escolha o valor que será pago agora pelo Mercado Pago.</p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground sm:text-xs">Escolha o valor que será pago agora pela InfinitePay.</p>
                 </div>
               </div>
 
@@ -461,11 +455,10 @@ function Agendar() {
         </div>
       </div>
 
-      <MercadoPagoPaymentDialog
+      <InfinitePayPaymentDialog
         open={paymentOpen}
         onOpenChange={setPaymentOpen}
         session={paymentSession}
-        onPaid={() => void finishPayment()}
       />
 
       <SiteFooter />
