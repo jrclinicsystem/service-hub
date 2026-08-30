@@ -283,6 +283,17 @@
   }
 }
 
+/* Hide Lovable hosting badge on every viewport, including mobile. */
+#lovable-badge,
+a[href*="lovable.app"] [id*="badge"],
+a[href*="lovable.dev"] [id*="badge"],
+[class*="lovable-badge"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
 /* Desktop admin navigation: emerald sidebar inspired by a native SaaS dashboard. */
 @media (min-width: 1024px) {
   body:has(a[href="/admin/equipe"]) header {
@@ -448,6 +459,4 @@
   body:has(a[href="/admin/equipe"]) a[href="/admin/equipe"]:hover {
     background: rgb(176 138 74 / 0.27) !important;
   }
-
-  #lovable-badge {   display: none !important; }
 }
