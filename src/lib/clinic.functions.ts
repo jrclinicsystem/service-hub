@@ -12,6 +12,10 @@ import type { Database } from "@/integrations/supabase/types";
 const serviceColumns =
   "id, slug, name, category_id, professional, professional_role, duration_min, price, rating, reviews_count, summary, description, includes, preparation, is_active";
 
+function money(value: number) {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
 function publicClient() {
   return createClient<Database>(
     JR_CLINIC_SUPABASE_URL,
@@ -73,21 +77,24 @@ export const getHomeOverview = createServerFn({ method: "GET" }).handler(async (
 export const getBookingCatalog = createServerFn({ method: "GET" }).handler(async () => {
   const supabase = publicClient();
   const db = supabase as any;
-  const [catalog, slots, links] = await Promise.all([
+  const [catalog, slots, links, settings] = await Promise.all([
     fetchCatalog(),
     supabase.from("time_slots").select("slot, is_available").order("sort_order"),
     db
       .from("service_professionals")
       .select("service_id, professional:professionals(id, name, specialty, sort_order, is_active)"),
+    db.from("business_settings").select("online_deposit_percent").eq("id", 1).maybeSingle(),
   ]);
 
   if (slots.error) throw slots.error;
   if (links.error) throw links.error;
+  if (settings.error) throw settings.error;
 
   return {
     ...catalog,
     timeSlots: slots.data ?? [],
     serviceProfessionals: (links.data ?? []).filter((item: any) => item.professional?.is_active),
+    depositPercent: Number(settings.data?.online_deposit_percent ?? 50),
   };
 });
 
@@ -136,20 +143,37 @@ export const createAppointment = createServerFn({ method: "POST" })
         notes: z.string().trim().max(1000).optional().default(""),
         scheduledDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
         scheduledTime: z.string().regex(/^\d{2}:\d{2}$/),
+        paymentChoice: z.enum(["deposit", "full"]),
       })
       .parse(data),
   )
   .handler(async ({ data, context }) => {
     const db = context.supabase as any;
-    const { data: validLink, error: linkError } = await db
-      .from("service_professionals")
-      .select("service_id")
-      .eq("service_id", data.serviceId)
-      .eq("professional_id", data.professionalId)
-      .maybeSingle();
+    const [{ data: validLink, error: linkError }, serviceResult, settingsResult] = await Promise.all([
+      db
+        .from("service_professionals")
+        .select("service_id")
+        .eq("service_id", data.serviceId)
+        .eq("professional_id", data.professionalId)
+        .maybeSingle(),
+      db.from("services").select("id, price, is_active").eq("id", data.serviceId).maybeSingle(),
+      db.from("business_settings").select("online_deposit_percent").eq("id", 1).maybeSingle(),
+    ]);
 
     if (linkError) throw linkError;
     if (!validLink) throw new Error("Esse profissional não atende o serviço selecionado.");
+    if (serviceResult.error) throw serviceResult.error;
+    if (!serviceResult.data?.is_active) throw new Error("Esse serviço não está disponível no momento.");
+    if (settingsResult.error) throw settingsResult.error;
+
+    const total = money(Number(serviceResult.data.price ?? 0));
+    if (!Number.isFinite(total) || total <= 0) throw new Error("O serviço precisa ter um valor válido para pagamento online.");
+
+    const rawDepositPercent = Number(settingsResult.data?.online_deposit_percent ?? 50);
+    const depositPercent = Math.max(1, Math.min(100, Number.isFinite(rawDepositPercent) ? rawDepositPercent : 50));
+    const depositAmount = money(total * depositPercent / 100);
+    const balanceAmount = data.paymentChoice === "full" ? 0 : money(Math.max(0, total - depositAmount));
+    const paymentAmount = data.paymentChoice === "full" ? total : depositAmount;
 
     const { data: created, error } = await db
       .from("appointments")
@@ -163,12 +187,25 @@ export const createAppointment = createServerFn({ method: "POST" })
         notes: data.notes,
         scheduled_date: data.scheduledDate,
         scheduled_time: data.scheduledTime,
+        status: "aguardando_pagamento",
+        service_price_snapshot: total,
+        deposit_percent: depositPercent,
+        deposit_amount: depositAmount,
+        balance_amount: balanceAmount,
       })
       .select("id")
       .single();
 
     if (error) throw error;
-    return { id: created.id };
+    return {
+      id: created.id,
+      total,
+      depositPercent,
+      depositAmount,
+      balanceAmount,
+      paymentAmount,
+      paymentChoice: data.paymentChoice,
+    };
   });
 
 export const getMyAppointments = createServerFn({ method: "GET" })
@@ -178,7 +215,7 @@ export const getMyAppointments = createServerFn({ method: "GET" })
     const { data, error } = await db
       .from("appointments")
       .select(
-        "id, patient_name, patient_email, patient_phone, scheduled_date, scheduled_time, status, created_at, service:services(name, price, duration_min), professional:professionals(name, specialty)",
+        "id, patient_name, patient_email, patient_phone, scheduled_date, scheduled_time, status, created_at, service_price_snapshot, deposit_percent, deposit_amount, balance_amount, service:services(name, price, duration_min), professional:professionals(name, specialty), payments(status, amount, kind, payment_method_id)",
       )
       .order("scheduled_date", { ascending: false })
       .order("scheduled_time", { ascending: false });
