@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 
+import { MercadoPagoPaymentDialog } from "@/components/mercado-pago-payment-dialog";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { Button } from "@/components/ui/button";
@@ -25,7 +26,7 @@ import { formatPrice } from "@/lib/clinic";
 
 const title = "Agendar atendimento — JR Clinic";
 const description =
-  "Escolha o serviço, o profissional, a data e o horário do seu atendimento na JR Clinic.";
+  "Escolha o serviço, o profissional, a data, o horário e conclua a reserva com pagamento seguro.";
 
 const searchSchema = z.object({
   servico: z.string().optional(),
@@ -58,9 +59,21 @@ const days = Array.from({ length: 14 }).map((_, index) => {
   };
 });
 
+type PaymentChoice = "deposit" | "full";
+
+type BookingPaymentSession = {
+  appointmentId: string;
+  amount: number;
+  total: number;
+  balance: number;
+  kind: PaymentChoice;
+  serviceName: string;
+  email: string;
+};
+
 function Agendar() {
   const { servico } = Route.useSearch();
-  const { services, timeSlots, serviceProfessionals } = Route.useLoaderData();
+  const { services, timeSlots, serviceProfessionals, depositPercent } = Route.useLoaderData();
   const navigate = Route.useNavigate();
   const authNavigate = useNavigate();
   const { user } = useAuth();
@@ -80,13 +93,27 @@ function Agendar() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [notes, setNotes] = useState("");
+  const [paymentChoice, setPaymentChoice] = useState<PaymentChoice>("deposit");
+  const [paymentSession, setPaymentSession] = useState<BookingPaymentSession | null>(null);
+  const [paymentOpen, setPaymentOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const selectedProfessional = professionals.find((item: any) => item.id === professionalId) ?? professionals[0];
+  const total = Number(service.price);
+  const safeDepositPercent = Number.isFinite(Number(depositPercent)) ? Number(depositPercent) : 50;
+  const depositValue = Math.round(total * safeDepositPercent) / 100;
+  const paymentNow = paymentChoice === "full" ? total : depositValue;
+  const remaining = paymentChoice === "full" ? 0 : Math.max(0, total - depositValue);
+  const depositLabel = Number.isInteger(safeDepositPercent)
+    ? `${safeDepositPercent}%`
+    : `${safeDepositPercent.toFixed(1).replace(".", ",")}%`;
 
   useEffect(() => {
     setProfessionalId(professionals[0]?.id ?? "");
     setTime(null);
+    setPaymentChoice("deposit");
+    setPaymentSession(null);
+    setPaymentOpen(false);
   }, [service.id]);
 
   useEffect(() => {
@@ -110,17 +137,28 @@ function Agendar() {
   }, [user]);
 
   const canConfirm = Boolean(professionalId && day && time && name.trim() && email.trim());
+  const buttonLabel = busy
+    ? "Preparando..."
+    : paymentSession
+      ? "Retomar pagamento"
+      : "Continuar para pagamento";
 
   const confirm = async () => {
+    if (paymentSession) {
+      setPaymentOpen(true);
+      return;
+    }
+
     if (!user) {
-      toast.info("Entre na sua conta para confirmar o agendamento.");
+      toast.info("Entre na sua conta para continuar para o pagamento.");
       await authNavigate({ to: "/auth", search: { next: "/agendar" } });
       return;
     }
     if (!time || !professionalId) return;
+
     setBusy(true);
     try {
-      await submitAppointment({
+      const created = await submitAppointment({
         data: {
           serviceId: service.id,
           professionalId,
@@ -130,17 +168,34 @@ function Agendar() {
           notes,
           scheduledDate: day,
           scheduledTime: time,
+          paymentChoice,
         },
       });
-      toast.success("Agendamento enviado", {
-        description: `Atendimento solicitado com ${selectedProfessional?.name ?? "o profissional escolhido"}.`,
+
+      setPaymentSession({
+        appointmentId: created.id,
+        amount: Number(created.paymentAmount),
+        total: Number(created.total),
+        balance: Number(created.balanceAmount),
+        kind: paymentChoice,
+        serviceName: service.name,
+        email,
       });
-      await authNavigate({ to: "/minha-conta" });
+      setPaymentOpen(true);
+      toast.info("Última etapa: pagamento", {
+        description: "O horário será enviado para a profissional somente após a aprovação do pagamento.",
+      });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Não foi possível agendar.");
+      toast.error(error instanceof Error ? error.message : "Não foi possível preparar o agendamento.");
     } finally {
       setBusy(false);
     }
+  };
+
+  const finishPayment = async () => {
+    setPaymentOpen(false);
+    setPaymentSession(null);
+    await authNavigate({ to: "/minha-conta" });
   };
 
   return (
@@ -150,16 +205,16 @@ function Agendar() {
       <main className="mx-auto box-border w-full min-w-0 max-w-[1440px] px-4 pb-44 pt-6 max-sm:w-[calc(100dvw-24px)] max-sm:max-w-[calc(100dvw-24px)] max-sm:px-0 sm:px-8 sm:pb-32 sm:pt-10 lg:pb-12">
         <span className="eyebrow text-muted-foreground max-sm:text-[10px]">Agendamento</span>
         <h1 className="mt-1 max-w-full text-[28px] font-semibold leading-tight sm:mt-2 sm:text-4xl">Reserve seu horário</h1>
-        <p className="mt-2 max-w-[52ch] text-sm leading-relaxed text-muted-foreground sm:mt-3 sm:text-base">
-          Escolha o serviço, quem vai atender você, a data e o horário.
-          <span className="hidden sm:inline"> Nenhum pagamento é feito nesta etapa.</span>
+        <p className="mt-2 max-w-[58ch] text-sm leading-relaxed text-muted-foreground sm:mt-3 sm:text-base">
+          Escolha o atendimento e, no final, decida se prefere pagar {depositLabel} para reservar ou quitar o valor total.
         </p>
 
-        <div className="mt-5 grid w-full min-w-0 grid-cols-4 gap-1.5 sm:hidden">
+        <div className="mt-5 grid w-full min-w-0 grid-cols-5 gap-1 sm:hidden">
           <StepChip number="1" label="Serviço" />
-          <StepChip number="2" label="Profissional" />
+          <StepChip number="2" label="Prof." />
           <StepChip number="3" label="Horário" />
           <StepChip number="4" label="Dados" />
+          <StepChip number="5" label="Pagar" />
         </div>
 
         <div className="mt-5 grid w-full min-w-0 max-w-full gap-4 sm:mt-10 sm:gap-8 lg:grid-cols-[1.15fr_0.85fr]">
@@ -191,7 +246,7 @@ function Agendar() {
 
               <div className="mt-4 w-full min-w-0 max-w-full">
                 <Label htmlFor="profissional" className="text-xs sm:text-sm">Quem você prefere?</Label>
-                <Select value={professionalId} onValueChange={(value) => { setProfessionalId(value); setTime(null); }}>
+                <Select value={professionalId} onValueChange={(value) => { setProfessionalId(value); setTime(null); setPaymentSession(null); }}>
                   <SelectTrigger id="profissional" className="mt-2 h-11 w-full min-w-0 max-w-full overflow-hidden rounded-xl">
                     <SelectValue placeholder="Escolha o profissional" />
                   </SelectTrigger>
@@ -213,7 +268,7 @@ function Agendar() {
                   <p className="truncate text-xs font-medium">{selectedProfessional?.name ?? "Escolha o profissional"}</p>
                   <p className="mt-0.5 text-[10px] text-muted-foreground">{service.duration_min} min</p>
                 </div>
-                <p className="shrink-0 text-sm font-semibold text-primary">{formatPrice(Number(service.price))}</p>
+                <p className="shrink-0 text-sm font-semibold text-primary">{formatPrice(total)}</p>
               </div>
             </section>
 
@@ -230,7 +285,7 @@ function Agendar() {
                     key={item.key}
                     type="button"
                     disabled={item.disabled}
-                    onClick={() => setDay(item.key)}
+                    onClick={() => { setDay(item.key); setPaymentSession(null); }}
                     className={`w-[54px] shrink-0 rounded-xl border px-2 py-2.5 text-center transition-colors disabled:opacity-35 sm:w-auto sm:py-3 ${
                       day === item.key
                         ? "border-primary bg-primary text-primary-foreground"
@@ -252,7 +307,7 @@ function Agendar() {
                       key={slot.slot}
                       type="button"
                       disabled={disabled}
-                      onClick={() => setTime(slot.slot)}
+                      onClick={() => { setTime(slot.slot); setPaymentSession(null); }}
                       className={`min-w-0 max-w-full rounded-xl border px-1 py-2.5 text-xs font-medium transition-colors disabled:opacity-35 sm:px-3 sm:text-sm ${
                         time === slot.slot
                           ? "border-primary bg-primary text-primary-foreground"
@@ -274,32 +329,84 @@ function Agendar() {
               <div className="mt-3 grid w-full min-w-0 max-w-full gap-3 sm:mt-4 sm:grid-cols-2 sm:gap-4">
                 <div className="w-full min-w-0 max-w-full">
                   <Label htmlFor="nome" className="text-xs sm:text-sm">Nome completo</Label>
-                  <Input id="nome" value={name} onChange={(event) => setName(event.target.value)} placeholder="Como no documento" className="mt-1.5 h-11 w-full min-w-0 max-w-full rounded-xl sm:mt-2" />
+                  <Input id="nome" value={name} onChange={(event) => { setName(event.target.value); setPaymentSession(null); }} placeholder="Como no documento" className="mt-1.5 h-11 w-full min-w-0 max-w-full rounded-xl sm:mt-2" />
                 </div>
                 <div className="w-full min-w-0 max-w-full">
                   <Label htmlFor="email" className="text-xs sm:text-sm">E-mail</Label>
-                  <Input id="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="voce@email.com" className="mt-1.5 h-11 w-full min-w-0 max-w-full rounded-xl sm:mt-2" />
+                  <Input id="email" type="email" value={email} onChange={(event) => { setEmail(event.target.value); setPaymentSession(null); }} placeholder="voce@email.com" className="mt-1.5 h-11 w-full min-w-0 max-w-full rounded-xl sm:mt-2" />
                 </div>
                 <div className="w-full min-w-0 max-w-full sm:col-span-2">
                   <Label htmlFor="telefone" className="text-xs sm:text-sm">Telefone/WhatsApp <span className="font-normal text-muted-foreground">(opcional)</span></Label>
-                  <Input id="telefone" value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="(85) 99999-9999" className="mt-1.5 h-11 w-full min-w-0 max-w-full rounded-xl sm:mt-2" />
+                  <Input id="telefone" value={phone} onChange={(event) => { setPhone(event.target.value); setPaymentSession(null); }} placeholder="(85) 99999-9999" className="mt-1.5 h-11 w-full min-w-0 max-w-full rounded-xl sm:mt-2" />
                 </div>
                 <div className="w-full min-w-0 max-w-full sm:col-span-2">
                   <Label htmlFor="obs" className="text-xs sm:text-sm">Observações <span className="font-normal text-muted-foreground">(opcional)</span></Label>
-                  <Textarea id="obs" value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Informações úteis para a equipe" className="mt-1.5 min-h-[82px] w-full min-w-0 max-w-full resize-none rounded-xl sm:mt-2" rows={3} />
+                  <Textarea id="obs" value={notes} onChange={(event) => { setNotes(event.target.value); setPaymentSession(null); }} placeholder="Informações úteis para a equipe" className="mt-1.5 min-h-[82px] w-full min-w-0 max-w-full resize-none rounded-xl sm:mt-2" rows={3} />
                 </div>
+              </div>
+            </section>
+
+            <section className="box-border w-full min-w-0 max-w-full overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-6">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="grid size-6 shrink-0 place-items-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground sm:hidden">5</span>
+                <div>
+                  <h2 className="text-base font-semibold sm:text-lg">Como deseja pagar?</h2>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground sm:text-xs">Escolha o valor que será pago agora pelo Mercado Pago.</p>
+                </div>
+              </div>
+
+              <div className="mt-4 grid gap-2.5 sm:grid-cols-2 sm:gap-3">
+                <button
+                  type="button"
+                  disabled={Boolean(paymentSession)}
+                  onClick={() => setPaymentChoice("deposit")}
+                  className={`rounded-2xl border p-4 text-left transition disabled:cursor-not-allowed ${
+                    paymentChoice === "deposit"
+                      ? "border-primary bg-primary-soft/60 shadow-sm"
+                      : "border-border bg-background hover:bg-secondary/40"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold">Pagar {depositLabel} agora</p>
+                      <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">Reserva o horário e deixa o restante para a clínica.</p>
+                    </div>
+                    <span className="shrink-0 text-base font-semibold text-primary">{formatPrice(depositValue)}</span>
+                  </div>
+                  <p className="mt-3 text-xs font-medium">Restante: {formatPrice(Math.max(0, total - depositValue))}</p>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={Boolean(paymentSession)}
+                  onClick={() => setPaymentChoice("full")}
+                  className={`rounded-2xl border p-4 text-left transition disabled:cursor-not-allowed ${
+                    paymentChoice === "full"
+                      ? "border-primary bg-primary-soft/60 shadow-sm"
+                      : "border-border bg-background hover:bg-secondary/40"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold">Pagar valor total</p>
+                      <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">Quita o serviço online e não deixa saldo pendente.</p>
+                    </div>
+                    <span className="shrink-0 text-base font-semibold text-primary">{formatPrice(total)}</span>
+                  </div>
+                  <p className="mt-3 text-xs font-medium">Restante: {formatPrice(0)}</p>
+                </button>
               </div>
 
               <div className="mt-4 border-t border-border/70 pt-4 sm:hidden">
                 <div className="mb-3 flex items-end justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate text-[10px] text-muted-foreground">{service.name}</p>
-                    <p className="truncate text-xs font-medium">{selectedProfessional?.name ?? "Escolha o profissional"}</p>
+                    <p className="truncate text-[10px] text-muted-foreground">Pagar agora</p>
+                    <p className="truncate text-xs font-medium">{paymentChoice === "deposit" ? `${depositLabel} para reservar` : "Valor total"}</p>
                   </div>
-                  <p className="shrink-0 text-lg font-semibold text-primary">{formatPrice(Number(service.price))}</p>
+                  <p className="shrink-0 text-lg font-semibold text-primary">{formatPrice(paymentNow)}</p>
                 </div>
                 <Button className="h-12 w-full rounded-full" disabled={!canConfirm || busy} onClick={confirm}>
-                  {busy ? "Enviando..." : "Confirmar agendamento"}
+                  {buttonLabel}
                 </Button>
                 {!canConfirm && (
                   <p className="mt-2 text-center text-[10px] text-muted-foreground">Preencha os dados e selecione profissional, dia e horário.</p>
@@ -321,14 +428,22 @@ function Agendar() {
               <Separator className="my-5" />
 
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Total</span>
-                <span className="font-sans text-2xl font-semibold tracking-tight text-primary lining-nums tabular-nums">{formatPrice(Number(service.price))}</span>
+                <span className="text-sm text-muted-foreground">Valor do serviço</span>
+                <span className="font-sans text-xl font-semibold tracking-tight lining-nums tabular-nums">{formatPrice(total)}</span>
+              </div>
+              <div className="mt-3 flex items-center justify-between rounded-xl bg-primary-soft/60 px-3 py-3">
+                <span className="text-sm font-medium text-primary">Pagar agora</span>
+                <span className="font-sans text-2xl font-semibold tracking-tight text-primary lining-nums tabular-nums">{formatPrice(paymentNow)}</span>
+              </div>
+              <div className="mt-2 flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">Restante na clínica</span>
+                <span className="font-medium">{formatPrice(remaining)}</span>
               </div>
 
               <Button size="lg" className="mt-6 w-full rounded-full" disabled={!canConfirm || busy} onClick={confirm}>
-                {busy ? "Enviando..." : "Confirmar agendamento"}
+                {buttonLabel}
               </Button>
-              <p className="mt-3 text-center text-xs text-muted-foreground">Nenhuma cobrança é feita nesta etapa.</p>
+              <p className="mt-3 text-center text-xs leading-relaxed text-muted-foreground">O agendamento só é liberado para a profissional após a confirmação do pagamento.</p>
             </div>
           </aside>
         </div>
@@ -337,14 +452,21 @@ function Agendar() {
       <div className="fixed bottom-[calc(63px+env(safe-area-inset-bottom))] left-0 right-0 z-[60] box-border w-[100dvw] max-w-[100dvw] overflow-hidden border-t border-border bg-card/95 px-3 py-3 shadow-[0_-8px_30px_rgba(0,0,0,0.06)] backdrop-blur-xl md:bottom-0 lg:hidden">
         <div className="mx-auto flex w-full min-w-0 max-w-lg items-center gap-2.5">
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[10px] text-muted-foreground">{service.name} · {selectedProfessional?.name ?? "Escolha quem atende"}</p>
-            <p className="text-base font-semibold leading-tight text-primary">{formatPrice(Number(service.price))}</p>
+            <p className="truncate text-[10px] text-muted-foreground">Pagar agora · {paymentChoice === "deposit" ? depositLabel : "100%"}</p>
+            <p className="text-base font-semibold leading-tight text-primary">{formatPrice(paymentNow)}</p>
           </div>
-          <Button className="h-11 min-w-[142px] shrink-0 rounded-full px-4" disabled={!canConfirm || busy} onClick={confirm}>
-            {busy ? "Enviando..." : "Confirmar"}
+          <Button className="h-11 min-w-[162px] shrink-0 rounded-full px-4" disabled={!canConfirm || busy} onClick={confirm}>
+            {busy ? "Preparando..." : paymentSession ? "Retomar" : "Ir para pagamento"}
           </Button>
         </div>
       </div>
+
+      <MercadoPagoPaymentDialog
+        open={paymentOpen}
+        onOpenChange={setPaymentOpen}
+        session={paymentSession}
+        onPaid={() => void finishPayment()}
+      />
 
       <SiteFooter />
     </div>
