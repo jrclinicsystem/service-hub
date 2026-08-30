@@ -12,8 +12,8 @@ const description =
 
 export const Route = createFileRoute("/")({
   loader: () => getCatalog(),
-  staleTime: 5 * 60 * 1000,
-  preloadStaleTime: 5 * 60 * 1000,
+  staleTime: 0,
+  preloadStaleTime: 0,
   head: () => ({
     meta: [
       { title },
