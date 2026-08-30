@@ -4,7 +4,6 @@ import {
   Link,
   createRootRouteWithContext,
   useLocation,
-  useNavigate,
   useRouter,
   HeadContent,
   Scripts,
@@ -15,7 +14,6 @@ import { jrClinicIconDataUrl } from "@/assets/jr-clinic-icon";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 import { SupportWhatsapp } from "@/components/support-whatsapp";
 import { Toaster } from "@/components/ui/sonner";
-import { useAuth } from "@/hooks/use-auth";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -122,28 +120,8 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function SystemAccess() {
   const location = useLocation();
-  const navigate = useNavigate();
-  const { user, loading } = useAuth();
-  const requiresLogin = location.pathname === "/agendar";
   const isInternalArea = location.pathname.startsWith("/admin") || location.pathname === "/profissional";
   const showAdminShortcuts = location.pathname === "/admin";
-
-  useEffect(() => {
-    if (!requiresLogin || loading || user) return;
-    const next = `${window.location.pathname}${window.location.search}`;
-    void navigate({ to: "/auth", search: { next }, replace: true });
-  }, [requiresLogin, loading, user, navigate]);
-
-  if (requiresLogin && (loading || !user)) {
-    return (
-      <div className="grid min-h-screen place-items-center bg-background px-5">
-        <div className="text-center">
-          <div className="mx-auto size-9 animate-pulse rounded-2xl bg-primary-soft" />
-          <p className="mt-3 text-sm text-muted-foreground">Entrando na área de agendamento...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <>
