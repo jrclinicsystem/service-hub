@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { CheckCircle2, Copy, LoaderCircle, ShieldCheck } from "lucide-react";
+import { CheckCircle2, Copy, CreditCard, LoaderCircle, QrCode, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { formatPrice } from "@/lib/clinic";
 
 type PaymentKind = "deposit" | "full";
+type PaymentMode = "pix" | "card";
 
 type PaymentSession = {
   appointmentId: string;
@@ -40,6 +41,11 @@ type PaymentResult = {
       ticket_url?: string;
     };
   } | null;
+};
+
+type MercadoPagoConfig = {
+  publicKey: string;
+  isTest: boolean;
 };
 
 function ensureMercadoPagoSdk() {
@@ -126,13 +132,17 @@ export function MercadoPagoPaymentDialog({
 }) {
   const controllerRef = useRef<any>(null);
   const payerDocumentRef = useRef("");
-  const [loading, setLoading] = useState(false);
-  const [ready, setReady] = useState(false);
+  const [mode, setMode] = useState<PaymentMode>("pix");
+  const [config, setConfig] = useState<MercadoPagoConfig | null>(null);
+  const [loadingConfig, setLoadingConfig] = useState(false);
+  const [loadingCard, setLoadingCard] = useState(false);
+  const [cardReady, setCardReady] = useState(false);
+  const [generatingPix, setGeneratingPix] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [result, setResult] = useState<PaymentResult | null>(null);
   const [checking, setChecking] = useState(false);
-  const [isTest, setIsTest] = useState(false);
   const [payerDocument, setPayerDocument] = useState("");
+  const [payerEmail, setPayerEmail] = useState("");
 
   const updatePayerDocument = (value: string) => {
     const digits = onlyDigits(value);
@@ -145,6 +155,30 @@ export function MercadoPagoPaymentDialog({
       description: "Seu agendamento foi enviado para a clínica.",
     });
     onPaid();
+  };
+
+  const applyPaymentResult = async (paymentResult: PaymentResult) => {
+    const status = String(paymentResult.status ?? "pending");
+
+    if (status === "approved") {
+      await controllerRef.current?.unmount?.();
+      controllerRef.current = null;
+      setResult(paymentResult);
+      finishApproved();
+      return;
+    }
+
+    if (["pending", "in_process"].includes(status)) {
+      await controllerRef.current?.unmount?.();
+      controllerRef.current = null;
+      setResult(paymentResult);
+      return;
+    }
+
+    const rejection = paymentResult.status_detail
+      ? `Pagamento não aprovado: ${paymentResult.status_detail}`
+      : "Pagamento não aprovado. Revise os dados e tente novamente.";
+    throw new Error(rejection);
   };
 
   const checkPayment = async (silent = false) => {
@@ -171,8 +205,63 @@ export function MercadoPagoPaymentDialog({
     }
 
     if (!silent) {
-      const detail = data?.status_detail ? String(data.status_detail) : "Assim que o Mercado Pago aprovar, o agendamento será liberado automaticamente.";
+      const detail = data?.status_detail
+        ? String(data.status_detail)
+        : "Assim que o Mercado Pago aprovar, o agendamento será liberado automaticamente.";
       toast.info("Pagamento ainda não confirmado", { description: detail });
+    }
+  };
+
+  const generatePix = async () => {
+    if (!session || generatingPix) return;
+    setErrorMessage("");
+
+    const email = payerEmail.trim();
+    if (!email || !email.includes("@")) {
+      setErrorMessage("Informe um e-mail válido para o pagador.");
+      return;
+    }
+
+    if (payerDocumentRef.current.length !== 11) {
+      setErrorMessage("Informe um CPF com 11 dígitos para gerar o Pix.");
+      return;
+    }
+
+    setGeneratingPix(true);
+    try {
+      const attemptId = crypto.randomUUID();
+      const { data, error } = await supabase.functions.invoke("mercado-pago-create-payment", {
+        body: {
+          appointmentId: session.appointmentId,
+          attemptId,
+          kind: session.kind,
+          payerDocument: payerDocumentRef.current,
+          formData: {
+            payment_method_id: "pix",
+            payer: {
+              email,
+              identification: {
+                type: "CPF",
+                number: payerDocumentRef.current,
+              },
+            },
+          },
+        },
+      });
+
+      if (error) throw new Error(await invokeErrorMessage(error));
+      if (data?.error) {
+        const detail = data?.message || data?.details?.message || data?.details?.cause?.[0]?.description || data.error;
+        throw new Error(String(detail));
+      }
+
+      await applyPaymentResult(data as PaymentResult);
+    } catch (error) {
+      const message = paymentErrorMessage(error);
+      setErrorMessage(message);
+      toast.error("Pix não gerado", { description: message });
+    } finally {
+      setGeneratingPix(false);
     }
   };
 
@@ -185,25 +274,52 @@ export function MercadoPagoPaymentDialog({
   }, [open, result?.status, session?.appointmentId]);
 
   useEffect(() => {
-    if (!open || !session || result) return;
+    if (!open || !session) return;
 
     let cancelled = false;
-    setLoading(true);
-    setReady(false);
+    setLoadingConfig(true);
+    setErrorMessage("");
+    setPayerEmail(session.email ?? "");
+
+    const loadConfig = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke("mercado-pago-config");
+        if (error) throw error;
+        if (!data?.publicKey) throw new Error("A chave pública do Mercado Pago não foi encontrada.");
+        if (cancelled) return;
+
+        const nextConfig = {
+          publicKey: String(data.publicKey),
+          isTest: Boolean(data.isTest),
+        };
+        setConfig(nextConfig);
+
+        if (nextConfig.isTest && !payerDocumentRef.current) {
+          updatePayerDocument("19119119100");
+        }
+      } catch (error) {
+        if (!cancelled) setErrorMessage(paymentErrorMessage(error));
+      } finally {
+        if (!cancelled) setLoadingConfig(false);
+      }
+    };
+
+    void loadConfig();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, session?.appointmentId]);
+
+  useEffect(() => {
+    if (!open || !session || !config || mode !== "card" || result) return;
+
+    let cancelled = false;
+    setLoadingCard(true);
+    setCardReady(false);
     setErrorMessage("");
 
-    const renderBrick = async () => {
+    const renderCardBrick = async () => {
       try {
-        const { data: config, error: configError } = await supabase.functions.invoke("mercado-pago-config");
-        if (configError) throw configError;
-        if (!config?.publicKey) throw new Error("A chave pública do Mercado Pago não foi encontrada.");
-
-        const testEnvironment = Boolean(config.isTest);
-        setIsTest(testEnvironment);
-        if (testEnvironment && !payerDocumentRef.current) {
-          updatePayerDocument("12345678909");
-        }
-
         await ensureMercadoPagoSdk();
         if (cancelled) return;
 
@@ -211,14 +327,13 @@ export function MercadoPagoPaymentDialog({
         const mp = new MercadoPago(config.publicKey);
         const bricksBuilder = mp.bricks();
 
-        const settings = {
+        controllerRef.current = await bricksBuilder.create("payment", "jrclinic-card-brick", {
           initialization: {
             amount: session.amount,
-            payer: { email: session.email },
+            payer: { email: payerEmail || session.email },
           },
           customization: {
             paymentMethods: {
-              bankTransfer: "all",
               creditCard: "all",
               debitCard: "all",
               prepaidCard: "all",
@@ -230,25 +345,18 @@ export function MercadoPagoPaymentDialog({
           callbacks: {
             onReady: () => {
               if (cancelled) return;
-              setLoading(false);
-              setReady(true);
+              setLoadingCard(false);
+              setCardReady(true);
             },
             onSubmit: async ({ formData }: any) => {
               setErrorMessage("");
-
               try {
-                const method = String(formData?.payment_method_id ?? "");
-                if (method === "pix" && payerDocumentRef.current.length !== 11) {
-                  throw new Error("Informe um CPF com 11 dígitos para gerar o Pix.");
-                }
-
                 const attemptId = crypto.randomUUID();
                 const { data, error } = await supabase.functions.invoke("mercado-pago-create-payment", {
                   body: {
                     appointmentId: session.appointmentId,
                     attemptId,
                     kind: session.kind,
-                    payerDocument: payerDocumentRef.current,
                     formData,
                   },
                 });
@@ -259,28 +367,8 @@ export function MercadoPagoPaymentDialog({
                   throw new Error(String(detail));
                 }
 
-                const paymentResult = data as PaymentResult;
-                const status = String(paymentResult.status ?? "pending");
-
-                if (status === "approved") {
-                  await controllerRef.current?.unmount?.();
-                  controllerRef.current = null;
-                  setResult(paymentResult);
-                  finishApproved();
-                  return paymentResult;
-                }
-
-                if (["pending", "in_process"].includes(status)) {
-                  await controllerRef.current?.unmount?.();
-                  controllerRef.current = null;
-                  setResult(paymentResult);
-                  return paymentResult;
-                }
-
-                const rejection = paymentResult.status_detail
-                  ? `Pagamento não aprovado: ${paymentResult.status_detail}`
-                  : "Pagamento não aprovado. Revise os dados e tente novamente.";
-                throw new Error(rejection);
+                await applyPaymentResult(data as PaymentResult);
+                return data;
               } catch (error) {
                 const message = paymentErrorMessage(error);
                 setErrorMessage(message);
@@ -289,27 +377,22 @@ export function MercadoPagoPaymentDialog({
               }
             },
             onError: (error: unknown) => {
-              console.error("Mercado Pago Brick", error);
-              setLoading(false);
+              console.error("Mercado Pago Card Brick", error);
+              setLoadingCard(false);
               const message = paymentErrorMessage(error);
               setErrorMessage((current) => current || message);
             },
           },
-        };
-
-        controllerRef.current = await bricksBuilder.create(
-          "payment",
-          "jrclinic-payment-brick",
-          settings,
-        );
+        });
       } catch (error) {
-        if (cancelled) return;
-        setLoading(false);
-        setErrorMessage(paymentErrorMessage(error));
+        if (!cancelled) {
+          setLoadingCard(false);
+          setErrorMessage(paymentErrorMessage(error));
+        }
       }
     };
 
-    void renderBrick();
+    void renderCardBrick();
 
     return () => {
       cancelled = true;
@@ -317,17 +400,31 @@ export function MercadoPagoPaymentDialog({
       controllerRef.current = null;
       if (controller?.unmount) void controller.unmount();
     };
-  }, [open, session?.appointmentId, session?.amount, session?.kind, session?.email, result]);
+  }, [open, mode, config?.publicKey, session?.appointmentId, session?.amount, session?.kind, result]);
+
+  useEffect(() => {
+    if (mode !== "card") {
+      const controller = controllerRef.current;
+      controllerRef.current = null;
+      if (controller?.unmount) void controller.unmount();
+      setCardReady(false);
+      setLoadingCard(false);
+    }
+  }, [mode]);
 
   useEffect(() => {
     if (!open) {
+      setMode("pix");
+      setConfig(null);
       setResult(null);
       setErrorMessage("");
-      setReady(false);
-      setLoading(false);
-      setIsTest(false);
+      setCardReady(false);
+      setLoadingCard(false);
+      setLoadingConfig(false);
+      setGeneratingPix(false);
       payerDocumentRef.current = "";
       setPayerDocument("");
+      setPayerEmail("");
     }
   }, [open]);
 
@@ -385,7 +482,9 @@ export function MercadoPagoPaymentDialog({
             )}
             <h3 className="mt-4 text-lg font-semibold">Aguardando pagamento</h3>
             <p className="mx-auto mt-1 max-w-md text-sm leading-relaxed text-muted-foreground">
-              {qrCode ? "Escaneie o QR Code ou copie o código Pix abaixo. A confirmação é automática." : "O Mercado Pago está processando a cobrança. A confirmação é automática."}
+              {qrCode
+                ? "Escaneie o QR Code ou copie o código Pix abaixo. A confirmação é automática."
+                : "O Mercado Pago está processando a cobrança. A confirmação é automática."}
             </p>
             {qrCode ? (
               <div className="mt-4 rounded-2xl border border-border bg-secondary/40 p-3 text-left">
@@ -398,7 +497,7 @@ export function MercadoPagoPaymentDialog({
                     toast.success("Código Pix copiado.");
                   }}
                 >
-                  <Copy className="size-4" /> Copiar Pix
+                  <Copy className="size-4" /> Copiar código Pix
                 </Button>
               </div>
             ) : null}
@@ -411,44 +510,110 @@ export function MercadoPagoPaymentDialog({
           <>
             <div className="mt-4 flex items-center gap-2 rounded-xl bg-primary-soft/70 px-3 py-2.5 text-xs text-primary">
               <ShieldCheck className="size-4 shrink-0" />
-              <span>Pix e cartões são processados pelo ambiente seguro do Mercado Pago.</span>
+              <span>O pagamento acontece aqui mesmo. Você não será redirecionado para outro site.</span>
             </div>
 
-            {isTest ? (
-              <div className="mt-3 rounded-xl border border-border bg-secondary/35 px-3 py-2.5 text-[11px] leading-relaxed text-muted-foreground">
-                Ambiente de teste. Para cartões, use os dados oficiais de teste do Mercado Pago e um e-mail diferente do e-mail da conta vendedora.
-              </div>
-            ) : null}
-
-            <div className="mt-4">
-              <Label htmlFor="payment-cpf" className="text-xs">CPF do pagador</Label>
-              <Input
-                id="payment-cpf"
-                inputMode="numeric"
-                autoComplete="off"
-                value={formatCpf(payerDocument)}
-                onChange={(event) => updatePayerDocument(event.target.value)}
-                placeholder="000.000.000-00"
-                className="mt-1.5 h-11 rounded-xl"
-              />
-              <p className="mt-1.5 text-[10px] leading-relaxed text-muted-foreground">
-                Necessário para gerar Pix. Este dado é enviado ao Mercado Pago e não é salvo no cadastro da clínica.
-              </p>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setMode("pix")}
+                className={`flex items-center justify-center gap-2 rounded-2xl border px-3 py-3 text-sm font-medium transition ${
+                  mode === "pix" ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card hover:bg-secondary/50"
+                }`}
+              >
+                <QrCode className="size-4" /> Pix
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode("card")}
+                className={`flex items-center justify-center gap-2 rounded-2xl border px-3 py-3 text-sm font-medium transition ${
+                  mode === "card" ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card hover:bg-secondary/50"
+                }`}
+              >
+                <CreditCard className="size-4" /> Cartão
+              </button>
             </div>
 
-            {loading ? (
-              <div className="grid min-h-48 place-items-center">
-                <div className="text-center">
-                  <LoaderCircle className="mx-auto size-6 animate-spin text-primary" />
-                  <p className="mt-3 text-sm text-muted-foreground">Carregando pagamento seguro...</p>
+            {mode === "pix" ? (
+              <div className="mt-4 rounded-2xl border border-border bg-card p-4 sm:p-5">
+                <div>
+                  <h3 className="font-semibold">Pagar com Pix</h3>
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                    Ao gerar o Pix, o QR Code e o código copia e cola aparecerão nesta mesma tela.
+                  </p>
                 </div>
-              </div>
-            ) : null}
 
-            <div id="jrclinic-payment-brick" className={ready ? "mt-4" : "min-h-0"} />
+                <div className="mt-4 space-y-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="jrclinic-pix-email">E-mail do pagador</Label>
+                    <Input
+                      id="jrclinic-pix-email"
+                      type="email"
+                      value={payerEmail}
+                      onChange={(event) => setPayerEmail(event.target.value)}
+                      placeholder="cliente@email.com"
+                      autoComplete="email"
+                    />
+                    <p className="text-[10px] leading-relaxed text-muted-foreground">
+                      O Mercado Pago exige esse dado para processar o Pix. Nenhum link de pagamento será enviado por e-mail.
+                    </p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="jrclinic-payer-cpf">CPF do pagador</Label>
+                    <Input
+                      id="jrclinic-payer-cpf"
+                      inputMode="numeric"
+                      value={formatCpf(payerDocument)}
+                      onChange={(event) => updatePayerDocument(event.target.value)}
+                      placeholder="000.000.000-00"
+                      autoComplete="off"
+                    />
+                    <p className="text-[10px] leading-relaxed text-muted-foreground">
+                      Necessário para gerar o Pix. Este dado é enviado ao Mercado Pago e não é salvo no cadastro da clínica.
+                    </p>
+                  </div>
+                </div>
+
+                {config?.isTest ? (
+                  <p className="mt-4 rounded-xl bg-secondary/45 px-3 py-2 text-[10px] leading-relaxed text-muted-foreground">
+                    Ambiente de teste do Mercado Pago.
+                  </p>
+                ) : null}
+
+                <Button
+                  className="mt-4 w-full rounded-full"
+                  onClick={() => void generatePix()}
+                  disabled={generatingPix || loadingConfig}
+                >
+                  {generatingPix || loadingConfig ? <LoaderCircle className="size-4 animate-spin" /> : <QrCode className="size-4" />}
+                  {generatingPix ? "Gerando Pix..." : "Gerar QR Code Pix"}
+                </Button>
+              </div>
+            ) : (
+              <div className="mt-4 rounded-2xl border border-border bg-card p-3 sm:p-4">
+                <div className="px-1 pb-3">
+                  <h3 className="font-semibold">Pagar com cartão</h3>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Crédito, débito e parcelamento aparecem conforme a disponibilidade da conta Mercado Pago.
+                  </p>
+                </div>
+
+                {loadingCard ? (
+                  <div className="grid min-h-40 place-items-center">
+                    <div className="text-center">
+                      <LoaderCircle className="mx-auto size-6 animate-spin text-primary" />
+                      <p className="mt-3 text-sm text-muted-foreground">Carregando pagamento seguro...</p>
+                    </div>
+                  </div>
+                ) : null}
+
+                <div id="jrclinic-card-brick" className={cardReady ? "" : "min-h-0"} />
+              </div>
+            )}
 
             {errorMessage ? (
-              <div className="mt-3 rounded-xl border border-destructive/25 bg-destructive/5 px-3 py-2.5 text-xs leading-relaxed text-destructive">
+              <div className="mt-3 rounded-xl border border-destructive/25 bg-destructive/5 px-3 py-2.5 text-xs text-destructive">
                 {errorMessage}
               </div>
             ) : null}
