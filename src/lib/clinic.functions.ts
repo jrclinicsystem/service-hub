@@ -143,7 +143,7 @@ export const createAppointment = createServerFn({ method: "POST" })
         notes: z.string().trim().max(1000).optional().default(""),
         scheduledDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
         scheduledTime: z.string().regex(/^\d{2}:\d{2}$/),
-        paymentChoice: z.enum(["deposit", "full"]),
+        paymentChoice: z.enum(["deposit", "onsite"]),
       })
       .parse(data),
   )
@@ -167,13 +167,15 @@ export const createAppointment = createServerFn({ method: "POST" })
     if (settingsResult.error) throw settingsResult.error;
 
     const total = money(Number(serviceResult.data.price ?? 0));
-    if (!Number.isFinite(total) || total <= 0) throw new Error("O serviço precisa ter um valor válido para pagamento online.");
+    if (!Number.isFinite(total) || total <= 0) throw new Error("O serviço precisa ter um valor válido.");
 
     const rawDepositPercent = Number(settingsResult.data?.online_deposit_percent ?? 50);
     const depositPercent = Math.max(1, Math.min(100, Number.isFinite(rawDepositPercent) ? rawDepositPercent : 50));
-    const depositAmount = money(total * depositPercent / 100);
-    const balanceAmount = data.paymentChoice === "full" ? 0 : money(Math.max(0, total - depositAmount));
-    const paymentAmount = data.paymentChoice === "full" ? total : depositAmount;
+    const configuredDeposit = money(total * depositPercent / 100);
+    const requiresOnlinePayment = data.paymentChoice === "deposit";
+    const depositAmount = requiresOnlinePayment ? configuredDeposit : 0;
+    const balanceAmount = requiresOnlinePayment ? money(Math.max(0, total - configuredDeposit)) : total;
+    const paymentAmount = requiresOnlinePayment ? configuredDeposit : 0;
 
     const { data: created, error } = await db
       .from("appointments")
@@ -187,7 +189,8 @@ export const createAppointment = createServerFn({ method: "POST" })
         notes: data.notes,
         scheduled_date: data.scheduledDate,
         scheduled_time: data.scheduledTime,
-        status: "aguardando_pagamento",
+        status: requiresOnlinePayment ? "aguardando_pagamento" : "pendente",
+        payment_choice: requiresOnlinePayment ? "online_deposit" : "onsite",
         service_price_snapshot: total,
         deposit_percent: depositPercent,
         deposit_amount: depositAmount,
@@ -205,6 +208,7 @@ export const createAppointment = createServerFn({ method: "POST" })
       balanceAmount,
       paymentAmount,
       paymentChoice: data.paymentChoice,
+      requiresOnlinePayment,
     };
   });
 
@@ -215,13 +219,32 @@ export const getMyAppointments = createServerFn({ method: "GET" })
     const { data, error } = await db
       .from("appointments")
       .select(
-        "id, patient_name, patient_email, patient_phone, scheduled_date, scheduled_time, status, created_at, service_price_snapshot, deposit_percent, deposit_amount, balance_amount, service:services(name, price, duration_min), professional:professionals(name, specialty), payments(status, amount, kind, payment_method_id)",
+        "id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status, created_at, status_updated_at, payment_choice, user_hidden_at, service_price_snapshot, deposit_percent, deposit_amount, balance_amount, service:services(name, price, duration_min), professional:professionals(name, specialty), payments(status, amount, kind, payment_method_id, provider, paid_at, created_at, status_detail, provider_payment_id)",
       )
+      .is("user_hidden_at", null)
       .order("scheduled_date", { ascending: false })
       .order("scheduled_time", { ascending: false });
 
     if (error) throw error;
     return data ?? [];
+  });
+
+export const hideMyAppointment = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data) => z.object({ id: z.string().uuid() }).parse(data))
+  .handler(async ({ data, context }) => {
+    const db = context.supabase as any;
+    const { data: updated, error } = await db
+      .from("appointments")
+      .update({ user_hidden_at: new Date().toISOString() })
+      .eq("id", data.id)
+      .eq("user_id", context.userId)
+      .select("id")
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!updated) throw new Error("Este agendamento não pode ser removido do histórico agora.");
+    return { ok: true };
   });
 
 async function isAdminContext(context: {
@@ -263,7 +286,7 @@ export const getAdminOverview = createServerFn({ method: "GET" })
       db
         .from("appointments")
         .select(
-          "id, patient_name, patient_email, scheduled_date, scheduled_time, status, service:services(name, price), professional:professionals(name, specialty)",
+          "id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status, created_at, status_updated_at, payment_choice, service_price_snapshot, deposit_percent, deposit_amount, balance_amount, service:services(name, price, duration_min), professional:professionals(name, specialty), payments(status, amount, kind, payment_method_id, provider, paid_at, created_at)",
         )
         .order("scheduled_date", { ascending: true }),
       db.from("services").select(serviceColumns).order("name"),
