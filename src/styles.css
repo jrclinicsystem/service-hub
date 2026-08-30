@@ -282,3 +282,170 @@
     animation: none !important;
   }
 }
+
+/* Desktop admin navigation: emerald sidebar inspired by a native SaaS dashboard. */
+@media (min-width: 1024px) {
+  body:has(a[href="/admin/equipe"]) header {
+    position: fixed !important;
+    inset: 0 auto 0 0 !important;
+    width: 250px !important;
+    height: 100dvh !important;
+    border: 0 !important;
+    background: var(--sidebar) !important;
+    color: var(--sidebar-foreground) !important;
+    box-shadow: 14px 0 42px rgb(15 77 62 / 0.11);
+  }
+
+  body:has(a[href="/admin/equipe"]) header > div {
+    height: 100% !important;
+    max-width: none !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    justify-content: space-between !important;
+    padding: 28px 18px 22px !important;
+  }
+
+  body:has(a[href="/admin/equipe"]) header > div > div:first-child {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+  }
+
+  body:has(a[href="/admin/equipe"]) header img {
+    height: 38px !important;
+    filter: brightness(0) invert(1);
+    opacity: 0.96;
+  }
+
+  body:has(a[href="/admin/equipe"]) header > div > div:first-child > span {
+    display: none !important;
+  }
+
+  body:has(a[href="/admin/equipe"]) header p {
+    color: rgb(255 250 246 / 0.72) !important;
+  }
+
+  body:has(a[href="/admin/equipe"]) header p:first-child {
+    color: var(--sidebar-foreground) !important;
+    font-size: 13px !important;
+  }
+
+  body:has(a[href="/admin/equipe"]) header > div > div:last-child {
+    width: 100% !important;
+    flex-direction: column !important;
+    gap: 7px !important;
+  }
+
+  body:has(a[href="/admin/equipe"]) header > div > div:last-child > * {
+    width: 100% !important;
+    height: 40px !important;
+    justify-content: flex-start !important;
+    border-color: rgb(255 250 246 / 0.15) !important;
+    background: transparent !important;
+    color: rgb(255 250 246 / 0.78) !important;
+  }
+
+  body:has(a[href="/admin/equipe"]) header > div > div:last-child > *:hover {
+    background: rgb(255 250 246 / 0.09) !important;
+    color: var(--sidebar-foreground) !important;
+  }
+
+  body:has(a[href="/admin/equipe"]) main.max-w-\[1480px\] {
+    width: calc(100% - 250px) !important;
+    max-width: none !important;
+    margin-left: 250px !important;
+    margin-right: 0 !important;
+    padding: 42px 48px 56px !important;
+  }
+
+  body:has(a[href="/admin/equipe"]) main.max-w-\[1480px\] div:has(> [role="tablist"]) {
+    position: fixed !important;
+    left: 18px !important;
+    top: 132px !important;
+    z-index: 60 !important;
+    width: 214px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+  }
+
+  body:has(a[href="/admin/equipe"]) main.max-w-\[1480px\] [role="tablist"] {
+    display: flex !important;
+    width: 100% !important;
+    height: auto !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 5px !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+  }
+
+  body:has(a[href="/admin/equipe"]) main.max-w-\[1480px\] [role="tab"] {
+    width: 100% !important;
+    height: 44px !important;
+    flex-direction: row !important;
+    justify-content: flex-start !important;
+    gap: 10px !important;
+    padding: 0 12px !important;
+    border: 1px solid transparent !important;
+    border-radius: 12px !important;
+    background: transparent !important;
+    color: rgb(255 250 246 / 0.68) !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    box-shadow: none !important;
+    transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease;
+  }
+
+  body:has(a[href="/admin/equipe"]) main.max-w-\[1480px\] [role="tab"] > svg {
+    display: block !important;
+    width: 16px !important;
+    height: 16px !important;
+    opacity: 0.8;
+  }
+
+  body:has(a[href="/admin/equipe"]) main.max-w-\[1480px\] [role="tab"] > span.sm\:hidden {
+    display: none !important;
+  }
+
+  body:has(a[href="/admin/equipe"]) main.max-w-\[1480px\] [role="tab"] > span.hidden.sm\:inline {
+    display: inline !important;
+  }
+
+  body:has(a[href="/admin/equipe"]) main.max-w-\[1480px\] [role="tab"]:hover {
+    background: rgb(255 250 246 / 0.07) !important;
+    color: rgb(255 250 246 / 0.94) !important;
+  }
+
+  body:has(a[href="/admin/equipe"]) main.max-w-\[1480px\] [role="tab"][data-state="active"] {
+    border-color: rgb(255 250 246 / 0.12) !important;
+    background: rgb(255 250 246 / 0.12) !important;
+    color: var(--sidebar-foreground) !important;
+    box-shadow: inset 0 0 0 1px rgb(255 250 246 / 0.03) !important;
+  }
+
+  body:has(a[href="/admin/equipe"]) a[href="/admin/equipe"] {
+    left: 18px !important;
+    bottom: 126px !important;
+    z-index: 65 !important;
+    width: 214px !important;
+    height: 44px !important;
+    justify-content: flex-start !important;
+    border: 1px solid rgb(255 250 246 / 0.12) !important;
+    border-radius: 12px !important;
+    background: rgb(176 138 74 / 0.18) !important;
+    color: #fffaf6 !important;
+    padding: 0 12px !important;
+    box-shadow: none !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    transform: none !important;
+  }
+
+  body:has(a[href="/admin/equipe"]) a[href="/admin/equipe"]:hover {
+    background: rgb(176 138 74 / 0.27) !important;
+  }
+}
