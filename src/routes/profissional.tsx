@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import {
   CalendarDays,
+  CheckCircle2,
   Clock3,
   LogOut,
   Mail,
@@ -9,9 +10,9 @@ import {
   RefreshCw,
   ShieldCheck,
   Stethoscope,
-  UserRound,
 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 
 import logo from "@/assets/jr-clinic-logo.png";
 import { Badge } from "@/components/ui/badge";
@@ -45,6 +46,11 @@ function todayIso() {
   return `${y}-${m}-${d}`;
 }
 
+function responseFor(appointment: any) {
+  const response = appointment?.professional_response;
+  return Array.isArray(response) ? response[0] ?? null : response ?? null;
+}
+
 async function loadProfessionalAgenda() {
   const { data: userData, error: userError } = await supabase.auth.getUser();
   if (userError || !userData.user) throw new Error("Sessão expirada. Entre novamente.");
@@ -67,7 +73,7 @@ async function loadProfessionalAgenda() {
   const appointments = await db
     .from("appointments")
     .select(
-      "id, professional_id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status, service:services(name, duration_min)",
+      "id, professional_id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status, service:services(name, duration_min), professional_response:appointment_professional_responses(response, responded_at)",
     )
     .eq("professional_id", access.data.professional_id)
     .order("scheduled_date", { ascending: true })
@@ -194,7 +200,7 @@ function ProfessionalAgenda() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h2 className="text-lg font-semibold">Meus atendimentos</h2>
-              <p className="mt-0.5 text-xs text-muted-foreground">Somente compromissos vinculados ao seu perfil aparecem aqui.</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">Confirme cada compromisso para avisar à recepção que você estará presente.</p>
             </div>
             <div className="grid grid-cols-2 gap-2 sm:flex">
               <div className="grid grid-cols-2 rounded-xl bg-secondary/70 p-1">
@@ -224,7 +230,7 @@ function ProfessionalAgenda() {
                 <p className="mt-3 text-sm text-muted-foreground">Nenhum atendimento encontrado.</p>
               </div>
             ) : filteredAppointments.map((appointment: any) => (
-              <ProfessionalAppointmentCard key={appointment.id} appointment={appointment} />
+              <ProfessionalAppointmentCard key={appointment.id} appointment={appointment} onSaved={() => refetch()} />
             ))}
           </div>
         </section>
@@ -233,7 +239,36 @@ function ProfessionalAgenda() {
   );
 }
 
-function ProfessionalAppointmentCard({ appointment }: any) {
+function ProfessionalAppointmentCard({ appointment, onSaved }: any) {
+  const [busy, setBusy] = useState(false);
+  const response = responseFor(appointment);
+  const confirmed = response?.response === "confirmado";
+
+  const confirmCommitment = async () => {
+    if (!appointment.professional_id || appointment.status === "cancelado") return;
+    setBusy(true);
+    const now = new Date().toISOString();
+    const { error } = await db
+      .from("appointment_professional_responses")
+      .upsert(
+        {
+          appointment_id: appointment.id,
+          professional_id: appointment.professional_id,
+          response: "confirmado",
+          responded_at: now,
+          updated_at: now,
+        },
+        { onConflict: "appointment_id" },
+      );
+    setBusy(false);
+    if (error) {
+      toast.error("Não foi possível confirmar o compromisso.");
+      return;
+    }
+    toast.success("Compromisso confirmado para a recepção.");
+    onSaved?.();
+  };
+
   return (
     <article className={`rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-5 ${appointment.status === "cancelado" ? "opacity-60" : ""}`}>
       <div className="flex items-start justify-between gap-3">
@@ -241,6 +276,11 @@ function ProfessionalAppointmentCard({ appointment }: any) {
           <div className="flex flex-wrap items-center gap-2">
             <p className="truncate font-semibold">{appointment.patient_name}</p>
             <StatusBadge status={appointment.status} />
+            {confirmed ? (
+              <Badge className="rounded-full bg-primary-soft text-[10px] text-primary hover:bg-primary-soft">
+                <CheckCircle2 className="mr-1 size-3" /> Você confirmou
+              </Badge>
+            ) : null}
           </div>
           <p className="mt-1 truncate text-xs text-muted-foreground">{appointment.service?.name || "Procedimento"}</p>
         </div>
@@ -266,6 +306,24 @@ function ProfessionalAppointmentCard({ appointment }: any) {
           <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Observação</p>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{appointment.notes}</p>
         </div>
+      ) : null}
+
+      {appointment.status !== "cancelado" ? (
+        confirmed ? (
+          <div className="mt-3 flex items-center gap-2 rounded-xl border border-primary/15 bg-primary-soft/70 px-3 py-3 text-xs text-primary">
+            <CheckCircle2 className="size-4 shrink-0" />
+            <span className="font-medium">Compromisso confirmado. A recepção já consegue ver sua confirmação.</span>
+          </div>
+        ) : (
+          <div className="mt-3 rounded-xl border border-border bg-background/70 p-3">
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              Confirme que você está ciente deste atendimento e estará disponível no horário marcado.
+            </p>
+            <Button className="mt-3 h-10 w-full rounded-xl" disabled={busy} onClick={confirmCommitment}>
+              <CheckCircle2 className="size-4" /> {busy ? "Confirmando..." : "Confirmar compromisso"}
+            </Button>
+          </div>
+        )
       ) : null}
     </article>
   );
