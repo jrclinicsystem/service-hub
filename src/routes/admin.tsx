@@ -16,6 +16,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import logo from "@/assets/jr-clinic-logo.png";
+import { AdminAppointmentsWorkspace } from "@/components/admin-appointments-workspace";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -49,7 +50,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
-import { formatDate, formatPrice } from "@/lib/clinic";
+import { formatPrice } from "@/lib/clinic";
 
 const title = "Painel administrativo — JR Clinic";
 const description = "Gestão de serviços, promoções, agenda e acessos administrativos da JR Clinic.";
@@ -138,9 +139,10 @@ async function loadAdminOverview() {
     db
       .from("appointments")
       .select(
-        "id, patient_name, patient_email, scheduled_date, scheduled_time, status, service:services(name, price)",
+        "id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status, created_at, status_updated_at, payment_choice, service_price_snapshot, deposit_percent, deposit_amount, balance_amount, service:services(name, price, duration_min), professional:professionals(name, specialty), payments(status, amount, kind, payment_method_id, provider, paid_at, created_at, status_detail)",
       )
-      .order("scheduled_date", { ascending: true }),
+      .order("scheduled_date", { ascending: true })
+      .order("scheduled_time", { ascending: true }),
     db
       .from("services")
       .select(
@@ -212,7 +214,7 @@ function Admin() {
     retry: 1,
   });
 
-  const refresh = () => queryClient.invalidateQueries({ queryKey: ["admin-overview"] });
+  const refresh = () => { void queryClient.invalidateQueries({ queryKey: ["admin-overview"] }); };
 
   const signOut = async () => {
     await supabase.auth.signOut();
@@ -269,15 +271,26 @@ function Admin() {
 
   const revenue = data.appointments
     .filter((item: any) => item.status !== "cancelado")
-    .reduce((total: number, item: any) => total + Number(item.service?.price ?? 0), 0);
+    .reduce((total: number, item: any) => total + Number(item.service_price_snapshot ?? item.service?.price ?? 0), 0);
   const uniquePatients = new Set(data.appointments.map((item: any) => item.patient_email)).size;
   const activeServices = data.services.filter((item: any) => item.is_active).length;
 
   const updateRow = async (table: string, idColumn: string, id: string, values: any, message?: string) => {
     const { error } = await db.from(table).update(values).eq(idColumn, id);
-    if (error) { toast.error(error.message); return; }
+    if (error) { toast.error(error.message); return false; }
     if (message) toast.success(message);
     refresh();
+    return true;
+  };
+
+  const updateAppointmentStatus = async (id: string, status: "pendente" | "confirmado" | "cancelado") => {
+    return updateRow(
+      "appointments",
+      "id",
+      id,
+      { status },
+      status === "confirmado" ? "Agendamento confirmado." : status === "cancelado" ? "Agendamento recusado/cancelado." : "Status atualizado.",
+    );
   };
 
   const categoryName = (service: any) =>
@@ -346,85 +359,11 @@ function Admin() {
           </div>
 
           <TabsContent value="agendamentos" className="mt-4 sm:mt-5">
-            <div className="mb-3 flex items-center justify-between sm:hidden">
-              <div>
-                <h2 className="text-base font-semibold">Próximos agendamentos</h2>
-                <p className="text-xs text-muted-foreground">{data.appointments.length} registros</p>
-              </div>
-            </div>
-
-            <div className="space-y-2.5 md:hidden">
-              {data.appointments.map((appointment: any) => (
-                <div key={appointment.id} className="rounded-2xl border border-border bg-card p-4 shadow-soft">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold">{appointment.patient_name}</p>
-                      <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{appointment.patient_email}</p>
-                    </div>
-                    <span className="shrink-0 rounded-lg bg-secondary px-2 py-1 text-[11px] font-medium text-muted-foreground">
-                      {appointment.scheduled_time}
-                    </span>
-                  </div>
-                  <div className="mt-3 grid grid-cols-[1fr_auto] items-end gap-3 border-t border-border/70 pt-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-xs font-medium text-foreground">{appointment.service?.name}</p>
-                      <p className="mt-0.5 text-[11px] text-muted-foreground">{formatDate(appointment.scheduled_date)}</p>
-                    </div>
-                    <Select
-                      value={appointment.status}
-                      onValueChange={(status) =>
-                        updateRow("appointments", "id", appointment.id, { status }, "Status atualizado.")
-                      }
-                    >
-                      <SelectTrigger className="h-8 w-[118px] rounded-lg px-2 text-xs"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pendente">Pendente</SelectItem>
-                        <SelectItem value="confirmado">Confirmado</SelectItem>
-                        <SelectItem value="cancelado">Cancelado</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="hidden md:block">
-              <PanelTable>
-                <TableHeader><TableRow>
-                  <TableHead>Paciente</TableHead><TableHead>Serviço</TableHead>
-                  <TableHead>Quando</TableHead><TableHead className="text-right">Status</TableHead>
-                </TableRow></TableHeader>
-                <TableBody>
-                  {data.appointments.map((appointment: any) => (
-                    <TableRow key={appointment.id}>
-                      <TableCell>
-                        <p className="font-medium">{appointment.patient_name}</p>
-                        <p className="text-xs text-muted-foreground">{appointment.patient_email}</p>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">{appointment.service?.name}</TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {formatDate(appointment.scheduled_date)} · {appointment.scheduled_time}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Select
-                          value={appointment.status}
-                          onValueChange={(status) =>
-                            updateRow("appointments", "id", appointment.id, { status }, "Status atualizado.")
-                          }
-                        >
-                          <SelectTrigger className="ml-auto w-[145px]"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="pendente">Pendente</SelectItem>
-                            <SelectItem value="confirmado">Confirmado</SelectItem>
-                            <SelectItem value="cancelado">Cancelado</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </PanelTable>
-            </div>
+            <AdminAppointmentsWorkspace
+              appointments={data.appointments}
+              onStatusChange={updateAppointmentStatus}
+              onRefresh={refresh}
+            />
           </TabsContent>
 
           <TabsContent value="servicos" className="mt-4 sm:mt-5">
