@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import {
   CalendarDays,
+  CheckCircle2,
   ChevronLeft,
   Clock3,
   ExternalLink,
@@ -65,6 +66,11 @@ function todayIso() {
   return `${y}-${m}-${d}`;
 }
 
+function responseFor(appointment: any) {
+  const response = appointment?.professional_response;
+  return Array.isArray(response) ? response[0] ?? null : response ?? null;
+}
+
 async function loadTeamAgenda() {
   const { data: userData, error: userError } = await supabase.auth.getUser();
   if (userError || !userData.user) throw new Error("Sessão expirada. Entre novamente.");
@@ -87,7 +93,7 @@ async function loadTeamAgenda() {
     db
       .from("appointments")
       .select(
-        "id, professional_id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status, service:services(name, duration_min), professional:professionals(id, name, specialty)",
+        "id, professional_id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status, service:services(name, duration_min), professional:professionals(id, name, specialty), professional_response:appointment_professional_responses(response, responded_at)",
       )
       .order("scheduled_date", { ascending: true })
       .order("scheduled_time", { ascending: true }),
@@ -172,6 +178,7 @@ function TeamAgendaPage() {
   const todayCount = data.appointments.filter((item: any) => item.scheduled_date === today && item.status !== "cancelado").length;
   const configuredAccess = data.access.filter((item: any) => item.enabled).length;
   const unassigned = data.appointments.filter((item: any) => !item.professional_id).length;
+  const confirmedByProfessionals = data.appointments.filter((item: any) => responseFor(item)?.response === "confirmado").length;
 
   return (
     <div className="min-h-screen bg-background">
@@ -202,7 +209,7 @@ function TeamAgendaPage() {
             <span className="eyebrow text-muted-foreground">Agenda interna</span>
             <h1 className="mt-2 text-3xl font-semibold sm:text-4xl">Agenda da equipe</h1>
             <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-              A recepção acompanha todos os atendimentos e libera um acesso individual para cada profissional.
+              A recepção acompanha todos os atendimentos e enxerga quando cada profissional confirma o próprio compromisso.
             </p>
           </div>
           <Button variant="outline" className="rounded-full" onClick={() => refetch()}>
@@ -210,10 +217,11 @@ function TeamAgendaPage() {
           </Button>
         </div>
 
-        <div className="mt-6 grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+        <div className="mt-6 grid grid-cols-2 gap-2.5 lg:grid-cols-5">
           <Metric icon={CalendarDays} label="Hoje" value={String(todayCount)} />
           <Metric icon={Users} label="Equipe" value={String(data.professionals.filter((p: any) => p.is_active).length)} />
           <Metric icon={ShieldCheck} label="Acessos ativos" value={String(configuredAccess)} />
+          <Metric icon={CheckCircle2} label="Confirmados pela equipe" value={String(confirmedByProfessionals)} />
           <Metric icon={UserRound} label="Sem profissional" value={String(unassigned)} />
         </div>
 
@@ -308,6 +316,8 @@ function AppointmentCard({ appointment, onSaved, admin = false }: any) {
     onSaved?.();
   };
 
+  const professionalResponse = responseFor(appointment);
+
   return (
     <div className="rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-5">
       <div className="flex items-start justify-between gap-3">
@@ -315,6 +325,9 @@ function AppointmentCard({ appointment, onSaved, admin = false }: any) {
           <div className="flex flex-wrap items-center gap-2">
             <p className="font-semibold">{appointment.patient_name}</p>
             <StatusBadge status={appointment.status} />
+            {appointment.professional_id ? (
+              <ProfessionalResponseBadge response={professionalResponse?.response} />
+            ) : null}
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
             {appointment.service?.name || "Serviço"} · {appointment.professional?.name || "Sem profissional definido"}
@@ -330,6 +343,11 @@ function AppointmentCard({ appointment, onSaved, admin = false }: any) {
         <p className="truncate sm:text-right">{appointment.patient_email}</p>
       </div>
       {appointment.notes ? <p className="mt-2 rounded-xl bg-secondary/60 px-3 py-2 text-xs text-muted-foreground">{appointment.notes}</p> : null}
+      {professionalResponse?.response === "confirmado" && professionalResponse.responded_at ? (
+        <p className="mt-2 text-[11px] text-primary">
+          Profissional confirmou o compromisso em {new Date(professionalResponse.responded_at).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}.
+        </p>
+      ) : null}
       {admin ? (
         <div className="mt-3 flex justify-end">
           <Select value={appointment.status} onValueChange={updateStatus}>
@@ -424,6 +442,17 @@ function StatusBadge({ status }: { status: string }) {
   const variant = status === "confirmado" ? "default" : status === "cancelado" ? "secondary" : "outline";
   const label = status === "confirmado" ? "Confirmado" : status === "cancelado" ? "Cancelado" : "Pendente";
   return <Badge variant={variant as any} className="rounded-full text-[10px]">{label}</Badge>;
+}
+
+function ProfessionalResponseBadge({ response }: { response?: string }) {
+  if (response === "confirmado") {
+    return (
+      <Badge className="rounded-full bg-primary-soft text-[10px] text-primary hover:bg-primary-soft">
+        <CheckCircle2 className="mr-1 size-3" /> Profissional confirmou
+      </Badge>
+    );
+  }
+  return <Badge variant="outline" className="rounded-full text-[10px] text-muted-foreground">Aguardando profissional</Badge>;
 }
 
 function Metric({ icon: Icon, label, value }: any) {
