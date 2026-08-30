@@ -8,11 +8,15 @@ import { cn } from "@/lib/utils";
 export function ServiceCard({
   service,
   compactMobile = false,
+  categoryName,
 }: {
   service: Service;
   compactMobile?: boolean;
+  categoryName?: string | undefined;
 }) {
-  const category = getCategory(service.categoryId);
+  const category = categoryName
+    ? { name: categoryName }
+    : getCategory(service.categoryId);
 
   return (
     <article
