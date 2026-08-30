@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 const title = "Entrar na JR Clinic";
 const description =
   "Entre ou crie sua conta JR Clinic para acessar agendamentos, perfil e histórico.";
+const RECOVERY_TARGET_KEY = "jrclinic:password-recovery-target";
 
 function safeNext(value: unknown) {
   if (typeof value !== "string") return undefined;
@@ -108,20 +109,25 @@ function AuthPage() {
     }
 
     setResetBusy(true);
-    const recoveryNext = next === "/admin" ? "/admin" : "/minha-conta";
-    const redirectTo = `${window.location.origin}/redefinir-senha?next=${encodeURIComponent(recoveryNext)}`;
+    const recoveryTarget = next === "/admin" ? "/admin" : "/minha-conta";
+    window.localStorage.setItem(RECOVERY_TARGET_KEY, recoveryTarget);
+
+    // Keep the redirect URL clean. Supabase can safely append/consume its recovery
+    // code without competing with our own query string.
+    const redirectTo = `${window.location.origin}/redefinir-senha`;
     const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
       redirectTo,
     });
     setResetBusy(false);
 
     if (error) {
+      window.localStorage.removeItem(RECOVERY_TARGET_KEY);
       toast.error(error.message);
       return;
     }
 
     toast.success("Link de recuperação enviado", {
-      description: "Confira seu e-mail e abra o link para criar uma nova senha.",
+      description: "Confira seu e-mail e abra o link mais recente para criar uma nova senha.",
     });
   };
 
