@@ -194,7 +194,7 @@ function Admin() {
 
   const signOut = async () => {
     await supabase.auth.signOut();
-    navigate({ to: "/auth", search: {} });
+    navigate({ to: "/auth", search: { next: undefined } });
   };
 
   if (isLoading) {
@@ -253,7 +253,7 @@ function Admin() {
 
   const updateRow = async (table: string, idColumn: string, id: string, values: any, message?: string) => {
     const { error } = await db.from(table).update(values).eq(idColumn, id);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     if (message) toast.success(message);
     refresh();
   };
@@ -633,7 +633,7 @@ function ServiceEditor({ service, categories, onSaved }: any) {
   const [busy, setBusy] = useState(false);
 
   const save = async () => {
-    if (!name.trim() || !categoryId || !price) return toast.error("Preencha nome, categoria e valor.");
+    if (!name.trim() || !categoryId || !price) { toast.error("Preencha nome, categoria e valor."); return; }
     setBusy(true);
     const payload = {
       name: name.trim(),
@@ -653,7 +653,7 @@ function ServiceEditor({ service, categories, onSaved }: any) {
       ? await db.from("services").update(payload).eq("id", service.id)
       : await db.from("services").insert(payload);
     setBusy(false);
-    if (result.error) return toast.error(result.error.message);
+    if (result.error) { toast.error(result.error.message); return; }
     toast.success(service?.id ? "Serviço atualizado." : "Serviço criado.");
     setOpen(false);
     onSaved();
@@ -710,7 +710,7 @@ function PromotionEditor({ services, onSaved }: any) {
   const [busy, setBusy] = useState(false);
 
   const save = async () => {
-    if (!titleValue.trim() || (!discount && !promoPrice)) return toast.error("Informe o título e o desconto ou preço promocional.");
+    if (!titleValue.trim() || (!discount && !promoPrice)) { toast.error("Informe o título e o desconto ou preço promocional."); return; }
     setBusy(true);
     const { error } = await db.from("promotions").insert({
       title: titleValue.trim(),
@@ -723,7 +723,7 @@ function PromotionEditor({ services, onSaved }: any) {
       is_active: true,
     });
     setBusy(false);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success("Promoção criada.");
     setOpen(false);
     onSaved();
@@ -765,11 +765,11 @@ function AdminEmailEditor({ onSaved }: any) {
 
   const save = async () => {
     const normalized = email.trim().toLowerCase();
-    if (!normalized.includes("@")) return toast.error("Digite um e-mail válido.");
+    if (!normalized.includes("@")) { toast.error("Digite um e-mail válido."); return; }
     setBusy(true);
     const { error } = await db.from("admin_emails").upsert({ email: normalized, enabled: true }, { onConflict: "email" });
     setBusy(false);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success("E-mail autorizado.");
     setEmail("");
     setOpen(false);

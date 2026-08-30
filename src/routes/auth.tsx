@@ -23,7 +23,7 @@ function safeNext(value: unknown) {
 
 export const Route = createFileRoute("/auth")({
   validateSearch: (search: Record<string, unknown>) => ({
-    next: safeNext(search.next),
+    next: safeNext(search['next']),
   }),
   head: () => ({
     meta: [
@@ -87,7 +87,7 @@ function AuthPage() {
   }, [loading, user, next, checkingAccess]);
 
   const signIn = async () => {
-    if (!email.trim() || !password) return toast.error("Digite seu e-mail e senha.");
+    if (!email.trim() || !password) { toast.error("Digite seu e-mail e senha."); return; }
     setBusy(true);
     const { error } = await supabase.auth.signInWithPassword({
       email: email.trim(),
@@ -105,7 +105,7 @@ function AuthPage() {
 
   const signUp = async () => {
     if (!name.trim() || !email.trim() || password.length < 6) {
-      return toast.error("Preencha nome, e-mail e uma senha de pelo menos 6 caracteres.");
+      { toast.error("Preencha nome, e-mail e uma senha de pelo menos 6 caracteres."); return; }
     }
 
     setBusy(true);

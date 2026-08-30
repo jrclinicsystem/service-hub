@@ -94,7 +94,7 @@ function Agendar() {
 
     setEmail((current) => current || user.email || "");
     const metadataName =
-      typeof user.user_metadata?.full_name === "string" ? user.user_metadata.full_name : "";
+      typeof user.user_metadata?.['full_name'] === "string" ? user.user_metadata['full_name'] : "";
     setName((current) => current || metadataName);
 
     void supabase

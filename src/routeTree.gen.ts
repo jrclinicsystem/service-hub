@@ -15,6 +15,8 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AgendarRouteImport } from './routes/agendar'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as CatalogoRouteImport } from './routes/catalogo'
+import { Route as PrivacidadeRouteImport } from './routes/privacidade'
+import { Route as TermosRouteImport } from './routes/termos'
 import { Route as AuthenticatedMinhaContaRouteImport } from './routes/_authenticated/minha-conta'
 import { Route as ServicoSlugRouteImport } from './routes/servico.$slug'
 
@@ -47,6 +49,16 @@ const CatalogoRoute = CatalogoRouteImport.update({
   path: '/catalogo',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PrivacidadeRoute = PrivacidadeRouteImport.update({
+  id: '/privacidade',
+  path: '/privacidade',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermosRoute = TermosRouteImport.update({
+  id: '/termos',
+  path: '/termos',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedMinhaContaRoute = AuthenticatedMinhaContaRouteImport.update({
   id: '/minha-conta',
   path: '/minha-conta',
@@ -64,6 +76,8 @@ export interface FileRoutesByFullPath {
   '/agendar': typeof AgendarRoute
   '/auth': typeof AuthRoute
   '/catalogo': typeof CatalogoRoute
+  '/privacidade': typeof PrivacidadeRoute
+  '/termos': typeof TermosRoute
   '/minha-conta': typeof AuthenticatedMinhaContaRoute
   '/servico/$slug': typeof ServicoSlugRoute
 }
@@ -73,6 +87,8 @@ export interface FileRoutesByTo {
   '/agendar': typeof AgendarRoute
   '/auth': typeof AuthRoute
   '/catalogo': typeof CatalogoRoute
+  '/privacidade': typeof PrivacidadeRoute
+  '/termos': typeof TermosRoute
   '/minha-conta': typeof AuthenticatedMinhaContaRoute
   '/servico/$slug': typeof ServicoSlugRoute
 }
@@ -84,6 +100,8 @@ export interface FileRoutesById {
   '/agendar': typeof AgendarRoute
   '/auth': typeof AuthRoute
   '/catalogo': typeof CatalogoRoute
+  '/privacidade': typeof PrivacidadeRoute
+  '/termos': typeof TermosRoute
   '/_authenticated/minha-conta': typeof AuthenticatedMinhaContaRoute
   '/servico/$slug': typeof ServicoSlugRoute
 }
@@ -95,6 +113,8 @@ export interface FileRouteTypes {
     | '/agendar'
     | '/auth'
     | '/catalogo'
+    | '/privacidade'
+    | '/termos'
     | '/minha-conta'
     | '/servico/$slug'
   fileRoutesByTo: FileRoutesByTo
@@ -104,6 +124,8 @@ export interface FileRouteTypes {
     | '/agendar'
     | '/auth'
     | '/catalogo'
+    | '/privacidade'
+    | '/termos'
     | '/minha-conta'
     | '/servico/$slug'
   id:
@@ -114,6 +136,8 @@ export interface FileRouteTypes {
     | '/agendar'
     | '/auth'
     | '/catalogo'
+    | '/privacidade'
+    | '/termos'
     | '/_authenticated/minha-conta'
     | '/servico/$slug'
   fileRoutesById: FileRoutesById
@@ -125,6 +149,8 @@ export interface RootRouteChildren {
   AgendarRoute: typeof AgendarRoute
   AuthRoute: typeof AuthRoute
   CatalogoRoute: typeof CatalogoRoute
+  PrivacidadeRoute: typeof PrivacidadeRoute
+  TermosRoute: typeof TermosRoute
   ServicoSlugRoute: typeof ServicoSlugRoute
 }
 
@@ -172,6 +198,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CatalogoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/privacidade': {
+      id: '/privacidade'
+      path: '/privacidade'
+      fullPath: '/privacidade'
+      preLoaderRoute: typeof PrivacidadeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/termos': {
+      id: '/termos'
+      path: '/termos'
+      fullPath: '/termos'
+      preLoaderRoute: typeof TermosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/minha-conta': {
       id: '/_authenticated/minha-conta'
       path: '/minha-conta'
@@ -207,6 +247,8 @@ const rootRouteChildren: RootRouteChildren = {
   AgendarRoute: AgendarRoute,
   AuthRoute: AuthRoute,
   CatalogoRoute: CatalogoRoute,
+  PrivacidadeRoute: PrivacidadeRoute,
+  TermosRoute: TermosRoute,
   ServicoSlugRoute: ServicoSlugRoute,
 }
 export const routeTree = rootRouteImport
