@@ -25,7 +25,7 @@ export function ServiceCard({
       className={cn(
         "card-lift flex min-h-[350px] flex-col rounded-2xl border border-border bg-card p-5 shadow-soft",
         compactMobile &&
-          "max-sm:min-h-[190px] max-sm:rounded-xl max-sm:p-2.5 max-sm:shadow-none",
+          "max-sm:min-h-[260px] max-sm:rounded-2xl max-sm:p-4 max-sm:shadow-soft",
         compactDesktop &&
           "md:min-h-[248px] md:rounded-xl md:p-4 md:shadow-[0_14px_30px_-26px_rgba(15,77,62,0.35)]",
       )}
@@ -39,7 +39,7 @@ export function ServiceCard({
         <div
           className={cn(
             "flex items-center justify-between gap-3",
-            compactMobile && "max-sm:flex-col max-sm:items-start max-sm:gap-1",
+            compactMobile && "max-sm:gap-2",
             compactDesktop && "md:gap-2",
           )}
         >
@@ -48,7 +48,7 @@ export function ServiceCard({
             className={cn(
               "rounded-full font-normal",
               compactMobile &&
-                "max-sm:max-w-full max-sm:truncate max-sm:px-2 max-sm:py-0 max-sm:text-[8px]",
+                "max-sm:max-w-[68%] max-sm:truncate max-sm:px-2.5 max-sm:py-0.5 max-sm:text-[10px]",
               compactDesktop && "md:max-w-[68%] md:truncate md:px-2.5 md:py-0 md:text-[10px]",
             )}
           >
@@ -57,14 +57,14 @@ export function ServiceCard({
           <span
             className={cn(
               "flex items-center gap-1.5 text-xs text-muted-foreground",
-              compactMobile && "max-sm:gap-1 max-sm:text-[8px]",
+              compactMobile && "max-sm:shrink-0 max-sm:gap-1 max-sm:text-[10px]",
               compactDesktop && "md:gap-1 md:text-[10px]",
             )}
           >
             <Clock
               className={cn(
                 "size-3.5",
-                compactMobile && "max-sm:size-2.5",
+                compactMobile && "max-sm:size-3",
                 compactDesktop && "md:size-3",
               )}
             />
@@ -75,7 +75,7 @@ export function ServiceCard({
         <h3
           className={cn(
             "mt-4 text-xl font-semibold",
-            compactMobile && "max-sm:mt-2 max-sm:line-clamp-2 max-sm:text-[12px] max-sm:leading-[1.18]",
+            compactMobile && "max-sm:mt-3 max-sm:line-clamp-2 max-sm:text-[16px] max-sm:leading-[1.22]",
             compactDesktop && "md:mt-3 md:line-clamp-2 md:text-[17px] md:leading-[1.2]",
           )}
         >
@@ -84,7 +84,7 @@ export function ServiceCard({
         <p
           className={cn(
             "mt-2 text-sm leading-relaxed text-muted-foreground",
-            compactMobile && "max-sm:hidden",
+            compactMobile && "max-sm:line-clamp-2 max-sm:text-[12px] max-sm:leading-5",
             compactDesktop && "md:line-clamp-2 md:text-[12px] md:leading-5",
           )}
         >
@@ -94,14 +94,14 @@ export function ServiceCard({
         <div
           className={cn(
             "mt-auto border-t border-border pt-4",
-            compactMobile && "max-sm:pt-2",
+            compactMobile && "max-sm:pt-3",
             compactDesktop && "md:pt-3",
           )}
         >
           <p
             className={cn(
               "text-sm font-medium leading-tight",
-              compactMobile && "max-sm:line-clamp-1 max-sm:text-[9px]",
+              compactMobile && "max-sm:line-clamp-1 max-sm:text-[12px]",
               compactDesktop && "md:line-clamp-1 md:text-[11px]",
             )}
           >
@@ -110,11 +110,11 @@ export function ServiceCard({
           <p
             className={cn(
               "mt-1 flex items-center gap-1 text-xs text-muted-foreground",
-              compactMobile && "max-sm:hidden",
+              compactMobile && "max-sm:text-[10px]",
               compactDesktop && "md:text-[10px]",
             )}
           >
-            <Star className="size-3 fill-accent text-accent" />
+            <Star className={cn("size-3 fill-accent text-accent", compactMobile && "max-sm:size-3.5")} />
             <span>{service.rating.toFixed(1)}</span>
             <span>· {service.reviewsCount} avaliações</span>
           </p>
@@ -127,7 +127,7 @@ export function ServiceCard({
         preload="intent"
         className={cn(
           "group/booking mt-4 flex items-center justify-between gap-3",
-          compactMobile && "max-sm:mt-2 max-sm:block",
+          compactMobile && "max-sm:mt-3 max-sm:gap-2",
           compactDesktop && "md:mt-3 md:gap-2",
         )}
         aria-label={`Agendar ${service.name} por ${formatPrice(service.price)}`}
@@ -136,7 +136,7 @@ export function ServiceCard({
           <p
             className={cn(
               "text-[9px] tracking-[0.14em] text-muted-foreground uppercase",
-              compactMobile && "max-sm:text-[6px] max-sm:tracking-[0.06em]",
+              compactMobile && "max-sm:text-[8px] max-sm:tracking-[0.1em]",
               compactDesktop && "md:text-[7px] md:tracking-[0.1em]",
             )}
           >
@@ -145,7 +145,7 @@ export function ServiceCard({
           <p
             className={cn(
               "font-sans text-xl leading-none font-semibold tracking-tight text-primary lining-nums tabular-nums",
-              compactMobile && "max-sm:mt-0.5 max-sm:text-[12px]",
+              compactMobile && "max-sm:mt-1 max-sm:text-[17px]",
               compactDesktop && "md:text-base",
             )}
           >
@@ -156,7 +156,7 @@ export function ServiceCard({
           className={cn(
             "flex shrink-0 items-center gap-1.5 rounded-full border border-transparent bg-accent px-3 py-2 text-xs font-semibold text-white transition-[border-color] duration-200 ease-out group-hover/booking:border-white/80 group-focus-visible/booking:border-white/80 motion-reduce:transition-none",
             compactMobile &&
-              "max-sm:mt-1.5 max-sm:w-full max-sm:justify-center max-sm:gap-1 max-sm:px-1.5 max-sm:py-1 max-sm:text-[8px]",
+              "max-sm:px-3.5 max-sm:py-2.5 max-sm:text-[11px]",
             compactDesktop && "md:px-2.5 md:py-1.5 md:text-[10px]",
           )}
         >
@@ -164,7 +164,7 @@ export function ServiceCard({
           <ArrowRight
             className={cn(
               "size-3.5",
-              compactMobile && "max-sm:size-2.5",
+              compactMobile && "max-sm:size-3.5",
               compactDesktop && "md:size-3",
             )}
           />
