@@ -448,4 +448,6 @@
   body:has(a[href="/admin/equipe"]) a[href="/admin/equipe"]:hover {
     background: rgb(176 138 74 / 0.27) !important;
   }
+
+  #lovable-badge {   display: none !important; }
 }
