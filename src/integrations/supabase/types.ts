@@ -14,6 +14,24 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_emails: {
+        Row: {
+          created_at: string
+          email: string
+          enabled: boolean
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          enabled?: boolean
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          enabled?: boolean
+        }
+        Relationships: []
+      }
       appointments: {
         Row: {
           created_at: string
@@ -22,6 +40,7 @@ export type Database = {
           patient_email: string
           patient_name: string
           patient_phone: string
+          professional_id: string | null
           scheduled_date: string
           scheduled_time: string
           service_id: string
@@ -35,6 +54,7 @@ export type Database = {
           patient_email: string
           patient_name: string
           patient_phone?: string
+          professional_id?: string | null
           scheduled_date: string
           scheduled_time: string
           service_id: string
@@ -48,6 +68,7 @@ export type Database = {
           patient_email?: string
           patient_name?: string
           patient_phone?: string
+          professional_id?: string | null
           scheduled_date?: string
           scheduled_time?: string
           service_id?: string
@@ -55,6 +76,13 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "appointments_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
+            referencedRelation: "professionals"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "appointments_service_id_fkey"
             columns: ["service_id"]
@@ -84,6 +112,113 @@ export type Database = {
           sort_order?: number
         }
         Relationships: []
+      }
+      professionals: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number
+          specialty: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          sort_order?: number
+          specialty?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number
+          specialty?: string
+        }
+        Relationships: []
+      }
+      promotions: {
+        Row: {
+          created_at: string
+          description: string
+          discount_percent: number | null
+          ends_at: string | null
+          id: string
+          is_active: boolean
+          promotional_price: number | null
+          service_id: string | null
+          starts_at: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          discount_percent?: number | null
+          ends_at?: string | null
+          id?: string
+          is_active?: boolean
+          promotional_price?: number | null
+          service_id?: string | null
+          starts_at?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          discount_percent?: number | null
+          ends_at?: string | null
+          id?: string
+          is_active?: boolean
+          promotional_price?: number | null
+          service_id?: string | null
+          starts_at?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "promotions_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_professionals: {
+        Row: {
+          professional_id: string
+          service_id: string
+        }
+        Insert: {
+          professional_id: string
+          service_id: string
+        }
+        Update: {
+          professional_id?: string
+          service_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_professionals_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
+            referencedRelation: "professionals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_professionals_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       service_reviews: {
         Row: {
