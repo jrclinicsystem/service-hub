@@ -3,6 +3,18 @@
   display: none;
 }
 
+/* Presence marker used only to keep the original desktop admin shell mounted. */
+body:has(a.admin-sidebar-presence-anchor) a.admin-sidebar-presence-anchor {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  position: absolute !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+}
+
 @media (min-width: 1024px) {
   .admin-sidebar-shortcut {
     position: fixed !important;
@@ -35,25 +47,20 @@
     transform: none !important;
   }
 
+  .admin-sidebar-shortcut.is-active {
+    border-color: rgb(255 250 246 / 0.12) !important;
+    background: rgb(255 250 246 / 0.12) !important;
+    color: var(--sidebar-foreground) !important;
+  }
+
   .admin-catalog-shortcut {
     top: 382px !important;
     bottom: auto !important;
   }
 
-  body:has(.admin-team-shortcut) a.admin-team-shortcut {
+  .admin-team-shortcut {
     top: 452px !important;
     bottom: auto !important;
-    left: 18px !important;
-    border: 1px solid transparent !important;
-    background: transparent !important;
-    color: rgb(255 250 246 / 0.68) !important;
-    font-size: 13px !important;
-    font-weight: 500 !important;
-  }
-
-  body:has(.admin-team-shortcut) a.admin-team-shortcut:hover {
-    background: rgb(255 250 246 / 0.07) !important;
-    color: rgb(255 250 246 / 0.94) !important;
   }
 
   .admin-team-shortcut::before {
