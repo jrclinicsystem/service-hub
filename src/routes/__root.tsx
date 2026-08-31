@@ -353,6 +353,22 @@ function SystemAccess() {
   const isInternalArea = location.pathname.startsWith("/admin") || location.pathname === "/profissional";
   const showAdminShortcuts = location.pathname === "/admin";
 
+  const activateMainTab = (section: MainAdminSection) => {
+    const tabs = Array.from(document.querySelectorAll<HTMLElement>('[role="tab"]'));
+    const target = tabs.find((tab) => (tab.textContent || "").includes(mainSectionLabels[section]));
+    if (!target) return;
+
+    // Radix Tabs changes value on mouse down. A synthetic .click() alone does not
+    // activate a trigger that is visually hidden behind the custom mobile nav.
+    target.dispatchEvent(
+      new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0 }),
+    );
+    target.dispatchEvent(
+      new MouseEvent("mouseup", { bubbles: true, cancelable: true, button: 0 }),
+    );
+    target.click();
+  };
+
   useEffect(() => {
     if (!showAdminShortcuts) {
       setInlineSection(null);
@@ -385,11 +401,7 @@ function SystemAccess() {
       const mainSection = section as MainAdminSection;
       setInlineSection(null);
       setActiveMainSection(mainSection);
-      const timer = window.setTimeout(() => {
-        const tabs = Array.from(document.querySelectorAll<HTMLElement>('[role="tab"]'));
-        const target = tabs.find((tab) => (tab.textContent || "").includes(mainSectionLabels[mainSection]));
-        target?.click();
-      }, 0);
+      const timer = window.setTimeout(() => activateMainTab(mainSection), 0);
       return () => window.clearTimeout(timer);
     }
   }, [location.hash, showAdminShortcuts]);
@@ -417,11 +429,7 @@ function SystemAccess() {
     setInlineSection(null);
     setActiveMainSection(section);
     window.history.replaceState(window.history.state, "", `/admin#${section}`);
-    window.setTimeout(() => {
-      const tabs = Array.from(document.querySelectorAll<HTMLElement>('[role="tab"]'));
-      const target = tabs.find((tab) => (tab.textContent || "").includes(mainSectionLabels[section]));
-      target?.click();
-    }, 0);
+    window.setTimeout(() => activateMainTab(section), 0);
   };
 
   const openInlineSection = (section: Exclude<InlineAdminSection, null>) => {
