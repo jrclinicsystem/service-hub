@@ -13,18 +13,18 @@ import { Link } from "@tanstack/react-router";
 
 import logo from "@/assets/jr-clinic-logo.png";
 
-type ActiveSection = "team" | "catalog" | "finance";
+type ActiveSection = "team" | "catalog" | "finance" | "access";
 
 const mainItems = [
   { href: "/admin#agendamentos", label: "Agendamentos", icon: CalendarDays },
   { href: "/admin#servicos", label: "Serviços", icon: Stethoscope },
   { href: "/admin#promocoes", label: "Promoções", icon: Tag },
   { href: "/admin#horarios", label: "Horários", icon: Clock3 },
-  { href: "/admin#acessos", label: "Acessos", icon: ShieldCheck },
 ] as const;
 
 const secondaryItems = [
   { to: "/admin/equipe", label: "Agenda da equipe", icon: Users, active: "team" as const },
+  { to: "/admin/acessos", label: "Acessos", icon: ShieldCheck, active: "access" as const },
   { to: "/admin/financeiro", label: "Financeiro", icon: CircleDollarSign, active: "finance" as const },
 ] as const;
 
