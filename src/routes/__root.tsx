@@ -8,6 +8,7 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
+import { CalendarDays, CircleDollarSign, Sparkles } from "lucide-react";
 import { useEffect, type ReactNode } from "react";
 
 import { jrClinicIconDataUrl } from "@/assets/jr-clinic-icon";
@@ -17,6 +18,7 @@ import { Toaster } from "@/components/ui/sonner";
 
 import appCss from "../styles.css?url";
 import paymentOptionsCss from "../payment-options.css?url";
+import adminNavigationCss from "../admin-navigation.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 
 function NotFoundComponent() {
@@ -90,6 +92,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     links: [
       { rel: "stylesheet", href: appCss },
       { rel: "stylesheet", href: paymentOptionsCss },
+      { rel: "stylesheet", href: adminNavigationCss },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
@@ -125,22 +128,47 @@ function SystemAccess() {
   const isInternalArea = location.pathname.startsWith("/admin") || location.pathname === "/profissional";
   const showAdminShortcuts = location.pathname === "/admin";
 
+  useEffect(() => {
+    if (!showAdminShortcuts) return;
+
+    const section = (location.hash || "").replace(/^#/, "");
+    if (!section) return;
+
+    const labels: Record<string, string> = {
+      agendamentos: "Agendamentos",
+      servicos: "Serviços",
+      promocoes: "Promoções",
+      horarios: "Horários",
+      acessos: "Acessos",
+    };
+    const targetLabel = labels[section];
+    if (!targetLabel) return;
+
+    const timer = window.setTimeout(() => {
+      const tabs = Array.from(document.querySelectorAll<HTMLElement>('[role="tab"]'));
+      const target = tabs.find((tab) => (tab.textContent || "").includes(targetLabel));
+      target?.click();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [location.hash, showAdminShortcuts]);
+
   return (
     <>
       <Outlet />
       {showAdminShortcuts ? (
         <>
-          <Link
-            to="/admin/catalogo"
-            className="fixed bottom-16 left-4 z-[80] inline-flex h-11 items-center justify-center rounded-full border border-primary/15 bg-card px-4 text-xs font-semibold text-primary shadow-lg transition-transform hover:-translate-y-0.5 sm:left-6 sm:px-5 sm:text-sm lg:bottom-[180px] lg:left-[18px] lg:w-[214px] lg:justify-start lg:rounded-xl lg:border-white/10 lg:bg-white/[0.08] lg:px-3 lg:text-white lg:shadow-none"
-          >
-            Destaque do catálogo
+          <Link to="/admin/catalogo" className="admin-sidebar-shortcut admin-catalog-shortcut">
+            <Sparkles className="size-4 shrink-0 opacity-80" />
+            <span>Destaque do catálogo</span>
           </Link>
-          <Link
-            to="/admin/equipe"
-            className="fixed bottom-4 left-4 z-[80] inline-flex h-11 items-center justify-center rounded-full border border-primary/15 bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-lg transition-transform hover:-translate-y-0.5 sm:bottom-6 sm:left-6 sm:px-5 sm:text-sm"
-          >
-            Agenda da equipe
+          <Link to="/admin/equipe" className="admin-sidebar-shortcut admin-team-shortcut">
+            <CalendarDays className="size-4 shrink-0 opacity-80" />
+            <span>Agenda da equipe</span>
+          </Link>
+          <Link to="/admin/financeiro" className="admin-sidebar-shortcut admin-finance-shortcut">
+            <CircleDollarSign className="size-4 shrink-0 opacity-80" />
+            <span>Financeiro</span>
           </Link>
         </>
       ) : null}
