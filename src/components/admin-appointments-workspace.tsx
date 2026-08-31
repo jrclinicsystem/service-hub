@@ -8,6 +8,7 @@ import {
   Phone,
   Search,
   Stethoscope,
+  Trash2,
   UserRound,
   X,
 } from "lucide-react";
@@ -123,6 +124,7 @@ export function AdminAppointmentsWorkspace({
   const [selected, setSelected] = useState<any | null>(null);
   const [incoming, setIncoming] = useState<any | null>(null);
   const [busyAction, setBusyAction] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const audioRef = useRef<AudioContext | null>(null);
   const notified = useRef(new Set<string>());
 
@@ -215,6 +217,24 @@ export function AdminAppointmentsWorkspace({
     if (status === "confirmado") setScope("accepted");
   };
 
+  const removeAppointment = async (appointment: any) => {
+    const confirmed = window.confirm(`Apagar o agendamento de ${appointment.patient_name}? Esta ação não pode ser desfeita.`);
+    if (!confirmed) return;
+
+    setDeletingId(appointment.id);
+    const { error } = await db.from("appointments").delete().eq("id", appointment.id);
+    setDeletingId(null);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    if (selected?.id === appointment.id) setSelected(null);
+    if (incoming?.id === appointment.id) setIncoming(null);
+    toast.success("Agendamento apagado.");
+    onRefresh();
+  };
+
   return (
     <section>
       <div className="rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-5">
@@ -244,36 +264,50 @@ export function AdminAppointmentsWorkspace({
             <p className="mt-3 text-sm text-muted-foreground">Nenhum agendamento nesta categoria.</p>
           </div>
         ) : filtered.map((appointment) => (
-          <button
+          <article
             key={appointment.id}
-            type="button"
-            onClick={() => setSelected(appointment)}
             className="rounded-2xl border border-border bg-card p-4 text-left shadow-soft transition hover:border-primary/30 hover:shadow-md"
           >
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="truncate text-base font-semibold">{appointment.patient_name}</p>
-                <p className="mt-0.5 truncate text-xs text-muted-foreground">{appointment.patient_email}</p>
+            <button type="button" onClick={() => setSelected(appointment)} className="block w-full text-left">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-base font-semibold">{appointment.patient_name}</p>
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">{appointment.patient_email}</p>
+                </div>
+                <AdminStatusBadge status={appointment.status} />
               </div>
-              <AdminStatusBadge status={appointment.status} />
-            </div>
 
-            <div className="mt-3 rounded-xl bg-secondary/45 p-3">
-              <p className="truncate text-sm font-medium">{appointment.service?.name ?? "Atendimento"}</p>
-              <p className="mt-1 truncate text-xs text-muted-foreground">{appointment.professional?.name ?? "Profissional não definido"} · {appointment.professional?.specialty ?? "Equipe"}</p>
-            </div>
+              <div className="mt-3 rounded-xl bg-secondary/45 p-3">
+                <p className="truncate text-sm font-medium">{appointment.service?.name ?? "Atendimento"}</p>
+                <p className="mt-1 truncate text-xs text-muted-foreground">{appointment.professional?.name ?? "Profissional não definido"} · {appointment.professional?.specialty ?? "Equipe"}</p>
+              </div>
 
-            <div className="mt-3 grid grid-cols-3 gap-2">
-              <SmallInfo label="Data" value={formatDate(appointment.scheduled_date)} />
-              <SmallInfo label="Horário" value={appointment.scheduled_time} />
-              <SmallInfo label="Pagamento" value={paymentLabel(appointment)} accent />
-            </div>
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                <SmallInfo label="Data" value={formatDate(appointment.scheduled_date)} />
+                <SmallInfo label="Horário" value={appointment.scheduled_time} />
+                <SmallInfo label="Pagamento" value={paymentLabel(appointment)} accent />
+              </div>
+            </button>
 
             <div className="mt-3 flex items-center justify-between gap-3 border-t border-border/70 pt-3">
-              <p className="truncate text-xs text-muted-foreground">{appointment.patient_phone || "Sem telefone"}</p>
-              <p className="shrink-0 text-xs font-semibold text-primary">{formatPrice(Number(appointment.service_price_snapshot ?? appointment.service?.price ?? 0))} · Detalhes →</p>
+              <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{appointment.patient_phone || "Sem telefone"}</p>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                onClick={() => removeAppointment(appointment)}
+                disabled={deletingId === appointment.id}
+                title="Apagar agendamento"
+                aria-label="Apagar agendamento"
+              >
+                <Trash2 className="size-3.5" />
+              </Button>
+              <button type="button" onClick={() => setSelected(appointment)} className="shrink-0 text-xs font-semibold text-primary hover:underline">
+                {formatPrice(Number(appointment.service_price_snapshot ?? appointment.service?.price ?? 0))} · Detalhes →
+              </button>
             </div>
-          </button>
+          </article>
         ))}
       </div>
 
