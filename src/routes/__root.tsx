@@ -13,6 +13,7 @@ import {
   CircleDollarSign,
   Clock3,
   ExternalLink,
+  Plus,
   ShieldCheck,
   Sparkles,
   Stethoscope,
@@ -247,6 +248,104 @@ function PersistentAdminSidebar({
   );
 }
 
+function MobileAdminNav({
+  inlineSection,
+  activeMainSection,
+  onMainSection,
+  onInlineSection,
+}: {
+  inlineSection: InlineAdminSection;
+  activeMainSection: MainAdminSection;
+  onMainSection: (section: MainAdminSection) => void;
+  onInlineSection: (section: Exclude<InlineAdminSection, null>) => void;
+}) {
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreActive =
+    inlineSection === "team" ||
+    inlineSection === "finance" ||
+    (inlineSection === null && activeMainSection === "acessos");
+
+  const selectMain = (section: MainAdminSection) => {
+    setMoreOpen(false);
+    onMainSection(section);
+  };
+
+  const selectInline = (section: Exclude<InlineAdminSection, null>) => {
+    setMoreOpen(false);
+    onInlineSection(section);
+  };
+
+  const mainButton = (
+    section: Exclude<MainAdminSection, "acessos">,
+    label: string,
+    Icon: ComponentType<{ className?: string }>,
+  ) => {
+    const active = inlineSection === null && activeMainSection === section;
+    return (
+      <button
+        type="button"
+        className={`admin-mobile-nav-item${active ? " is-active" : ""}`}
+        onClick={() => selectMain(section)}
+        aria-pressed={active}
+      >
+        <Icon className="admin-mobile-nav-icon" />
+        <span>{label}</span>
+      </button>
+    );
+  };
+
+  return (
+    <>
+      {moreOpen ? (
+        <button
+          type="button"
+          className="admin-mobile-more-backdrop"
+          aria-label="Fechar mais opções"
+          onClick={() => setMoreOpen(false)}
+        />
+      ) : null}
+
+      <div className="admin-mobile-nav" aria-label="Navegação administrativa móvel">
+        {moreOpen ? (
+          <div id="admin-mobile-more-menu" className="admin-mobile-more-menu" role="menu" aria-label="Mais opções">
+            <button type="button" className="admin-mobile-more-option" role="menuitem" onClick={() => selectInline("finance")}>
+              <span className="admin-mobile-more-option-icon"><CircleDollarSign /></span>
+              <span><strong>Financeiro</strong><small>Gestão financeira da clínica</small></span>
+            </button>
+            <button type="button" className="admin-mobile-more-option" role="menuitem" onClick={() => selectInline("team")}>
+              <span className="admin-mobile-more-option-icon"><CalendarDays /></span>
+              <span><strong>Agenda da equipe</strong><small>Agendas e profissionais</small></span>
+            </button>
+            <button type="button" className="admin-mobile-more-option" role="menuitem" onClick={() => selectMain("acessos")}>
+              <span className="admin-mobile-more-option-icon"><ShieldCheck /></span>
+              <span><strong>Acessos</strong><small>Permissões administrativas</small></span>
+            </button>
+          </div>
+        ) : null}
+
+        <nav className="admin-mobile-nav-bar">
+          {mainButton("agendamentos", "Agenda", CalendarDays)}
+          {mainButton("servicos", "Serviços", Stethoscope)}
+
+          <button
+            type="button"
+            className={`admin-mobile-more-trigger${moreOpen ? " is-open" : ""}${moreActive ? " is-active" : ""}`}
+            onClick={() => setMoreOpen((current) => !current)}
+            aria-expanded={moreOpen}
+            aria-controls="admin-mobile-more-menu"
+          >
+            <span className="admin-mobile-more-circle"><Plus /></span>
+            <span>Mais</span>
+          </button>
+
+          {mainButton("promocoes", "Ofertas", Tag)}
+          {mainButton("horarios", "Horários", Clock3)}
+        </nav>
+      </div>
+    </>
+  );
+}
+
 function SystemAccess() {
   const location = useLocation();
   const [inlineSection, setInlineSection] = useState<InlineAdminSection>(null);
@@ -348,6 +447,13 @@ function SystemAccess() {
           <a href="/admin/equipe" className="admin-sidebar-presence-anchor" aria-hidden="true" tabIndex={-1} />
 
           <PersistentAdminSidebar
+            inlineSection={inlineSection}
+            activeMainSection={activeMainSection}
+            onMainSection={openMainSection}
+            onInlineSection={openInlineSection}
+          />
+
+          <MobileAdminNav
             inlineSection={inlineSection}
             activeMainSection={activeMainSection}
             onMainSection={openMainSection}
