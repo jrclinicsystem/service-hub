@@ -423,18 +423,18 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated }: { open: bool
   };
 
   const createAppointment = async () => {
-    if (!patientName.trim()) return toast.error("Informe o nome do cliente.");
-    if (!serviceId) return toast.error("Selecione o serviço.");
-    if (!professionalId) return toast.error("Selecione o profissional.");
-    if (!scheduledDate) return toast.error("Selecione a data.");
-    if (scheduledDate < todayIso()) return toast.error("A data do agendamento não pode estar no passado.");
-    if (!scheduledTime) return toast.error("Selecione o horário.");
+    if (!patientName.trim()) { toast.error("Informe o nome do cliente."); return; }
+    if (!serviceId) { toast.error("Selecione o serviço."); return; }
+    if (!professionalId) { toast.error("Selecione o profissional."); return; }
+    if (!scheduledDate) { toast.error("Selecione a data."); return; }
+    if (scheduledDate < todayIso()) { toast.error("A data do agendamento não pode estar no passado."); return; }
+    if (!scheduledTime) { toast.error("Selecione o horário."); return; }
 
     const validLink = links.some((link) => link.service_id === serviceId && link.professional_id === professionalId);
-    if (!validLink) return toast.error("Esse profissional não atende o serviço selecionado.");
+    if (!validLink) { toast.error("Esse profissional não atende o serviço selecionado."); return; }
 
     const service = services.find((item) => item.id === serviceId);
-    if (!service) return toast.error("Serviço não encontrado.");
+    if (!service) { toast.error("Serviço não encontrado."); return; }
     const total = Number(service.price ?? 0);
 
     setSaving(true);

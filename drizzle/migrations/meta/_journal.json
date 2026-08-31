@@ -8,6 +8,13 @@
       "when": 1787967014351,
       "tag": "0000_create_clinic_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1788220187181,
+      "tag": "0001_create_professional_time_slots",
+      "breakpoints": true
     }
   ]
 }

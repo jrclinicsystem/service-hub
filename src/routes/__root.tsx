@@ -387,12 +387,12 @@ function SystemAccess() {
   }, [showAdminShortcuts]);
 
   useEffect(() => {
-    if (!showAdminShortcuts) return;
+    if (!showAdminShortcuts) return undefined;
 
     const section = (location.hash || "").replace(/^#/, "");
     if (section === "catalogo") {
       setInlineSection("catalog");
-      return;
+      return undefined;
     }
     if (section === "equipe") {
       setInlineSection("team");
@@ -400,11 +400,11 @@ function SystemAccess() {
     }
     if (section === "acessos") {
       setInlineSection("access");
-      return;
+      return undefined;
     }
     if (section === "financeiro") {
       setInlineSection("finance");
-      return;
+      return undefined;
     }
 
     if (section in mainSectionLabels) {
@@ -414,6 +414,7 @@ function SystemAccess() {
       const timer = window.setTimeout(() => activateMainTab(mainSection), 0);
       return () => window.clearTimeout(timer);
     }
+    return undefined;
   }, [location.hash, showAdminShortcuts]);
 
   useEffect(() => {

@@ -223,7 +223,7 @@ function TeamAgendaPage() {
                   <Button type="button" variant="secondary" className="rounded-full bg-white/15 text-white hover:bg-destructive hover:text-destructive-foreground" onClick={async () => {
                     if (!window.confirm(`Excluir a agenda de ${selected.name}? O histórico de atendimentos será preservado.`)) return;
                     const { error: deleteError } = await db.rpc("delete_professional_agenda", { _professional_id: selected.id });
-                    if (deleteError) return toast.error(deleteError.message);
+                    if (deleteError) { toast.error(deleteError.message); return; }
                     toast.success("Agenda excluída.");
                     setSelectedId(null);
                     await refresh();
@@ -245,7 +245,7 @@ function TeamAgendaPage() {
               {selectedAppointments.length === 0 ? <div className="rounded-3xl border border-dashed border-border bg-card p-10 text-center text-sm text-muted-foreground">Nenhum atendimento cadastrado.</div> : selectedAppointments.map((appointment: any) => (
                 <article key={appointment.id} className="rounded-2xl border border-border bg-card p-4 shadow-soft">
                   <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="font-semibold">{appointment.patient_name}</p><p className="mt-1 text-xs text-muted-foreground">{appointment.service?.name || "Atendimento"}</p></div><div className="text-right"><p className="font-semibold">{appointment.scheduled_time}</p><p className="text-[10px] text-muted-foreground">{formatDate(appointment.scheduled_date)}</p></div></div>
-                  <div className="mt-3 flex items-center justify-between border-t border-border pt-3"><Badge variant={appointment.status === "confirmado" ? "default" : "outline"} className="rounded-full">{appointment.status}</Badge><Button type="button" variant="ghost" size="icon" className="text-destructive" onClick={async () => { if (!window.confirm(`Apagar o agendamento de ${appointment.patient_name}?`)) return; const { error: removeError } = await db.from("appointments").delete().eq("id", appointment.id); if (removeError) return toast.error(removeError.message); toast.success("Agendamento apagado."); await refresh(); }}><Trash2 className="size-4" /></Button></div>
+                  <div className="mt-3 flex items-center justify-between border-t border-border pt-3"><Badge variant={appointment.status === "confirmado" ? "default" : "outline"} className="rounded-full">{appointment.status}</Badge><Button type="button" variant="ghost" size="icon" className="text-destructive" onClick={async () => { if (!window.confirm(`Apagar o agendamento de ${appointment.patient_name}?`)) return; const { error: removeError } = await db.from("appointments").delete().eq("id", appointment.id); if (removeError) { toast.error(removeError.message); return; } toast.success("Agendamento apagado."); await refresh(); }}><Trash2 className="size-4" /></Button></div>
                 </article>
               ))}
             </div>
@@ -297,8 +297,8 @@ function CreateAgendaModal({ open, onClose, services, onSaved }: any) {
   const close = () => { if (!busy) { reset(); onClose(); } };
   const save = async () => {
     const normalizedEmail = email.trim().toLowerCase();
-    if (name.trim().length < 2) return toast.error("Informe o nome da profissional.");
-    if (normalizedEmail && !normalizedEmail.includes("@")) return toast.error("Informe um e-mail válido.");
+    if (name.trim().length < 2) { toast.error("Informe o nome da profissional."); return; }
+    if (normalizedEmail && !normalizedEmail.includes("@")) { toast.error("Informe um e-mail válido."); return; }
     setBusy(true);
     try {
       const { data: professional, error: professionalError } = await db.from("professionals").insert({ name: name.trim(), specialty: specialty.trim(), is_active: true, sort_order: 999 }).select("id").single();
@@ -340,7 +340,7 @@ function EditAgendaModal({ open, onClose, professional, access, services, linked
   useEffect(() => { if (open) { setName(professional.name); setSpecialty(professional.specialty ?? ""); setEmail(access?.email ?? ""); setEnabled(access?.enabled ?? true); setActive(professional.is_active); setServiceIds(linkedServiceIds); } }, [open, professional, access, linkedServiceIds]);
 
   const save = async () => {
-    if (name.trim().length < 2) return toast.error("Informe um nome válido.");
+    if (name.trim().length < 2) { toast.error("Informe um nome válido."); return; }
     const normalizedEmail = email.trim().toLowerCase();
     setBusy(true);
     try {
@@ -389,12 +389,12 @@ function NewAppointmentModal({ open, onClose, professional, services, slots, onS
 
   const reset = () => { setServiceId(""); setPatientName(""); setPatientEmail(""); setPatientPhone(""); setDate(todayIso()); setTime(""); setNotes(""); };
   const save = async () => {
-    if (!serviceId || !patientName.trim() || !date || !time) return toast.error("Preencha serviço, cliente, data e horário.");
+    if (!serviceId || !patientName.trim() || !date || !time) { toast.error("Preencha serviço, cliente, data e horário."); return; }
     const selectedService = services.find((service: any) => service.id === serviceId);
     setBusy(true);
     const { error } = await db.from("appointments").insert({ user_id: null, professional_id: professional.id, service_id: serviceId, patient_name: patientName.trim(), patient_email: patientEmail.trim().toLowerCase(), patient_phone: patientPhone.trim(), scheduled_date: date, scheduled_time: time, notes: notes.trim(), status: "confirmado", payment_choice: "onsite", service_price_snapshot: Number(selectedService?.price ?? 0), deposit_percent: 0, deposit_amount: 0, balance_amount: Number(selectedService?.price ?? 0) });
     setBusy(false);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success("Agendamento criado."); reset(); onClose(); await onSaved();
   };
 
@@ -416,11 +416,11 @@ function HoursModal({ open, onClose, professional, slots, onSaved }: any) {
   const [busy, setBusy] = useState(false);
 
   const add = async () => {
-    if (!newTime) return toast.error("Escolha um horário.");
+    if (!newTime) { toast.error("Escolha um horário."); return; }
     setBusy(true);
     const { error } = await db.from("professional_time_slots").upsert({ professional_id: professional.id, slot: newTime, is_available: true, sort_order: Number(newTime.replace(":", "")) }, { onConflict: "professional_id,slot" });
     setBusy(false);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     setNewTime(""); toast.success("Horário adicionado."); await onSaved();
   };
 
@@ -428,7 +428,7 @@ function HoursModal({ open, onClose, professional, slots, onSaved }: any) {
     <div className="flex gap-2"><Input type="time" value={newTime} onChange={(e) => setNewTime(e.target.value)} /><Button type="button" onClick={add} disabled={busy}><Plus className="size-4" /> Adicionar horário</Button></div>
     <div className="mt-5 space-y-2">
       {slots.length === 0 ? <p className="rounded-2xl border border-dashed border-border p-5 text-center text-sm text-muted-foreground">Nenhum horário cadastrado.</p> : slots.map((slot: any) => (
-        <div key={slot.id} className="flex items-center justify-between rounded-2xl border border-border px-4 py-3"><div><p className="font-semibold tabular-nums">{slot.slot}</p><p className="text-[10px] text-muted-foreground">{slot.is_available ? "Disponível para agendamento" : "Pausado"}</p></div><div className="flex items-center gap-2"><Switch checked={slot.is_available} onCheckedChange={async (checked) => { const { error } = await db.from("professional_time_slots").update({ is_available: checked, updated_at: new Date().toISOString() }).eq("id", slot.id); if (error) return toast.error(error.message); await onSaved(); }} /><Button type="button" variant="ghost" size="icon" className="text-destructive" onClick={async () => { if (!window.confirm(`Remover o horário ${slot.slot}?`)) return; const { error } = await db.from("professional_time_slots").delete().eq("id", slot.id); if (error) return toast.error(error.message); toast.success("Horário removido."); await onSaved(); }}><Trash2 className="size-4" /></Button></div></div>
+        <div key={slot.id} className="flex items-center justify-between rounded-2xl border border-border px-4 py-3"><div><p className="font-semibold tabular-nums">{slot.slot}</p><p className="text-[10px] text-muted-foreground">{slot.is_available ? "Disponível para agendamento" : "Pausado"}</p></div><div className="flex items-center gap-2"><Switch checked={slot.is_available} onCheckedChange={async (checked) => { const { error } = await db.from("professional_time_slots").update({ is_available: checked, updated_at: new Date().toISOString() }).eq("id", slot.id); if (error) { toast.error(error.message); return; } await onSaved(); }} /><Button type="button" variant="ghost" size="icon" className="text-destructive" onClick={async () => { if (!window.confirm(`Remover o horário ${slot.slot}?`)) return; const { error } = await db.from("professional_time_slots").delete().eq("id", slot.id); if (error) { toast.error(error.message); return; } toast.success("Horário removido."); await onSaved(); }}><Trash2 className="size-4" /></Button></div></div>
       ))}
     </div>
   </ModalShell>;

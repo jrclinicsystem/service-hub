@@ -99,23 +99,23 @@ function AccessManagementPage() {
 
   const toggleAdmin = async (email: string, enabled: boolean) => {
     const { error: updateError } = await db.from("admin_emails").update({ enabled }).eq("email", email);
-    if (updateError) return toast.error(updateError.message);
+    if (updateError) { toast.error(updateError.message); return; }
     toast.success(enabled ? "Administrador ativado." : "Administrador pausado.");
     await refresh();
   };
 
   const removeAdmin = async (email: string) => {
-    if (email === data.currentEmail) return toast.error("Você não pode excluir o próprio acesso enquanto usa esta conta.");
+    if (email === data.currentEmail) { toast.error("Você não pode excluir o próprio acesso enquanto usa esta conta."); return; }
     if (!window.confirm(`Excluir o acesso administrativo de ${email}?`)) return;
     const { error: removeError } = await db.from("admin_emails").delete().eq("email", email);
-    if (removeError) return toast.error(removeError.message);
+    if (removeError) { toast.error(removeError.message); return; }
     toast.success("Acesso administrativo excluído.");
     await refresh();
   };
 
   const toggleCollaborator = async (id: string, enabled: boolean) => {
     const { error: updateError } = await db.from("professional_access").update({ enabled, updated_at: new Date().toISOString() }).eq("id", id);
-    if (updateError) return toast.error(updateError.message);
+    if (updateError) { toast.error(updateError.message); return; }
     toast.success(enabled ? "Colaborador ativado." : "Colaborador pausado.");
     await refresh();
   };
@@ -123,7 +123,7 @@ function AccessManagementPage() {
   const removeCollaborator = async (item: any) => {
     if (!window.confirm(`Excluir o acesso de ${item.email}${item.professional?.name ? ` à agenda de ${item.professional.name}` : ""}?`)) return;
     const { error: removeError } = await db.from("professional_access").delete().eq("id", item.id);
-    if (removeError) return toast.error(removeError.message);
+    if (removeError) { toast.error(removeError.message); return; }
     toast.success("Acesso do colaborador excluído.");
     await refresh();
   };
@@ -219,12 +219,12 @@ function AdminModal({ open, onClose, onSaved }: any) {
   const close = () => { if (!busy) { setEmail(""); onClose(); } };
   const save = async () => {
     const normalized = email.trim().toLowerCase();
-    if (!normalized.includes("@")) return toast.error("Informe um e-mail válido.");
+    if (!normalized.includes("@")) { toast.error("Informe um e-mail válido."); return; }
     setBusy(true);
     const { data: userData } = await supabase.auth.getUser();
     const { error } = await db.from("admin_emails").upsert({ email: normalized, enabled: true, created_by: userData.user?.id ?? null }, { onConflict: "email" });
     setBusy(false);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success("Administrador geral autorizado.");
     setEmail(""); onClose(); await onSaved();
   };
@@ -240,13 +240,13 @@ function CollaboratorModal({ open, onClose, professionals, onSaved }: any) {
   const close = () => { if (!busy) { setProfessionalId(""); setEmail(""); onClose(); } };
   const save = async () => {
     const normalized = email.trim().toLowerCase();
-    if (!professionalId) return toast.error("Selecione a agenda do colaborador.");
-    if (!normalized.includes("@")) return toast.error("Informe um e-mail válido.");
+    if (!professionalId) { toast.error("Selecione a agenda do colaborador."); return; }
+    if (!normalized.includes("@")) { toast.error("Informe um e-mail válido."); return; }
     setBusy(true);
     const { data: userData } = await supabase.auth.getUser();
     const { error } = await db.from("professional_access").upsert({ professional_id: professionalId, email: normalized, enabled: true, created_by: userData.user?.id ?? null, updated_at: new Date().toISOString() }, { onConflict: "professional_id" });
     setBusy(false);
-    if (error) return toast.error(String(error.message).includes("professional_access_email_unique") ? "Este e-mail já está vinculado a outra agenda." : error.message);
+    if (error) { toast.error(String(error.message).includes("professional_access_email_unique") ? "Este e-mail já está vinculado a outra agenda." : error.message); return; }
     toast.success("Colaborador vinculado à agenda.");
     setProfessionalId(""); setEmail(""); onClose(); await onSaved();
   };

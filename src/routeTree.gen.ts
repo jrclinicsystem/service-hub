@@ -20,6 +20,7 @@ import { Route as ProfissionalRouteImport } from './routes/profissional'
 import { Route as RedefinirSenhaRouteImport } from './routes/redefinir-senha'
 import { Route as TermosRouteImport } from './routes/termos'
 import { Route as AuthenticatedMinhaContaRouteImport } from './routes/_authenticated/minha-conta'
+import { Route as AdminAcessosRouteImport } from './routes/admin_.acessos'
 import { Route as AdminCatalogoRouteImport } from './routes/admin_.catalogo'
 import { Route as AdminEquipeRouteImport } from './routes/admin_.equipe'
 import { Route as AdminFinanceiroRouteImport } from './routes/admin_.financeiro'
@@ -79,6 +80,11 @@ const AuthenticatedMinhaContaRoute = AuthenticatedMinhaContaRouteImport.update({
   path: '/minha-conta',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AdminAcessosRoute = AdminAcessosRouteImport.update({
+  id: '/admin_/acessos',
+  path: '/admin/acessos',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminCatalogoRoute = AdminCatalogoRouteImport.update({
   id: '/admin_/catalogo',
   path: '/admin/catalogo',
@@ -111,6 +117,7 @@ export interface FileRoutesByFullPath {
   '/redefinir-senha': typeof RedefinirSenhaRoute
   '/termos': typeof TermosRoute
   '/minha-conta': typeof AuthenticatedMinhaContaRoute
+  '/admin/acessos': typeof AdminAcessosRoute
   '/admin/catalogo': typeof AdminCatalogoRoute
   '/admin/equipe': typeof AdminEquipeRoute
   '/admin/financeiro': typeof AdminFinanceiroRoute
@@ -127,6 +134,7 @@ export interface FileRoutesByTo {
   '/redefinir-senha': typeof RedefinirSenhaRoute
   '/termos': typeof TermosRoute
   '/minha-conta': typeof AuthenticatedMinhaContaRoute
+  '/admin/acessos': typeof AdminAcessosRoute
   '/admin/catalogo': typeof AdminCatalogoRoute
   '/admin/equipe': typeof AdminEquipeRoute
   '/admin/financeiro': typeof AdminFinanceiroRoute
@@ -145,6 +153,7 @@ export interface FileRoutesById {
   '/redefinir-senha': typeof RedefinirSenhaRoute
   '/termos': typeof TermosRoute
   '/_authenticated/minha-conta': typeof AuthenticatedMinhaContaRoute
+  '/admin_/acessos': typeof AdminAcessosRoute
   '/admin_/catalogo': typeof AdminCatalogoRoute
   '/admin_/equipe': typeof AdminEquipeRoute
   '/admin_/financeiro': typeof AdminFinanceiroRoute
@@ -163,6 +172,7 @@ export interface FileRouteTypes {
     | '/redefinir-senha'
     | '/termos'
     | '/minha-conta'
+    | '/admin/acessos'
     | '/admin/catalogo'
     | '/admin/equipe'
     | '/admin/financeiro'
@@ -179,6 +189,7 @@ export interface FileRouteTypes {
     | '/redefinir-senha'
     | '/termos'
     | '/minha-conta'
+    | '/admin/acessos'
     | '/admin/catalogo'
     | '/admin/equipe'
     | '/admin/financeiro'
@@ -196,6 +207,7 @@ export interface FileRouteTypes {
     | '/redefinir-senha'
     | '/termos'
     | '/_authenticated/minha-conta'
+    | '/admin_/acessos'
     | '/admin_/catalogo'
     | '/admin_/equipe'
     | '/admin_/financeiro'
@@ -213,6 +225,7 @@ export interface RootRouteChildren {
   ProfissionalRoute: typeof ProfissionalRoute
   RedefinirSenhaRoute: typeof RedefinirSenhaRoute
   TermosRoute: typeof TermosRoute
+  AdminAcessosRoute: typeof AdminAcessosRoute
   AdminCatalogoRoute: typeof AdminCatalogoRoute
   AdminEquipeRoute: typeof AdminEquipeRoute
   AdminFinanceiroRoute: typeof AdminFinanceiroRoute
@@ -298,6 +311,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMinhaContaRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/admin_/acessos': {
+      id: '/admin_/acessos'
+      path: '/admin/acessos'
+      fullPath: '/admin/acessos'
+      preLoaderRoute: typeof AdminAcessosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin_/catalogo': {
       id: '/admin_/catalogo'
       path: '/admin/catalogo'
@@ -351,6 +371,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProfissionalRoute: ProfissionalRoute,
   RedefinirSenhaRoute: RedefinirSenhaRoute,
   TermosRoute: TermosRoute,
+  AdminAcessosRoute: AdminAcessosRoute,
   AdminCatalogoRoute: AdminCatalogoRoute,
   AdminEquipeRoute: AdminEquipeRoute,
   AdminFinanceiroRoute: AdminFinanceiroRoute,
