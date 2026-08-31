@@ -121,8 +121,8 @@ function RedefinirSenha() {
       toast.error("O link de recuperação não está mais válido. Solicite um novo link.");
       return;
     }
-    if (password.length < 6) {
-      toast.error("A nova senha precisa ter pelo menos 6 caracteres.");
+    if (password.length < 8) {
+      toast.error("A nova senha precisa ter pelo menos 8 caracteres.");
       return;
     }
     if (password !== confirmPassword) {
@@ -198,7 +198,7 @@ function RedefinirSenha() {
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   className="mt-2 h-11 rounded-xl"
-                  placeholder="Mínimo de 6 caracteres"
+                  placeholder="Mínimo de 8 caracteres"
                 />
               </div>
               <div>
