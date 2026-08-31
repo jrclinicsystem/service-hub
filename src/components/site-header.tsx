@@ -11,38 +11,42 @@ const nav = [
 
 export function SiteHeader() {
   return (
-    <header className="sticky top-0 z-40 border-b border-primary-foreground/10 bg-primary/95 backdrop-blur-xl">
-      <div className="mx-auto flex h-[72px] max-w-[1520px] items-center justify-between px-4 sm:h-[84px] sm:px-8 md:h-24 lg:px-10">
-        <Link to="/" preload="intent" className="flex items-center">
-          <img src={logo} alt="JR Clinic" className="h-10 w-auto brightness-0 invert sm:h-[54px] md:h-[62px]" />
-        </Link>
+    <>
+      <header className="fixed inset-x-0 top-0 z-[100] w-full border-b border-primary-foreground/10 bg-primary/95 shadow-[0_8px_28px_rgba(0,0,0,0.08)] backdrop-blur-xl">
+        <div className="mx-auto flex h-[72px] max-w-[1520px] items-center justify-between px-4 sm:h-[84px] sm:px-8 md:h-24 lg:px-10">
+          <Link to="/" preload="intent" className="flex items-center">
+            <img src={logo} alt="JR Clinic" className="h-10 w-auto brightness-0 invert sm:h-[54px] md:h-[62px]" />
+          </Link>
 
-        <nav className="hidden items-center gap-8 text-sm text-primary-foreground/70 md:flex lg:gap-9">
-          {nav.map((item) => (
-            <Link
-              key={item.to}
-              to={item.to}
-              preload="intent"
-              activeOptions={{ exact: item.to === "/" }}
-              activeProps={{ className: "text-primary-foreground font-medium" }}
-              className="transition-colors hover:text-primary-foreground"
-            >
-              {item.label}
-            </Link>
-          ))}
-        </nav>
+          <nav className="hidden items-center gap-8 text-sm text-primary-foreground/70 md:flex lg:gap-9">
+            {nav.map((item) => (
+              <Link
+                key={item.to}
+                to={item.to}
+                preload="intent"
+                activeOptions={{ exact: item.to === "/" }}
+                activeProps={{ className: "text-primary-foreground font-medium" }}
+                className="transition-colors hover:text-primary-foreground"
+              >
+                {item.label}
+              </Link>
+            ))}
+          </nav>
 
-        <div className="hidden items-center gap-2.5 md:flex">
-          <Button asChild variant="ghost" size="sm" className="h-11 rounded-full px-5 text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground">
-            <Link to="/minha-conta" preload="intent">Minha conta</Link>
-          </Button>
-          <Button asChild size="sm" className="h-11 rounded-full bg-accent px-5 text-primary-foreground hover:bg-accent/90 hover:text-primary-foreground">
-            <Link to="/agendar" preload="intent">Agendar consulta</Link>
-          </Button>
+          <div className="hidden items-center gap-2.5 md:flex">
+            <Button asChild variant="ghost" size="sm" className="h-11 rounded-full px-5 text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground">
+              <Link to="/minha-conta" preload="intent">Minha conta</Link>
+            </Button>
+            <Button asChild size="sm" className="h-11 rounded-full bg-accent px-5 text-primary-foreground hover:bg-accent/90 hover:text-primary-foreground">
+              <Link to="/agendar" preload="intent">Agendar consulta</Link>
+            </Button>
+          </div>
+
+          <div className="w-8 md:hidden" aria-hidden="true" />
         </div>
+      </header>
 
-        <div className="w-8 md:hidden" aria-hidden="true" />
-      </div>
-    </header>
+      <div className="h-[72px] sm:h-[84px] md:h-24" aria-hidden="true" />
+    </>
   );
 }
