@@ -108,63 +108,66 @@ export function InfinitePayPaymentDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100%-1rem)] rounded-3xl p-4 sm:max-w-lg sm:p-6">
-        <DialogHeader>
-          <DialogTitle>Finalizar pagamento</DialogTitle>
-          <DialogDescription>
-            Seu horário só será liberado para a profissional depois que a InfinitePay confirmar o pagamento.
+      <DialogContent className="max-h-[92dvh] w-[calc(100vw-24px)] max-w-[620px] overflow-x-hidden overflow-y-auto rounded-3xl p-5 sm:w-[calc(100vw-48px)] sm:p-7">
+        <DialogHeader className="min-w-0 pr-6">
+          <DialogTitle className="text-xl sm:text-2xl">Finalizar pagamento</DialogTitle>
+          <DialogDescription className="mt-1 text-sm leading-6">
+            Revise o valor escolhido e continue para o ambiente seguro da InfinitePay.
           </DialogDescription>
         </DialogHeader>
 
         {session ? (
-          <div className="mt-2 rounded-2xl border border-border bg-secondary/35 p-4">
-            <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold">{session.serviceName}</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {session.kind === "deposit" ? "Sinal da reserva" : "Pagamento integral"}
+          <div className="mt-3 min-w-0 rounded-2xl border border-border bg-secondary/35 p-4 sm:p-5">
+            <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-5">
+              <div className="min-w-0 flex-1">
+                <p className="break-words text-base font-semibold leading-snug">{session.serviceName}</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {session.kind === "deposit" ? "Pagamento de 50% da reserva" : "Pagamento integral do serviço"}
                 </p>
               </div>
-              <p className="shrink-0 text-xl font-semibold text-primary">{formatPrice(session.amount)}</p>
+              <div className="min-w-0 sm:text-right">
+                <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">Pagar agora</p>
+                <p className="mt-1 break-words text-2xl font-semibold leading-none text-primary sm:text-3xl">{formatPrice(session.amount)}</p>
+              </div>
             </div>
 
-            <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-              <div className="rounded-xl bg-card px-3 py-2.5">
-                <p className="text-[9px] uppercase tracking-wide text-muted-foreground">Valor total</p>
-                <p className="mt-0.5 font-medium">{formatPrice(session.total)}</p>
+            <div className="mt-4 grid min-w-0 grid-cols-1 gap-2.5 sm:grid-cols-2">
+              <div className="min-w-0 rounded-xl bg-card px-3.5 py-3">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Valor total</p>
+                <p className="mt-1 break-words text-sm font-semibold">{formatPrice(session.total)}</p>
               </div>
-              <div className="rounded-xl bg-card px-3 py-2.5">
-                <p className="text-[9px] uppercase tracking-wide text-muted-foreground">Restante na clínica</p>
-                <p className="mt-0.5 font-medium">{formatPrice(session.balance)}</p>
+              <div className="min-w-0 rounded-xl bg-card px-3.5 py-3">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Restante na clínica</p>
+                <p className="mt-1 break-words text-sm font-semibold">{formatPrice(session.balance)}</p>
               </div>
             </div>
           </div>
         ) : null}
 
-        <div className="mt-4 flex items-start gap-2 rounded-xl bg-primary-soft/70 px-3 py-3 text-xs text-primary">
+        <div className="mt-4 flex min-w-0 items-start gap-3 rounded-2xl border border-primary/10 bg-primary-soft/70 px-4 py-3.5 text-sm leading-5 text-primary">
           <ShieldCheck className="mt-0.5 size-4 shrink-0" />
-          <span>
-            Pagamento processado pela InfinitePay. No checkout, o cliente escolhe Pix ou cartão e retorna ao JR Clinic depois de pagar.
+          <span className="min-w-0 break-words">
+            Na próxima tela você escolhe Pix, cartão ou outro método disponível na InfinitePay. A confirmação do pagamento volta automaticamente para o JR Clinic.
           </span>
         </div>
 
         {errorMessage ? (
-          <div className="mt-3 rounded-xl border border-destructive/25 bg-destructive/5 px-3 py-2.5 text-xs text-destructive">
+          <div className="mt-3 min-w-0 break-words rounded-xl border border-destructive/25 bg-destructive/5 px-3.5 py-3 text-sm leading-5 text-destructive">
             {errorMessage}
           </div>
         ) : null}
 
         <Button
-          className="mt-5 h-12 w-full rounded-full"
+          className="mt-5 h-11 w-full rounded-full text-sm sm:h-12"
           onClick={() => void startCheckout()}
           disabled={!session || loading}
         >
           {loading ? <LoaderCircle className="size-4 animate-spin" /> : <ExternalLink className="size-4" />}
-          {loading ? "Abrindo InfinitePay..." : "Pagar com InfinitePay"}
+          {loading ? "Abrindo InfinitePay..." : "Continuar para pagamento"}
         </Button>
 
-        <p className="mt-3 text-center text-[11px] leading-relaxed text-muted-foreground">
-          A confirmação é automática. O agendamento permanece bloqueado até o pagamento ser validado.
+        <p className="mt-3 px-1 text-center text-xs leading-5 text-muted-foreground">
+          O agendamento permanece protegido até a InfinitePay confirmar o pagamento.
         </p>
       </DialogContent>
     </Dialog>
