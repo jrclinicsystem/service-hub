@@ -113,6 +113,44 @@ export type Database = {
         }
         Relationships: []
       }
+      professional_time_slots: {
+        Row: {
+          created_at: string
+          id: string
+          is_available: boolean
+          professional_id: string
+          slot: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_available?: boolean
+          professional_id: string
+          slot: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_available?: boolean
+          professional_id?: string
+          slot?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "professional_time_slots_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
+            referencedRelation: "professionals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       professionals: {
         Row: {
           created_at: string
