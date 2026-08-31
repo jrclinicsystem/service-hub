@@ -1,0 +1,2 @@
+Force Lovable rebuild after correcting admin team page offset and finance centering.
+Timestamp: 2026-08-31T01:52:00-03:00
