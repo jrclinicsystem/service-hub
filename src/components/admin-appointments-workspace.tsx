@@ -6,6 +6,7 @@ import {
   CreditCard,
   Mail,
   Phone,
+  Plus,
   Search,
   Stethoscope,
   Trash2,
@@ -26,6 +27,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDate, formatPrice } from "@/lib/clinic";
 
@@ -123,6 +133,7 @@ export function AdminAppointmentsWorkspace({
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<any | null>(null);
   const [incoming, setIncoming] = useState<any | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
   const [busyAction, setBusyAction] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const audioRef = useRef<AudioContext | null>(null);
@@ -243,9 +254,15 @@ export function AdminAppointmentsWorkspace({
             <h2 className="text-lg font-semibold">Agendamentos</h2>
             <p className="mt-1 text-xs text-muted-foreground">Separe rapidamente o que ainda precisa de decisão do que já foi aceito.</p>
           </div>
-          <div className="relative w-full xl:max-w-sm">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Paciente, serviço, profissional..." className="h-10 rounded-xl pl-9" />
+          <div className="flex w-full flex-col gap-2 sm:flex-row xl:w-auto">
+            <Button type="button" className="h-10 shrink-0 rounded-xl" onClick={() => setCreateOpen(true)}>
+              <Plus className="size-4" />
+              Novo agendamento
+            </Button>
+            <div className="relative w-full sm:min-w-[280px] xl:w-[340px]">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Paciente, serviço, profissional..." className="h-10 rounded-xl pl-9" />
+            </div>
           </div>
         </div>
 
@@ -272,7 +289,7 @@ export function AdminAppointmentsWorkspace({
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="truncate text-base font-semibold">{appointment.patient_name}</p>
-                  <p className="mt-0.5 truncate text-xs text-muted-foreground">{appointment.patient_email}</p>
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">{appointment.patient_email || "Sem e-mail"}</p>
                 </div>
                 <AdminStatusBadge status={appointment.status} />
               </div>
@@ -311,6 +328,16 @@ export function AdminAppointmentsWorkspace({
         ))}
       </div>
 
+      <CreateAppointmentDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onCreated={() => {
+          setCreateOpen(false);
+          setScope("accepted");
+          onRefresh();
+        }}
+      />
+
       <AppointmentAdminDialog
         appointment={selected}
         open={Boolean(selected)}
@@ -329,6 +356,212 @@ export function AdminAppointmentsWorkspace({
         busy={busyAction}
       />
     </section>
+  );
+}
+
+function CreateAppointmentDialog({ open, onOpenChange, onCreated }: { open: boolean; onOpenChange: (open: boolean) => void; onCreated: () => void }) {
+  const [loadingCatalog, setLoadingCatalog] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [services, setServices] = useState<any[]>([]);
+  const [professionals, setProfessionals] = useState<any[]>([]);
+  const [links, setLinks] = useState<any[]>([]);
+  const [timeSlots, setTimeSlots] = useState<any[]>([]);
+  const [patientName, setPatientName] = useState("");
+  const [patientEmail, setPatientEmail] = useState("");
+  const [patientPhone, setPatientPhone] = useState("");
+  const [serviceId, setServiceId] = useState("");
+  const [professionalId, setProfessionalId] = useState("");
+  const [scheduledDate, setScheduledDate] = useState(todayIso());
+  const [scheduledTime, setScheduledTime] = useState("");
+  const [notes, setNotes] = useState("");
+
+  useEffect(() => {
+    if (!open) return;
+    let active = true;
+    setLoadingCatalog(true);
+    Promise.all([
+      db.from("services").select("id, name, price, duration_min, is_active").eq("is_active", true).order("name"),
+      db.from("professionals").select("id, name, specialty, is_active, sort_order").eq("is_active", true).order("sort_order").order("name"),
+      db.from("service_professionals").select("service_id, professional_id"),
+      db.from("time_slots").select("id, slot, is_available, sort_order").eq("is_available", true).order("sort_order"),
+    ]).then(([serviceResult, professionalResult, linkResult, slotResult]) => {
+      if (!active) return;
+      const firstError = [serviceResult, professionalResult, linkResult, slotResult].find((result) => result.error)?.error;
+      if (firstError) {
+        toast.error(firstError.message);
+      } else {
+        setServices(serviceResult.data ?? []);
+        setProfessionals(professionalResult.data ?? []);
+        setLinks(linkResult.data ?? []);
+        setTimeSlots(slotResult.data ?? []);
+      }
+      setLoadingCatalog(false);
+    });
+    return () => { active = false; };
+  }, [open]);
+
+  const availableProfessionals = useMemo(() => {
+    if (!serviceId) return [];
+    const allowed = new Set(links.filter((link) => link.service_id === serviceId).map((link) => link.professional_id));
+    return professionals.filter((professional) => allowed.has(professional.id));
+  }, [serviceId, links, professionals]);
+
+  const reset = () => {
+    setPatientName("");
+    setPatientEmail("");
+    setPatientPhone("");
+    setServiceId("");
+    setProfessionalId("");
+    setScheduledDate(todayIso());
+    setScheduledTime("");
+    setNotes("");
+  };
+
+  const handleOpenChange = (next: boolean) => {
+    if (!next && !saving) reset();
+    onOpenChange(next);
+  };
+
+  const createAppointment = async () => {
+    if (!patientName.trim()) return toast.error("Informe o nome do cliente.");
+    if (!serviceId) return toast.error("Selecione o serviço.");
+    if (!professionalId) return toast.error("Selecione o profissional.");
+    if (!scheduledDate) return toast.error("Selecione a data.");
+    if (scheduledDate < todayIso()) return toast.error("A data do agendamento não pode estar no passado.");
+    if (!scheduledTime) return toast.error("Selecione o horário.");
+
+    const validLink = links.some((link) => link.service_id === serviceId && link.professional_id === professionalId);
+    if (!validLink) return toast.error("Esse profissional não atende o serviço selecionado.");
+
+    const service = services.find((item) => item.id === serviceId);
+    if (!service) return toast.error("Serviço não encontrado.");
+    const total = Number(service.price ?? 0);
+
+    setSaving(true);
+    const conflict = await db
+      .from("appointments")
+      .select("id")
+      .eq("professional_id", professionalId)
+      .eq("scheduled_date", scheduledDate)
+      .eq("scheduled_time", scheduledTime)
+      .neq("status", "cancelado")
+      .limit(1)
+      .maybeSingle();
+
+    if (conflict.error) {
+      setSaving(false);
+      toast.error(conflict.error.message);
+      return;
+    }
+    if (conflict.data) {
+      setSaving(false);
+      toast.error("Este profissional já possui um agendamento nesse horário.");
+      return;
+    }
+
+    const { error } = await db.from("appointments").insert({
+      user_id: null,
+      service_id: serviceId,
+      professional_id: professionalId,
+      patient_name: patientName.trim(),
+      patient_email: patientEmail.trim(),
+      patient_phone: patientPhone.trim(),
+      notes: notes.trim(),
+      scheduled_date: scheduledDate,
+      scheduled_time: scheduledTime,
+      status: "confirmado",
+      payment_choice: "onsite",
+      service_price_snapshot: total,
+      deposit_percent: 0,
+      deposit_amount: 0,
+      balance_amount: total,
+    });
+
+    setSaving(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    toast.success("Agendamento criado e confirmado.", {
+      description: `${patientName.trim()} · ${service.name} · ${formatDate(scheduledDate)} às ${scheduledTime}`,
+    });
+    reset();
+    onCreated();
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="max-h-[92dvh] w-[calc(100%-1rem)] overflow-y-auto rounded-3xl p-5 sm:max-w-2xl sm:p-6">
+        <DialogHeader>
+          <DialogTitle>Novo agendamento</DialogTitle>
+          <DialogDescription>Crie um agendamento diretamente pela clínica. Ele será registrado como confirmado e com pagamento presencial.</DialogDescription>
+        </DialogHeader>
+
+        <div className="mt-2 grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label htmlFor="admin-patient-name">Nome do cliente *</Label>
+            <Input id="admin-patient-name" value={patientName} onChange={(event) => setPatientName(event.target.value)} placeholder="Nome completo" disabled={saving} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="admin-patient-phone">Telefone</Label>
+            <Input id="admin-patient-phone" value={patientPhone} onChange={(event) => setPatientPhone(event.target.value)} placeholder="(85) 99999-9999" disabled={saving} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="admin-patient-email">E-mail</Label>
+            <Input id="admin-patient-email" type="email" value={patientEmail} onChange={(event) => setPatientEmail(event.target.value)} placeholder="cliente@email.com" disabled={saving} />
+          </div>
+
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label>Serviço *</Label>
+            <Select value={serviceId} onValueChange={(value) => { setServiceId(value); setProfessionalId(""); }} disabled={saving || loadingCatalog}>
+              <SelectTrigger><SelectValue placeholder={loadingCatalog ? "Carregando serviços..." : "Selecione o serviço"} /></SelectTrigger>
+              <SelectContent>
+                {services.map((service) => <SelectItem key={service.id} value={service.id}>{service.name} · {formatPrice(Number(service.price ?? 0))}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label>Profissional *</Label>
+            <Select value={professionalId} onValueChange={setProfessionalId} disabled={saving || !serviceId || availableProfessionals.length === 0}>
+              <SelectTrigger><SelectValue placeholder={!serviceId ? "Escolha primeiro o serviço" : availableProfessionals.length === 0 ? "Nenhum profissional vinculado" : "Selecione o profissional"} /></SelectTrigger>
+              <SelectContent>
+                {availableProfessionals.map((professional) => <SelectItem key={professional.id} value={professional.id}>{professional.name}{professional.specialty ? ` · ${professional.specialty}` : ""}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="admin-scheduled-date">Data *</Label>
+            <Input id="admin-scheduled-date" type="date" min={todayIso()} value={scheduledDate} onChange={(event) => setScheduledDate(event.target.value)} disabled={saving} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Horário *</Label>
+            <Select value={scheduledTime} onValueChange={setScheduledTime} disabled={saving || loadingCatalog}>
+              <SelectTrigger><SelectValue placeholder="Selecione o horário" /></SelectTrigger>
+              <SelectContent>
+                {timeSlots.map((slot) => <SelectItem key={slot.id} value={slot.slot}>{slot.slot}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label htmlFor="admin-notes">Observações</Label>
+            <Textarea id="admin-notes" value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Informações importantes para o atendimento..." className="min-h-24" disabled={saving} />
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-2xl bg-primary-soft/60 p-3 text-xs text-muted-foreground">
+          O agendamento criado pelo painel entra diretamente em <strong className="text-foreground">Aceitos</strong>. O valor fica registrado integralmente como saldo para pagamento presencial.
+        </div>
+
+        <DialogFooter className="mt-4 gap-2 sm:gap-0">
+          <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={saving}>Cancelar</Button>
+          <Button onClick={createAppointment} disabled={saving || loadingCatalog}>{saving ? "Salvando..." : "Criar agendamento"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -394,7 +627,7 @@ function AppointmentAdminDialog({ appointment, open, onOpenChange, onConfirm, on
           <DetailBox icon={Stethoscope} label="Profissional" value={`${appointment.professional?.name ?? "Não definido"}${appointment.professional?.specialty ? ` · ${appointment.professional.specialty}` : ""}`} />
           <DetailBox icon={UserRound} label="Paciente" value={appointment.patient_name} />
           <DetailBox icon={Phone} label="Telefone" value={appointment.patient_phone || "Não informado"} />
-          <DetailBox icon={Mail} label="E-mail" value={appointment.patient_email} />
+          <DetailBox icon={Mail} label="E-mail" value={appointment.patient_email || "Não informado"} />
         </div>
 
         <div className="mt-4 rounded-2xl border border-border p-4">
