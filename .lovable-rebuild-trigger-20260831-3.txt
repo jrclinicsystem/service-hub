@@ -1,0 +1,2 @@
+JR Clinic rebuild trigger — 2026-08-31
+Admin agenda modal stacking fix, unified access management, and professional-specific schedules.
