@@ -258,7 +258,7 @@ function Agendar() {
           <StepChip number="5" label="Pagamento" />
         </div>
 
-        <div className="mt-5 grid gap-4 sm:mt-10 sm:gap-8 lg:grid-cols-[1.15fr_0.85fr]">
+        <div className="mt-5 grid grid-cols-1 gap-4 sm:mt-10 sm:gap-8 lg:grid-cols-[1.15fr_0.85fr]">
           <div className="space-y-4 sm:space-y-8">
             <section className="rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-6">
               <h2 className="text-base font-semibold sm:text-lg">Serviço e profissional</h2>
@@ -356,7 +356,7 @@ function Agendar() {
                 </p>
               </div>
 
-              <div className="mt-6 grid gap-3 sm:grid-cols-3 sm:gap-5">
+              <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-5">
                 <PaymentOption
                   icon={Landmark}
                   selected={paymentChoice === "deposit"}
