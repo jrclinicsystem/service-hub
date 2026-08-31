@@ -83,7 +83,7 @@ body:has(a.admin-sidebar-presence-anchor) a.admin-sidebar-presence-anchor {
   .admin-team-shortcut {
     top: 443px !important;
     bottom: auto !important;
-    left: 13px !important;
+    left: 8px !important;
     width: 214px !important;
     margin: 0 !important;
     padding: 0 12px !important;
