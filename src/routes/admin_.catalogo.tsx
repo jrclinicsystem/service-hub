@@ -77,6 +77,45 @@ async function loadCatalogHighlight() {
   };
 }
 
+function CatalogHeader() {
+  return (
+    <header className="sticky top-0 z-40 border-b border-border bg-card/95 backdrop-blur-xl">
+      <div className="mx-auto flex h-16 max-w-[1180px] items-center justify-between px-4 sm:px-8">
+        <Button variant="ghost" size="sm" asChild>
+          <Link to="/admin"><ChevronLeft className="size-4" /> Painel</Link>
+        </Button>
+        <Button variant="outline" size="sm" asChild>
+          <Link to="/catalogo"><Eye className="size-4" /> Ver catálogo</Link>
+        </Button>
+      </div>
+    </header>
+  );
+}
+
+function CatalogLoading() {
+  return (
+    <div className="min-h-screen bg-background lg:pl-[252px]">
+      <AdminSubpageSidebar active="catalog" />
+      <CatalogHeader />
+
+      <main className="mx-auto max-w-[1180px] px-4 py-8 sm:px-8 sm:py-12">
+        <div className="h-3 w-24 animate-pulse rounded-full bg-accent/15" />
+        <div className="mt-3 h-10 w-72 max-w-[80%] animate-pulse rounded-xl bg-primary/10" />
+        <div className="mt-4 h-4 w-[560px] max-w-full animate-pulse rounded-full bg-muted" />
+        <div className="mt-2 h-4 w-[430px] max-w-[86%] animate-pulse rounded-full bg-muted" />
+
+        <div className="mt-7 h-[74px] animate-pulse rounded-2xl bg-primary/10" />
+
+        <div className="mt-8 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <div key={index} className="h-[160px] animate-pulse rounded-2xl border border-border bg-card/70" />
+          ))}
+        </div>
+      </main>
+    </div>
+  );
+}
+
 function CatalogHighlightPage() {
   const queryClient = useQueryClient();
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -84,6 +123,8 @@ function CatalogHighlightPage() {
     queryKey: ["catalog-highlight-admin"],
     queryFn: loadCatalogHighlight,
     retry: 1,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const setFeatured = async (categoryId: string) => {
@@ -104,13 +145,7 @@ function CatalogHighlightPage() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="grid min-h-screen place-items-center bg-background">
-        <p className="text-sm text-muted-foreground">Carregando configuração do catálogo...</p>
-      </div>
-    );
-  }
+  if (isLoading) return <CatalogLoading />;
 
   if (error) {
     return (
@@ -143,17 +178,7 @@ function CatalogHighlightPage() {
   return (
     <div className="min-h-screen bg-background lg:pl-[252px]">
       <AdminSubpageSidebar active="catalog" />
-
-      <header className="sticky top-0 z-40 border-b border-border bg-card/95 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 max-w-[1180px] items-center justify-between px-4 sm:px-8">
-          <Button variant="ghost" size="sm" asChild>
-            <Link to="/admin"><ChevronLeft className="size-4" /> Painel</Link>
-          </Button>
-          <Button variant="outline" size="sm" asChild>
-            <Link to="/catalogo"><Eye className="size-4" /> Ver catálogo</Link>
-          </Button>
-        </div>
-      </header>
+      <CatalogHeader />
 
       <main className="mx-auto max-w-[1180px] px-4 py-8 sm:px-8 sm:py-12">
         <span className="eyebrow text-accent">Apresentação</span>
