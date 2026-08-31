@@ -346,22 +346,23 @@ function Agendar() {
               </div>
             </section>
 
-            <section className="rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-6">
-              <div>
-                <h2 className="text-base font-semibold sm:text-lg">Métodos de pagamento</h2>
-                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+            <section className="rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-8">
+              <div className="text-center">
+                <h2 className="text-lg font-semibold tracking-tight sm:text-2xl">Métodos de pagamento</h2>
+                <p className="mx-auto mt-1.5 max-w-[52ch] text-sm leading-relaxed text-muted-foreground">
                   {service
-                    ? "Escolha como deseja pagar este agendamento. Os detalhes completos aparecem na próxima etapa."
+                    ? "Selecione a forma mais conveniente para você. Os detalhes completos aparecem na próxima etapa."
                     : "Selecione um serviço acima para ver os valores reais de cada opção de pagamento."}
                 </p>
               </div>
 
-              <div className="mt-4 grid gap-2 sm:grid-cols-3">
+              <div className="mt-6 grid gap-3 sm:grid-cols-3 sm:gap-5">
                 <PaymentOption
                   icon={Landmark}
                   selected={paymentChoice === "deposit"}
                   disabled={!service || Boolean(paymentSession)}
                   title={`Pagar ${depositLabel} online`}
+                  description="Garanta seu horário pagando o sinal agora e o restante na clínica."
                   value={service ? formatPrice(depositValue) : "—"}
                   badge="Online"
                   onClick={() => { setPaymentChoice("deposit"); resetPreparedPayment(); }}
@@ -371,6 +372,7 @@ function Agendar() {
                   selected={paymentChoice === "full"}
                   disabled={!service || Boolean(paymentSession)}
                   title="Pagar valor total"
+                  description="Agilize seu atendimento com o pagamento integral, seguro e rápido."
                   value={service ? formatPrice(total) : "—"}
                   badge="Online"
                   onClick={() => { setPaymentChoice("full"); resetPreparedPayment(); }}
@@ -380,6 +382,7 @@ function Agendar() {
                   selected={paymentChoice === "onsite"}
                   disabled={!service || Boolean(paymentSession)}
                   title="Pagar presencialmente"
+                  description="Reserve seu horário e pague diretamente na recepção no dia do atendimento."
                   value={service ? "Na clínica" : "—"}
                   badge="Presencial"
                   onClick={() => { setPaymentChoice("onsite"); resetPreparedPayment(); }}
