@@ -16,6 +16,7 @@ import { SupportWhatsapp } from "@/components/support-whatsapp";
 import { Toaster } from "@/components/ui/sonner";
 
 import appCss from "../styles.css?url";
+import paymentOptionsCss from "../payment-options.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 
 function NotFoundComponent() {
@@ -88,6 +89,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     ],
     links: [
       { rel: "stylesheet", href: appCss },
+      { rel: "stylesheet", href: paymentOptionsCss },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
