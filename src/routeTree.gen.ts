@@ -22,6 +22,7 @@ import { Route as TermosRouteImport } from './routes/termos'
 import { Route as AuthenticatedMinhaContaRouteImport } from './routes/_authenticated/minha-conta'
 import { Route as AdminCatalogoRouteImport } from './routes/admin_.catalogo'
 import { Route as AdminEquipeRouteImport } from './routes/admin_.equipe'
+import { Route as AdminFinanceiroRouteImport } from './routes/admin_.financeiro'
 import { Route as ServicoSlugRouteImport } from './routes/servico.$slug'
 
 const IndexRoute = IndexRouteImport.update({
@@ -88,6 +89,11 @@ const AdminEquipeRoute = AdminEquipeRouteImport.update({
   path: '/admin/equipe',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminFinanceiroRoute = AdminFinanceiroRouteImport.update({
+  id: '/admin_/financeiro',
+  path: '/admin/financeiro',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ServicoSlugRoute = ServicoSlugRouteImport.update({
   id: '/servico/$slug',
   path: '/servico/$slug',
@@ -107,6 +113,7 @@ export interface FileRoutesByFullPath {
   '/minha-conta': typeof AuthenticatedMinhaContaRoute
   '/admin/catalogo': typeof AdminCatalogoRoute
   '/admin/equipe': typeof AdminEquipeRoute
+  '/admin/financeiro': typeof AdminFinanceiroRoute
   '/servico/$slug': typeof ServicoSlugRoute
 }
 export interface FileRoutesByTo {
@@ -122,6 +129,7 @@ export interface FileRoutesByTo {
   '/minha-conta': typeof AuthenticatedMinhaContaRoute
   '/admin/catalogo': typeof AdminCatalogoRoute
   '/admin/equipe': typeof AdminEquipeRoute
+  '/admin/financeiro': typeof AdminFinanceiroRoute
   '/servico/$slug': typeof ServicoSlugRoute
 }
 export interface FileRoutesById {
@@ -139,6 +147,7 @@ export interface FileRoutesById {
   '/_authenticated/minha-conta': typeof AuthenticatedMinhaContaRoute
   '/admin_/catalogo': typeof AdminCatalogoRoute
   '/admin_/equipe': typeof AdminEquipeRoute
+  '/admin_/financeiro': typeof AdminFinanceiroRoute
   '/servico/$slug': typeof ServicoSlugRoute
 }
 export interface FileRouteTypes {
@@ -156,6 +165,7 @@ export interface FileRouteTypes {
     | '/minha-conta'
     | '/admin/catalogo'
     | '/admin/equipe'
+    | '/admin/financeiro'
     | '/servico/$slug'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -171,6 +181,7 @@ export interface FileRouteTypes {
     | '/minha-conta'
     | '/admin/catalogo'
     | '/admin/equipe'
+    | '/admin/financeiro'
     | '/servico/$slug'
   id:
     | '__root__'
@@ -187,6 +198,7 @@ export interface FileRouteTypes {
     | '/_authenticated/minha-conta'
     | '/admin_/catalogo'
     | '/admin_/equipe'
+    | '/admin_/financeiro'
     | '/servico/$slug'
   fileRoutesById: FileRoutesById
 }
@@ -203,6 +215,7 @@ export interface RootRouteChildren {
   TermosRoute: typeof TermosRoute
   AdminCatalogoRoute: typeof AdminCatalogoRoute
   AdminEquipeRoute: typeof AdminEquipeRoute
+  AdminFinanceiroRoute: typeof AdminFinanceiroRoute
   ServicoSlugRoute: typeof ServicoSlugRoute
 }
 
@@ -299,6 +312,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminEquipeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin_/financeiro': {
+      id: '/admin_/financeiro'
+      path: '/admin/financeiro'
+      fullPath: '/admin/financeiro'
+      preLoaderRoute: typeof AdminFinanceiroRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/servico/$slug': {
       id: '/servico/$slug'
       path: '/servico/$slug'
@@ -333,6 +353,7 @@ const rootRouteChildren: RootRouteChildren = {
   TermosRoute: TermosRoute,
   AdminCatalogoRoute: AdminCatalogoRoute,
   AdminEquipeRoute: AdminEquipeRoute,
+  AdminFinanceiroRoute: AdminFinanceiroRoute,
   ServicoSlugRoute: ServicoSlugRoute,
 }
 export const routeTree = rootRouteImport
