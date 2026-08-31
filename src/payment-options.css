@@ -17,11 +17,7 @@ button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.te
   background: color-mix(in srgb, var(--card) 94%, var(--secondary)) !important;
   box-shadow: 0 10px 28px -24px rgb(15 77 62 / 0.3) !important;
   --tw-ring-shadow: 0 0 #0000 !important;
-  transition:
-    transform 180ms ease,
-    border-color 180ms ease,
-    box-shadow 180ms ease,
-    background-color 180ms ease;
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
 }
 
 button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center:not(:disabled):hover {
@@ -30,16 +26,12 @@ button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.te
   box-shadow: 0 18px 38px -28px color-mix(in srgb, var(--accent) 55%, transparent) !important;
 }
 
-/* Selected card stays neutral, with only a subtle brand-brown outline. */
 button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center[class*="border-primary"] {
   border-color: color-mix(in srgb, var(--accent) 70%, var(--border)) !important;
   background: color-mix(in srgb, var(--card) 94%, var(--secondary)) !important;
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent),
-    0 14px 30px -25px color-mix(in srgb, var(--accent) 45%, transparent) !important;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent), 0 14px 30px -25px color-mix(in srgb, var(--accent) 45%, transparent) !important;
 }
 
-/* ONLINE / PRESENCIAL tags remain green. */
 button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center > span.absolute {
   top: -0.65rem;
   min-width: 4.25rem;
@@ -53,7 +45,6 @@ button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.te
   box-shadow: 0 8px 18px -14px rgb(15 77 62 / 0.7);
 }
 
-/* Keep all three method icons in the same green visual language. */
 button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center > span.grid {
   background: var(--primary) !important;
   color: var(--primary-foreground) !important;
@@ -78,7 +69,6 @@ button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.te
   letter-spacing: -0.025em;
 }
 
-/* CTA is always green at rest, including the selected option. */
 button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center > span.mt-4.flex.w-full,
 button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center[class*="border-primary"] > span.mt-4.flex.w-full {
   margin-top: auto !important;
@@ -87,21 +77,14 @@ button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.te
   color: #fff !important;
   box-shadow: 0 10px 22px -18px rgb(15 77 62 / 0.6) !important;
   animation: none !important;
-  transition:
-    transform 180ms ease,
-    background-color 180ms ease,
-    border-color 180ms ease,
-    color 180ms ease,
-    box-shadow 180ms ease;
+  transition: transform 180ms ease, background-color 180ms ease, border-color 180ms ease, color 180ms ease, box-shadow 180ms ease;
 }
 
-/* Brown appears only on hover. The label stays white for maximum contrast. */
 button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center:not(:disabled):hover > span.mt-4.flex.w-full {
   transform: translateY(-1px);
   border-color: var(--accent) !important;
   background: var(--accent) !important;
   color: #fff !important;
-  box-shadow: 0 12px 24px -16px color-mix(in srgb, var(--accent) 78%, transparent) !important;
 }
 
 button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center:disabled {
@@ -115,7 +98,6 @@ button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.te
     padding: 1.7rem 1.4rem 1.45rem;
   }
 
-  /* All descriptions reserve exactly three lines; longer copy is clamped. */
   button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center > p:nth-of-type(2) {
     display: -webkit-box !important;
     min-height: 4.05rem;
@@ -131,9 +113,70 @@ button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.te
   }
 }
 
+/* Mobile: keep all three payment methods side-by-side and compact. */
 @media (max-width: 639px) {
+  section:has(> div > button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center) {
+    padding-left: 0.65rem !important;
+    padding-right: 0.65rem !important;
+  }
+
+  section:has(> div > button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center) > div.mt-6.grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 0.38rem !important;
+  }
+
   button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center {
-    min-height: 228px;
+    min-width: 0;
+    min-height: 184px;
+    padding: 1.05rem 0.28rem 0.55rem !important;
+    border-radius: 0.9rem !important;
+  }
+
+  button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center > span.absolute {
+    top: -0.48rem;
+    min-width: 0;
+    padding: 0.2rem 0.34rem;
+    font-size: 0.43rem;
+    letter-spacing: 0.055em;
+  }
+
+  button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center > span.grid {
+    width: 2.15rem !important;
+    height: 2.15rem !important;
+    border-radius: 0.75rem !important;
+  }
+
+  button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center > span.grid svg {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center > p:first-of-type {
+    min-height: 2.45rem;
+    margin-top: 0.55rem;
+    padding: 0 0.08rem;
+    font-size: 0.72rem !important;
+    line-height: 1.15;
+  }
+
+  button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center > p:nth-of-type(2) {
+    display: none !important;
+  }
+
+  button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center > p:nth-of-type(3) {
+    min-height: 1.7rem;
+    margin-top: 0.3rem;
+    font-size: 0.92rem !important;
+    line-height: 1.05;
+    white-space: normal;
+  }
+
+  button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center > span.mt-4.flex.w-full {
+    min-height: 1.9rem !important;
+    margin-top: auto !important;
+    padding: 0.25rem 0.1rem !important;
+    font-size: 0.58rem !important;
+    line-height: 1;
   }
 }
 
