@@ -61,12 +61,13 @@
   }
 
   /*
-   * The overlay starts 250px after the viewport because of the admin sidebar.
-   * Reserve the same amount on the right so the Financeiro message is centered
-   * against the entire viewport, not merely the remaining content column.
+   * The inline panel begins 250px to the right of the viewport because of the
+   * persistent sidebar. Its geometric center is therefore 125px too far right.
+   * Move only the Financeiro message by half the sidebar width so it lands on
+   * the exact horizontal center of the full viewport.
    */
-  .admin-inline-overlay .finance-coming-soon-main {
-    padding-right: 250px !important;
+  .admin-inline-overlay .finance-coming-soon-main > section {
+    transform: translateX(-125px);
   }
 }
 
