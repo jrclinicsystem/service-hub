@@ -1,0 +1,77 @@
+/* Keep secondary admin sections inside the existing dashboard shell. */
+.admin-inline-overlay {
+  position: fixed;
+  inset: 0 0 0 250px;
+  z-index: 55;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: var(--background);
+  overscroll-behavior: contain;
+}
+
+.admin-inline-overlay > div {
+  min-height: 100% !important;
+  padding-left: 0 !important;
+  background: var(--background) !important;
+}
+
+/* The dashboard sidebar stays mounted, so route-specific chrome is unnecessary inline. */
+.admin-inline-overlay > div > aside,
+.admin-inline-overlay > div > header {
+  display: none !important;
+}
+
+.admin-inline-overlay > div > main {
+  min-height: 100% !important;
+  margin-inline: auto !important;
+}
+
+.admin-inline-loading {
+  display: grid;
+  min-height: 100%;
+  place-items: center;
+  padding: 3rem;
+}
+
+.admin-inline-loading > div {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  color: var(--muted-foreground);
+  font-size: 0.8rem;
+}
+
+.admin-inline-loading span {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: var(--primary);
+  animation: admin-inline-pulse 900ms ease-in-out infinite alternate;
+}
+
+.admin-inline-loading span:nth-child(2) { animation-delay: 120ms; }
+.admin-inline-loading span:nth-child(3) { animation-delay: 240ms; }
+
+.admin-sidebar-shortcut.is-active {
+  border-color: rgb(255 250 246 / 0.12) !important;
+  background: rgb(255 250 246 / 0.12) !important;
+  color: var(--sidebar-foreground) !important;
+}
+
+@keyframes admin-inline-pulse {
+  from { opacity: 0.3; transform: translateY(0); }
+  to { opacity: 1; transform: translateY(-2px); }
+}
+
+@media (max-width: 1023px) {
+  .admin-inline-overlay {
+    inset: 0;
+    z-index: 90;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-inline-loading span {
+    animation: none;
+  }
+}
