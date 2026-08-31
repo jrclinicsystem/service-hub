@@ -68,7 +68,7 @@ function Home() {
 
       <main className="mx-auto flex min-h-[calc(100dvh-3.5rem)] max-w-[1480px] items-center px-4 pb-24 pt-7 sm:min-h-[calc(100dvh-4rem)] sm:px-8 sm:py-10 md:pb-10 lg:px-10 lg:py-12">
         <section className="grid w-full items-center gap-9 sm:gap-12 lg:grid-cols-[1.18fr_0.82fr] lg:gap-16 xl:gap-20">
-          <div className="home-copy min-w-0 lg:-translate-y-1">
+          <div className="home-copy min-w-0 text-center sm:text-left lg:-translate-y-1">
             <div className="inline-flex items-center gap-2 rounded-full border border-primary/10 bg-card/65 px-3 py-1.5 shadow-[0_12px_30px_-26px_rgba(15,77,62,0.55)] backdrop-blur">
               <span className="jr-home-status-dot size-1.5 rounded-full bg-primary" />
               <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-primary/75 sm:text-[10px]">
@@ -76,15 +76,15 @@ function Home() {
               </span>
             </div>
 
-            <h1 className="mt-4 max-w-[18ch] text-[42px] font-semibold leading-[0.98] tracking-[-0.025em] text-balance sm:mt-6 sm:text-[58px] lg:text-[68px] xl:text-[74px]">
+            <h1 className="mx-auto mt-4 max-w-[18ch] text-[42px] font-semibold leading-[0.98] tracking-[-0.025em] text-balance sm:mx-0 sm:mt-6 sm:text-[58px] lg:text-[68px] xl:text-[74px]">
               Cuidar da sua saúde, com calma e precisão.
             </h1>
 
-            <p className="mt-5 max-w-[48ch] text-[15px] leading-7 text-muted-foreground sm:mt-6 sm:text-[17px] sm:leading-8 lg:max-w-[46ch]">
+            <p className="mx-auto mt-5 max-w-[48ch] text-[15px] leading-7 text-muted-foreground sm:mx-0 sm:mt-6 sm:text-[17px] sm:leading-8 lg:max-w-[46ch]">
               Odontologia, estética e cuidados de beleza em um só lugar. Escolha o serviço, conheça quem atende e reserve seu horário com poucos passos.
             </p>
 
-            <div className="mt-7 flex flex-col gap-3 sm:mt-9 sm:flex-row sm:items-center">
+            <div className="mt-7 flex flex-col items-center gap-3 sm:mt-9 sm:flex-row sm:items-center">
               <Button asChild size="lg" className="h-12 w-full rounded-full px-7 shadow-[0_14px_28px_-20px_rgba(15,77,62,0.8)] sm:w-auto">
                 <Link to="/catalogo">
                   Explorar catálogo
@@ -101,7 +101,7 @@ function Home() {
               </Link>
             </div>
 
-            <div className="mt-8 max-w-[650px] overflow-hidden rounded-full border border-primary/10 bg-card/55 py-2.5 shadow-[0_18px_36px_-32px_rgba(15,77,62,0.65)] backdrop-blur sm:mt-11">
+            <div className="mx-auto mt-8 max-w-[650px] overflow-hidden rounded-full border border-primary/10 bg-card/55 py-2.5 shadow-[0_18px_36px_-32px_rgba(15,77,62,0.65)] backdrop-blur sm:mx-0 sm:mt-11">
               <div className="jr-home-marquee-track flex items-center">
                 {[...tickerItems, ...tickerItems].map((item, index) => (
                   <div key={`${item}-${index}`} className="flex shrink-0 items-center">
