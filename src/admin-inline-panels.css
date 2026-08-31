@@ -26,6 +26,18 @@
   margin-inline: auto !important;
 }
 
+/* Access page CTA: keep the "Gerenciar agendas" action visually prominent. */
+main.max-w-\[1180px\] a[href="/admin/equipe"] {
+  border-color: var(--primary) !important;
+  background: var(--primary) !important;
+  color: var(--primary-foreground) !important;
+}
+
+main.max-w-\[1180px\] a[href="/admin/equipe"]:hover {
+  background: color-mix(in srgb, var(--primary) 92%, black) !important;
+  color: var(--primary-foreground) !important;
+}
+
 .admin-inline-overlay .finance-coming-soon-page {
   min-height: 100% !important;
   padding-left: 0 !important;
