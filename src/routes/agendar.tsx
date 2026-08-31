@@ -49,8 +49,9 @@ const weekDays = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const days = Array.from({ length: 14 }).map((_, index) => {
   const date = new Date();
   date.setDate(date.getDate() + index);
+  const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
   return {
-    key: date.toISOString().slice(0, 10),
+    key,
     label: String(date.getDate()).padStart(2, "0"),
     weekday: weekDays[date.getDay()],
     disabled: date.getDay() === 0,
@@ -90,6 +91,7 @@ function Agendar() {
   }, [service, serviceProfessionals]);
 
   const [professionalId, setProfessionalId] = useState("");
+  const [professionalSlots, setProfessionalSlots] = useState<any[] | null>(null);
   const [day, setDay] = useState(days.find((item) => !item.disabled)?.key ?? days[0]!.key);
   const [time, setTime] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -102,6 +104,7 @@ function Agendar() {
   const [busy, setBusy] = useState(false);
 
   const selectedProfessional = professionals.find((item: any) => item.id === professionalId) ?? professionals[0];
+  const displayedTimeSlots = professionalSlots ?? timeSlots;
   const hasService = Boolean(service);
   const total = Number(service?.price ?? 0);
   const safeDepositPercent = Number.isFinite(Number(depositPercent)) ? Number(depositPercent) : 50;
@@ -128,11 +131,35 @@ function Agendar() {
 
   useEffect(() => {
     setProfessionalId(professionals[0]?.id ?? "");
+    setProfessionalSlots(null);
     setTime(null);
     setPaymentChoice("deposit");
     setPaymentSession(null);
     setPaymentOpen(false);
   }, [service?.id, professionals]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!professionalId) {
+      setProfessionalSlots(null);
+      return;
+    }
+
+    void supabase
+      .from("professional_time_slots")
+      .select("slot, is_available, sort_order")
+      .eq("professional_id", professionalId)
+      .order("sort_order")
+      .order("slot")
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error || !data?.length) setProfessionalSlots(timeSlots as any[]);
+        else setProfessionalSlots(data as any[]);
+        setTime(null);
+      });
+
+    return () => { cancelled = true; };
+  }, [professionalId, timeSlots]);
 
   useEffect(() => {
     if (!user) return;
@@ -320,9 +347,9 @@ function Agendar() {
                 ))}
               </div>
 
-              <p className="mt-5 text-xs font-medium text-muted-foreground">Horários disponíveis</p>
+              <p className="mt-5 text-xs font-medium text-muted-foreground">Horários disponíveis para {selectedProfessional?.name ?? "o profissional"}</p>
               <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {timeSlots.map((slot) => (
+                {displayedTimeSlots.map((slot: any) => (
                   <button
                     key={slot.slot}
                     type="button"
@@ -334,6 +361,7 @@ function Agendar() {
                   </button>
                 ))}
               </div>
+              {professionalId && displayedTimeSlots.filter((slot: any) => slot.is_available).length === 0 ? <p className="mt-3 text-xs text-destructive">Este profissional ainda não liberou horários para agendamento.</p> : null}
             </section>
 
             <section className="rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-6">
