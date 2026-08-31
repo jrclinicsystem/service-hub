@@ -5,7 +5,6 @@ import {
   CalendarDays,
   CalendarPlus,
   Check,
-  CheckCircle2,
   ChevronLeft,
   Clock3,
   ExternalLink,
@@ -18,23 +17,16 @@ import {
   Trash2,
   UserRound,
   Users,
+  X,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { toast } from "sonner";
 
 import logo from "@/assets/jr-clinic-logo.png";
 import { AdminSubpageSidebar } from "@/components/admin-subpage-sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -60,7 +52,7 @@ export const Route = createFileRoute("/admin_/equipe")({
   head: () => ({
     meta: [
       { title: "Agenda da equipe — JR Clinic" },
-      { name: "description", content: "Agendas individuais e acessos da equipe JR Clinic." },
+      { name: "description", content: "Gestão das agendas individuais da equipe JR Clinic." },
     ],
   }),
   component: TeamAgendaPage,
@@ -78,11 +70,6 @@ function initials(name: string) {
   return name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "JR";
 }
 
-function responseFor(appointment: any) {
-  const response = appointment?.professional_response;
-  return Array.isArray(response) ? response[0] ?? null : response ?? null;
-}
-
 function ProfessionalAvatar({ professional, className = "size-14" }: { professional: any; className?: string }) {
   if (professional.avatar_url) {
     return <img src={professional.avatar_url} alt={`Foto de ${professional.name}`} className={`${className} shrink-0 rounded-2xl object-cover shadow-sm ring-1 ring-black/5`} />;
@@ -96,57 +83,50 @@ async function loadTeamAgenda() {
 
   const { data: isAdmin, error: adminError } = await db.rpc("is_current_user_admin");
   if (adminError) throw adminError;
-  if (!isAdmin) return { isAdmin: false as const, currentEmail: userData.user.email ?? "" };
+  if (!isAdmin) return { isAdmin: false as const };
 
-  const [professionals, access, appointments, services, serviceProfessionals, timeSlots] = await Promise.all([
-    db
-      .from("professionals")
-      .select("id, name, specialty, avatar_url, is_active, sort_order, deleted_at")
-      .is("deleted_at", null)
-      .order("sort_order")
-      .order("name"),
+  const [professionals, access, appointments, services, links, slots] = await Promise.all([
+    db.from("professionals").select("id, name, specialty, avatar_url, is_active, sort_order, deleted_at").is("deleted_at", null).order("sort_order").order("name"),
     db.from("professional_access").select("id, professional_id, email, enabled, created_by, created_at, updated_at").order("created_at"),
-    db
-      .from("appointments")
-      .select("id, professional_id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status, service:services(id, name, duration_min), professional_response:appointment_professional_responses(response, responded_at)")
-      .order("scheduled_date", { ascending: true })
-      .order("scheduled_time", { ascending: true }),
+    db.from("appointments").select("id, professional_id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status, service:services(id, name, duration_min)").order("scheduled_date").order("scheduled_time"),
     db.from("services").select("id, name, duration_min, price, is_active").eq("is_active", true).order("name"),
     db.from("service_professionals").select("service_id, professional_id"),
-    db.from("time_slots").select("slot, is_available, sort_order").eq("is_available", true).order("sort_order"),
+    db.from("professional_time_slots").select("id, professional_id, slot, is_available, sort_order").order("sort_order").order("slot"),
   ]);
 
-  for (const [name, result] of [
-    ["profissionais", professionals],
-    ["acessos", access],
-    ["agenda", appointments],
-    ["serviços", services],
-    ["vínculos", serviceProfessionals],
-    ["horários", timeSlots],
-  ] as const) {
-    if (result.error) throw new Error(`Falha ao carregar ${name}: ${result.error.message}`);
+  for (const result of [professionals, access, appointments, services, links, slots]) {
+    if (result.error) throw result.error;
   }
 
   return {
     isAdmin: true as const,
-    currentEmail: userData.user.email ?? "",
     professionals: professionals.data ?? [],
     access: access.data ?? [],
     appointments: appointments.data ?? [],
     services: services.data ?? [],
-    serviceProfessionals: serviceProfessionals.data ?? [],
-    timeSlots: timeSlots.data ?? [],
+    links: links.data ?? [],
+    slots: slots.data ?? [],
   };
 }
 
 function TeamAgendaPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [selectedProfessionalId, setSelectedProfessionalId] = useState<string | null>(null);
-  const [dateFilter, setDateFilter] = useState("");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [appointmentOpen, setAppointmentOpen] = useState(false);
+  const [hoursOpen, setHoursOpen] = useState(false);
 
-  const { data, isLoading, error, refetch } = useQuery({ queryKey: ["team-agenda"], queryFn: loadTeamAgenda, retry: 1 });
-  const refresh = () => queryClient.invalidateQueries({ queryKey: ["team-agenda"] });
+  const { data, isLoading, error, refetch, isFetching } = useQuery({
+    queryKey: ["team-agenda-v2"],
+    queryFn: loadTeamAgenda,
+    retry: 1,
+  });
+
+  const refresh = async () => {
+    await queryClient.invalidateQueries({ queryKey: ["team-agenda-v2"] });
+  };
 
   const signOut = async () => {
     await supabase.auth.signOut();
@@ -154,10 +134,14 @@ function TeamAgendaPage() {
   };
 
   if (isLoading) return <CenteredMessage title="Carregando agendas da equipe..." />;
-  if (error) return <CenteredMessage title="Não foi possível carregar a equipe." detail={error instanceof Error ? error.message : "Erro inesperado."} action={<Button onClick={() => refetch()}>Tentar novamente</Button>} />;
-  if (!data?.isAdmin) return <CenteredMessage title="Acesso administrativo necessário" detail="Colaboradores usam o portal individual e não podem abrir a gestão das agendas." action={<Button asChild><Link to="/profissional">Ir para minha agenda</Link></Button>} />;
+  if (error) return <CenteredMessage title="Não foi possível carregar as agendas." detail={error instanceof Error ? error.message : "Erro inesperado."} action={<Button onClick={() => refetch()}>Tentar novamente</Button>} />;
+  if (!data?.isAdmin) return <CenteredMessage title="Acesso administrativo necessário" detail="Colaboradores devem usar o portal da própria agenda." action={<Button asChild><Link to="/profissional">Ir para minha agenda</Link></Button>} />;
 
-  const selectedProfessional = selectedProfessionalId ? data.professionals.find((item: any) => item.id === selectedProfessionalId) ?? null : null;
+  const selected = selectedId ? data.professionals.find((item: any) => item.id === selectedId) ?? null : null;
+  const selectedAccess = selected ? data.access.find((item: any) => item.professional_id === selected.id) ?? null : null;
+  const selectedAppointments = selected ? data.appointments.filter((item: any) => item.professional_id === selected.id) : [];
+  const selectedServiceIds = selected ? data.links.filter((item: any) => item.professional_id === selected.id).map((item: any) => item.service_id) : [];
+  const selectedSlots = selected ? data.slots.filter((item: any) => item.professional_id === selected.id) : [];
 
   return (
     <div className="min-h-screen bg-background lg:pl-[252px]">
@@ -165,175 +149,144 @@ function TeamAgendaPage() {
       <header className="sticky top-0 z-40 border-b border-border/80 bg-card/95 backdrop-blur-xl">
         <div className="mx-auto flex h-14 max-w-[1480px] items-center justify-between px-4 sm:h-16 sm:px-8">
           <div className="flex min-w-0 items-center gap-3">
-            <img src={logo} alt="JR Clinic" className="h-7 w-auto sm:h-9 lg:hidden" />
-            <div className="min-w-0">
+            <img src={logo} alt="JR Clinic" className="h-7 w-auto lg:hidden" />
+            <div>
               <p className="text-sm font-semibold">Agenda da equipe</p>
               <p className="hidden text-[11px] text-muted-foreground sm:block">Gestão completa pelos administradores gerais</p>
             </div>
           </div>
-          <div className="flex items-center gap-1.5">
-            <Button variant="ghost" size="sm" className="h-9" asChild><Link to="/admin"><ChevronLeft className="size-4" /> Painel</Link></Button>
-            <Button variant="outline" size="sm" className="h-9 rounded-full" onClick={signOut}><LogOut className="size-4" /><span className="hidden sm:inline">Sair</span></Button>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" asChild><Link to="/admin"><ChevronLeft className="size-4" /> Painel</Link></Button>
+            <Button variant="outline" size="sm" className="rounded-full" onClick={signOut}><LogOut className="size-4" /> <span className="hidden sm:inline">Sair</span></Button>
           </div>
         </div>
       </header>
 
-      {selectedProfessional ? (
-        <ProfessionalAgendaView
-          professional={selectedProfessional}
-          access={data.access.find((item: any) => item.professional_id === selectedProfessional.id)}
-          appointments={data.appointments.filter((item: any) => item.professional_id === selectedProfessional.id)}
-          services={data.services}
-          serviceProfessionals={data.serviceProfessionals}
-          timeSlots={data.timeSlots}
-          dateFilter={dateFilter}
-          setDateFilter={setDateFilter}
-          onBack={() => { setSelectedProfessionalId(null); setDateFilter(""); }}
-          onDeleted={() => { setSelectedProfessionalId(null); setDateFilter(""); void refresh(); }}
-          onSaved={refresh}
-        />
-      ) : (
-        <TeamCardsView data={data} onOpenAgenda={setSelectedProfessionalId} onSaved={refresh} onRefresh={() => refetch()} />
-      )}
-    </div>
-  );
-}
+      {!selected ? (
+        <main className="mx-auto max-w-[1480px] px-4 pb-16 pt-6 sm:px-8 sm:py-10">
+          <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+            <div>
+              <span className="eyebrow text-muted-foreground">Equipe</span>
+              <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Agendas da equipe</h1>
+              <p className="mt-2 max-w-2xl text-sm text-muted-foreground">Crie agendas, cadastre atendimentos, defina horários e controle os acessos dos colaboradores.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" className="rounded-full" onClick={() => setCreateOpen(true)}><Plus className="size-4" /> Criar agenda</Button>
+              <Button type="button" variant="outline" className="rounded-full" onClick={() => refetch()} disabled={isFetching}><RefreshCw className={`size-4 ${isFetching ? "animate-spin" : ""}`} /> Atualizar</Button>
+              <Button variant="outline" className="rounded-full" asChild><Link to="/admin/acessos"><ShieldCheck className="size-4" /> Acessos</Link></Button>
+              <Button variant="outline" className="rounded-full" asChild><Link to="/profissional" target="_blank">Portal da equipe <ExternalLink className="size-4" /></Link></Button>
+            </div>
+          </div>
 
-function TeamCardsView({ data, onOpenAgenda, onSaved, onRefresh }: any) {
-  const [createOpen, setCreateOpen] = useState(false);
-  const today = todayIso();
-  const activeProfessionals = data.professionals.filter((item: any) => item.is_active).length;
-  const todayCount = data.appointments.filter((item: any) => item.scheduled_date === today && item.status !== "cancelado").length;
-  const activeAccess = data.access.filter((item: any) => item.enabled).length;
+          <div className="mt-7 grid grid-cols-3 gap-2.5 sm:max-w-2xl sm:gap-4">
+            <Metric icon={Users} label="Agendas" value={String(data.professionals.length)} />
+            <Metric icon={CalendarDays} label="Agendamentos" value={String(data.appointments.filter((a: any) => a.status !== "cancelado").length)} />
+            <Metric icon={ShieldCheck} label="Acessos ativos" value={String(data.access.filter((a: any) => a.enabled).length)} />
+          </div>
 
-  return (
-    <main className="mx-auto max-w-[1480px] px-4 pb-16 pt-6 sm:px-8 sm:py-10">
-      <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-        <div>
-          <span className="eyebrow text-muted-foreground">Equipe</span>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Agendas da equipe</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">Administradores gerais criam, editam, excluem e preenchem todas as agendas. Colaboradores enxergam somente a própria agenda no portal individual.</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button className="rounded-full" onClick={() => setCreateOpen(true)}><Plus className="size-4" /> Criar agenda</Button>
-          <Button variant="outline" className="rounded-full" onClick={onRefresh}><RefreshCw className="size-4" /> Atualizar</Button>
-          <Button variant="outline" className="rounded-full" asChild><Link to="/admin/acessos"><ShieldCheck className="size-4" /> Acessos</Link></Button>
-          <Button variant="outline" className="rounded-full" asChild><Link to="/profissional" target="_blank">Portal da equipe <ExternalLink className="size-3.5" /></Link></Button>
-        </div>
-      </div>
-
-      <div className="mt-7 grid grid-cols-3 gap-2.5 sm:max-w-2xl sm:gap-4">
-        <Metric icon={Users} label="Agendas ativas" value={String(activeProfessionals)} />
-        <Metric icon={CalendarDays} label="Hoje" value={String(todayCount)} />
-        <Metric icon={ShieldCheck} label="Acessos ativos" value={String(activeAccess)} />
-      </div>
-
-      <section className="mt-9">
-        <div className="flex items-end justify-between gap-4">
-          <div><h2 className="text-lg font-semibold">Profissionais</h2><p className="mt-1 text-xs text-muted-foreground">Abra uma agenda para cadastrar e administrar os compromissos.</p></div>
-          <Badge variant="outline" className="rounded-full">{data.professionals.length} agendas</Badge>
-        </div>
-
-        {data.professionals.length === 0 ? (
-          <div className="mt-5 rounded-3xl border border-dashed border-border bg-card p-10 text-center"><UserRound className="mx-auto size-7 text-muted-foreground" /><h3 className="mt-4 text-base font-semibold">Nenhuma agenda criada</h3><p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">Use o botão “Criar agenda” para cadastrar a primeira profissional.</p></div>
-        ) : (
-          <div className="mt-5 grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
+          <section className="mt-8 grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
             {data.professionals.map((professional: any) => {
               const access = data.access.find((item: any) => item.professional_id === professional.id);
-              const appointments = data.appointments.filter((item: any) => item.professional_id === professional.id);
-              const todayAppointments = appointments.filter((item: any) => item.scheduled_date === today && item.status !== "cancelado");
-              const upcoming = appointments.filter((item: any) => item.scheduled_date >= today && item.status !== "cancelado");
-              const nextAppointment = upcoming[0];
-              const linkedServices = data.serviceProfessionals.filter((item: any) => item.professional_id === professional.id).length;
-
+              const appointments = data.appointments.filter((item: any) => item.professional_id === professional.id && item.status !== "cancelado");
+              const activeSlots = data.slots.filter((item: any) => item.professional_id === professional.id && item.is_available).length;
               return (
-                <article key={professional.id} className={`overflow-hidden rounded-3xl border border-border bg-card p-5 shadow-soft transition hover:-translate-y-0.5 hover:shadow-elegant ${professional.is_active ? "" : "opacity-65"}`}>
+                <article key={professional.id} className="rounded-3xl border border-border bg-card p-5 shadow-soft">
                   <div className="flex items-start gap-4">
                     <ProfessionalAvatar professional={professional} />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0"><h3 className="truncate text-xl font-semibold leading-tight">{professional.name}</h3><p className="mt-1 truncate text-xs text-muted-foreground">{professional.specialty || "Profissional JR Clinic"}</p></div>
-                        <Badge variant={professional.is_active ? "default" : "secondary"} className="shrink-0 rounded-full text-[9px]">{professional.is_active ? "Ativa" : "Pausada"}</Badge>
+                        <div className="min-w-0"><h2 className="truncate text-xl font-semibold">{professional.name}</h2><p className="mt-1 truncate text-xs text-muted-foreground">{professional.specialty || "Profissional JR Clinic"}</p></div>
+                        <Badge variant={professional.is_active ? "default" : "secondary"} className="rounded-full text-[10px]">{professional.is_active ? "Ativa" : "Pausada"}</Badge>
                       </div>
-                      <p className="mt-2.5 flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground"><Mail className="size-3 shrink-0" /><span className="truncate">{access?.email || "Sem acesso de colaborador"}</span></p>
+                      <p className="mt-2 flex items-center gap-1.5 truncate text-[11px] text-muted-foreground"><Mail className="size-3" /> {access?.email || "Sem colaborador vinculado"}</p>
                     </div>
                   </div>
-
-                  <div className="mt-5 grid grid-cols-3 gap-2"><CardStat label="Hoje" value={String(todayAppointments.length)} /><CardStat label="Próximos" value={String(upcoming.length)} /><CardStat label="Serviços" value={String(linkedServices)} /></div>
-                  <div className="mt-4 min-h-[74px] rounded-2xl bg-secondary/55 px-3.5 py-3">
-                    <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Próximo atendimento</p>
-                    {nextAppointment ? <div className="mt-2 flex items-end justify-between gap-3"><div className="min-w-0"><p className="truncate text-xs font-semibold">{nextAppointment.patient_name}</p><p className="mt-0.5 truncate text-[10px] text-muted-foreground">{nextAppointment.service?.name || "Atendimento"}</p></div><div className="shrink-0 text-right"><p className="text-xs font-semibold text-primary">{nextAppointment.scheduled_time}</p><p className="text-[9px] text-muted-foreground">{formatDate(nextAppointment.scheduled_date)}</p></div></div> : <p className="mt-2 text-xs text-muted-foreground">Nenhum atendimento futuro.</p>}
-                  </div>
-                  <div className="mt-4 flex items-center justify-between gap-2"><div className="flex items-center gap-1.5"><span className={`size-2 rounded-full ${access?.enabled ? "bg-primary" : "bg-muted-foreground/30"}`} /><span className="text-[10px] text-muted-foreground">{access?.enabled ? "Colaborador liberado" : "Sem acesso ativo"}</span></div><Button size="sm" className="rounded-full px-4" onClick={() => onOpenAgenda(professional.id)}>Abrir agenda</Button></div>
+                  <div className="mt-5 grid grid-cols-3 gap-2"><MiniStat label="Atendimentos" value={appointments.length} /><MiniStat label="Horários" value={activeSlots} /><MiniStat label="Serviços" value={data.links.filter((item: any) => item.professional_id === professional.id).length} /></div>
+                  <Button type="button" className="mt-4 w-full rounded-full" onClick={() => setSelectedId(professional.id)}>Abrir agenda</Button>
                 </article>
               );
             })}
-          </div>
-        )}
-      </section>
+          </section>
+        </main>
+      ) : (
+        <main className="mx-auto max-w-[1240px] px-4 pb-16 pt-6 sm:px-8 sm:py-10">
+          <Button type="button" variant="ghost" className="-ml-2 rounded-full" onClick={() => setSelectedId(null)}><ArrowLeft className="size-4" /> Voltar para equipe</Button>
 
-      <CreateAgendaDialog open={createOpen} onOpenChange={setCreateOpen} professionals={data.professionals} services={data.services} onSaved={onSaved} />
-    </main>
-  );
-}
-
-function ProfessionalAgendaView({ professional, access, appointments, services, serviceProfessionals, timeSlots, dateFilter, setDateFilter, onBack, onDeleted, onSaved }: any) {
-  const today = todayIso();
-  const filteredAppointments = useMemo(() => appointments.filter((item: any) => dateFilter ? item.scheduled_date === dateFilter : true), [appointments, dateFilter]);
-  const upcoming = appointments.filter((item: any) => item.scheduled_date >= today && item.status !== "cancelado");
-  const confirmed = appointments.filter((item: any) => responseFor(item)?.response === "confirmado");
-  const linkedServiceIds = serviceProfessionals.filter((item: any) => item.professional_id === professional.id).map((item: any) => item.service_id);
-
-  const deleteAgenda = async () => {
-    if (!window.confirm(`Excluir a agenda de ${professional.name}? O acesso do colaborador será removido e a agenda deixará de aparecer, mas o histórico de atendimentos será preservado.`)) return;
-    const { error } = await db.rpc("delete_professional_agenda", { _professional_id: professional.id });
-    if (error) return toast.error(error.message);
-    toast.success("Agenda excluída com segurança.");
-    onDeleted();
-  };
-
-  return (
-    <main className="mx-auto max-w-[1240px] px-4 pb-16 pt-6 sm:px-8 sm:py-10">
-      <Button type="button" variant="ghost" className="-ml-2 rounded-full" onClick={onBack}><ArrowLeft className="size-4" /> Voltar para equipe</Button>
-      <section className="mt-4 overflow-hidden rounded-3xl border border-border bg-card shadow-soft">
-        <div className="bg-primary px-5 py-5 text-primary-foreground sm:px-7 sm:py-6">
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex min-w-0 items-center gap-4"><ProfessionalAvatar professional={professional} className="size-16 sm:size-20" /><div className="min-w-0"><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/65">Agenda individual</p><h1 className="mt-1 truncate text-3xl font-semibold leading-tight sm:text-4xl">{professional.name}</h1><p className="mt-1 text-sm text-white/70">{professional.specialty || "Profissional JR Clinic"}</p></div></div>
-            <div className="flex flex-wrap gap-2">
-              <EditAgendaDialog
-                professional={professional}
-                access={access}
-                services={services}
-                linkedServiceIds={linkedServiceIds}
-                onSaved={onSaved}
-                trigger={<Button type="button" variant="secondary" className="rounded-full bg-white/12 text-white hover:bg-white/20"><Pencil className="size-4" /> Editar agenda</Button>}
-              />
-              <NewAppointmentDialog
-                professional={professional}
-                services={services}
-                serviceProfessionals={serviceProfessionals}
-                timeSlots={timeSlots}
-                onSaved={onSaved}
-                trigger={<Button type="button" className="rounded-full bg-white text-primary hover:bg-white/90"><CalendarPlus className="size-4" /> Novo agendamento</Button>}
-              />
-              <Button type="button" variant="secondary" className="rounded-full bg-white/12 text-white hover:bg-destructive hover:text-destructive-foreground" onClick={deleteAgenda}><Trash2 className="size-4" /> Excluir agenda</Button>
+          <section className="mt-4 overflow-hidden rounded-3xl border border-border bg-card shadow-soft">
+            <div className="bg-primary p-5 text-primary-foreground sm:p-7">
+              <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 items-center gap-4"><ProfessionalAvatar professional={selected} className="size-16 sm:size-20" /><div className="min-w-0"><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/65">Agenda individual</p><h1 className="mt-1 truncate text-3xl font-semibold sm:text-4xl">{selected.name}</h1><p className="mt-1 text-sm text-white/70">{selected.specialty}</p></div></div>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" variant="secondary" className="rounded-full bg-white/15 text-white hover:bg-white/25" onClick={() => setEditOpen(true)}><Pencil className="size-4" /> Editar agenda</Button>
+                  <Button type="button" variant="secondary" className="rounded-full bg-white/15 text-white hover:bg-white/25" onClick={() => setHoursOpen(true)}><Clock3 className="size-4" /> Horários</Button>
+                  <Button type="button" className="rounded-full bg-white text-primary hover:bg-white/90" onClick={() => setAppointmentOpen(true)}><CalendarPlus className="size-4" /> Novo agendamento</Button>
+                  <Button type="button" variant="secondary" className="rounded-full bg-white/15 text-white hover:bg-destructive hover:text-destructive-foreground" onClick={async () => {
+                    if (!window.confirm(`Excluir a agenda de ${selected.name}? O histórico de atendimentos será preservado.`)) return;
+                    const { error: deleteError } = await db.rpc("delete_professional_agenda", { _professional_id: selected.id });
+                    if (deleteError) return toast.error(deleteError.message);
+                    toast.success("Agenda excluída.");
+                    setSelectedId(null);
+                    await refresh();
+                  }}><Trash2 className="size-4" /> Excluir agenda</Button>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-        <div className="grid gap-3 border-t border-border/60 px-5 py-4 sm:grid-cols-[1fr_auto] sm:items-center sm:px-7"><div className="min-w-0"><p className="flex items-center gap-2 text-xs font-medium"><Mail className="size-3.5 text-primary" /> {access?.email || "Nenhum colaborador vinculado"}</p><p className="mt-1 text-[11px] text-muted-foreground">O colaborador vinculado vê somente esta agenda no portal individual.</p></div><Badge variant={access?.enabled ? "default" : "secondary"} className="w-fit rounded-full">{access?.enabled ? "Acesso ativo" : "Sem acesso ativo"}</Badge></div>
-      </section>
+            <div className="flex flex-col gap-2 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+              <div><p className="text-xs font-medium">{selectedAccess?.email || "Nenhum colaborador vinculado"}</p><p className="mt-1 text-[11px] text-muted-foreground">O colaborador vinculado enxerga somente esta agenda.</p></div>
+              <Badge variant={selectedAccess?.enabled ? "default" : "secondary"} className="w-fit rounded-full">{selectedAccess?.enabled ? "Acesso ativo" : "Sem acesso ativo"}</Badge>
+            </div>
+          </section>
 
-      <div className="mt-5 grid grid-cols-3 gap-2.5 sm:gap-4"><Metric icon={Clock3} label="Próximos" value={String(upcoming.length)} /><Metric icon={CheckCircle2} label="Confirmados" value={String(confirmed.length)} /><Metric icon={CalendarPlus} label="Total" value={String(appointments.length)} /></div>
+          <div className="mt-5 grid grid-cols-3 gap-2.5 sm:gap-4"><Metric icon={CalendarDays} label="Atendimentos" value={String(selectedAppointments.length)} /><Metric icon={Clock3} label="Horários ativos" value={String(selectedSlots.filter((slot: any) => slot.is_available).length)} /><Metric icon={Users} label="Serviços" value={String(selectedServiceIds.length)} /></div>
 
-      <section className="mt-8">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><h2 className="text-xl font-semibold sm:text-2xl">Atendimentos de {professional.name.split(" ")[0]}</h2><p className="mt-1 text-xs text-muted-foreground">Somente administradores gerais podem editar os compromissos desta agenda.</p></div><div className="flex gap-2"><Input type="date" value={dateFilter} onChange={(event) => setDateFilter(event.target.value)} className="h-10 rounded-xl sm:w-[180px]" />{dateFilter ? <Button variant="outline" className="rounded-xl" onClick={() => setDateFilter("")}>Limpar</Button> : null}</div></div>
-        <div className="mt-4 space-y-3">{filteredAppointments.length === 0 ? <div className="rounded-3xl border border-dashed border-border bg-card p-10 text-center"><CalendarDays className="mx-auto size-6 text-muted-foreground" /><p className="mt-3 text-sm font-medium">Nenhum atendimento nesta agenda.</p></div> : filteredAppointments.map((appointment: any) => <AppointmentCard key={appointment.id} appointment={appointment} onSaved={onSaved} />)}</div>
-      </section>
-    </main>
+          <section className="mt-8">
+            <div className="flex items-end justify-between"><div><h2 className="text-xl font-semibold">Atendimentos de {selected.name.split(" ")[0]}</h2><p className="mt-1 text-xs text-muted-foreground">Agendamentos desta agenda.</p></div></div>
+            <div className="mt-4 space-y-3">
+              {selectedAppointments.length === 0 ? <div className="rounded-3xl border border-dashed border-border bg-card p-10 text-center text-sm text-muted-foreground">Nenhum atendimento cadastrado.</div> : selectedAppointments.map((appointment: any) => (
+                <article key={appointment.id} className="rounded-2xl border border-border bg-card p-4 shadow-soft">
+                  <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="font-semibold">{appointment.patient_name}</p><p className="mt-1 text-xs text-muted-foreground">{appointment.service?.name || "Atendimento"}</p></div><div className="text-right"><p className="font-semibold">{appointment.scheduled_time}</p><p className="text-[10px] text-muted-foreground">{formatDate(appointment.scheduled_date)}</p></div></div>
+                  <div className="mt-3 flex items-center justify-between border-t border-border pt-3"><Badge variant={appointment.status === "confirmado" ? "default" : "outline"} className="rounded-full">{appointment.status}</Badge><Button type="button" variant="ghost" size="icon" className="text-destructive" onClick={async () => { if (!window.confirm(`Apagar o agendamento de ${appointment.patient_name}?`)) return; const { error: removeError } = await db.from("appointments").delete().eq("id", appointment.id); if (removeError) return toast.error(removeError.message); toast.success("Agendamento apagado."); await refresh(); }}><Trash2 className="size-4" /></Button></div>
+                </article>
+              ))}
+            </div>
+          </section>
+        </main>
+      )}
+
+      <CreateAgendaModal open={createOpen} onClose={() => setCreateOpen(false)} services={data.services} onSaved={refresh} />
+      {selected ? <EditAgendaModal open={editOpen} onClose={() => setEditOpen(false)} professional={selected} access={selectedAccess} services={data.services} linkedServiceIds={selectedServiceIds} onSaved={refresh} /> : null}
+      {selected ? <NewAppointmentModal open={appointmentOpen} onClose={() => setAppointmentOpen(false)} professional={selected} services={data.services.filter((service: any) => selectedServiceIds.includes(service.id))} slots={selectedSlots.filter((slot: any) => slot.is_available)} onSaved={refresh} /> : null}
+      {selected ? <HoursModal open={hoursOpen} onClose={() => setHoursOpen(false)} professional={selected} slots={selectedSlots} onSaved={refresh} /> : null}
+    </div>
   );
 }
 
-function CreateAgendaDialog({ open, onOpenChange, professionals, services, onSaved }: any) {
+function ModalShell({ open, onClose, title, description, children, footer, width = "max-w-2xl" }: any) {
+  useEffect(() => {
+    if (!open) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => { document.body.style.overflow = previous; window.removeEventListener("keydown", onKey); };
+  }, [open, onClose]);
+
+  if (!open || typeof document === "undefined") return null;
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-6" role="dialog" aria-modal="true">
+      <button type="button" className="absolute inset-0 cursor-default bg-black/70" aria-label="Fechar" onClick={onClose} />
+      <div className={`relative z-[10000] max-h-[92vh] w-full ${width} overflow-y-auto rounded-3xl border border-border bg-background p-5 text-foreground shadow-2xl sm:p-6`}>
+        <button type="button" onClick={onClose} className="absolute right-4 top-4 grid size-9 place-items-center rounded-full text-muted-foreground hover:bg-secondary"><X className="size-4" /></button>
+        <div className="pr-10"><h2 className="text-xl font-semibold">{title}</h2>{description ? <p className="mt-1 text-sm text-muted-foreground">{description}</p> : null}</div>
+        <div className="mt-5">{children}</div>
+        {footer ? <div className="mt-6 flex justify-end gap-2">{footer}</div> : null}
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+function CreateAgendaModal({ open, onClose, services, onSaved }: any) {
   const [name, setName] = useState("");
   const [specialty, setSpecialty] = useState("");
   const [email, setEmail] = useState("");
@@ -341,230 +294,148 @@ function CreateAgendaDialog({ open, onOpenChange, professionals, services, onSav
   const [busy, setBusy] = useState(false);
 
   const reset = () => { setName(""); setSpecialty(""); setEmail(""); setServiceIds([]); };
-  const toggleService = (id: string) => setServiceIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
-
+  const close = () => { if (!busy) { reset(); onClose(); } };
   const save = async () => {
     const normalizedEmail = email.trim().toLowerCase();
     if (name.trim().length < 2) return toast.error("Informe o nome da profissional.");
-    if (normalizedEmail && !normalizedEmail.includes("@")) return toast.error("Informe um e-mail válido ou deixe o campo vazio.");
-
+    if (normalizedEmail && !normalizedEmail.includes("@")) return toast.error("Informe um e-mail válido.");
     setBusy(true);
-    let createdProfessionalId: string | null = null;
     try {
-      const maxSort = professionals.reduce((max: number, item: any) => Math.max(max, Number(item.sort_order ?? 0)), 0);
-      const professionalResult = await db.from("professionals").insert({ name: name.trim(), specialty: specialty.trim(), is_active: true, sort_order: maxSort + 1, deleted_at: null }).select("id").single();
-      if (professionalResult.error) throw professionalResult.error;
-      createdProfessionalId = professionalResult.data.id;
-
+      const { data: professional, error: professionalError } = await db.from("professionals").insert({ name: name.trim(), specialty: specialty.trim(), is_active: true, sort_order: 999 }).select("id").single();
+      if (professionalError) throw professionalError;
       if (normalizedEmail) {
-        const { data: userData } = await supabase.auth.getUser();
-        const accessResult = await db.from("professional_access").insert({ professional_id: createdProfessionalId, email: normalizedEmail, enabled: true, created_by: userData.user?.id ?? null, updated_at: new Date().toISOString() });
-        if (accessResult.error) throw accessResult.error;
+        const { data: authData } = await supabase.auth.getUser();
+        const { error: accessError } = await db.from("professional_access").insert({ professional_id: professional.id, email: normalizedEmail, enabled: true, created_by: authData.user?.id ?? null });
+        if (accessError) throw accessError;
       }
-
       if (serviceIds.length) {
-        const linkResult = await db.from("service_professionals").insert(serviceIds.map((serviceId) => ({ service_id: serviceId, professional_id: createdProfessionalId })));
-        if (linkResult.error) throw linkResult.error;
+        const { error: linkError } = await db.from("service_professionals").insert(serviceIds.map((serviceId) => ({ service_id: serviceId, professional_id: professional.id })));
+        if (linkError) throw linkError;
       }
-
-      toast.success(`Agenda de ${name.trim()} criada.`);
-      reset(); onOpenChange(false); onSaved();
-    } catch (error: any) {
-      if (createdProfessionalId) {
-        await db.from("professional_access").delete().eq("professional_id", createdProfessionalId);
-        await db.from("service_professionals").delete().eq("professional_id", createdProfessionalId);
-        await db.from("professionals").delete().eq("id", createdProfessionalId);
-      }
-      const message = String(error?.message || "Não foi possível criar a agenda.");
-      toast.error(message.includes("professional_access_email_unique") ? "Este e-mail já está vinculado a outra agenda." : message);
-    } finally { setBusy(false); }
+      toast.success("Agenda criada com sucesso.");
+      reset(); onClose(); await onSaved();
+    } catch (err: any) { toast.error(err?.message || "Não foi possível criar a agenda."); }
+    finally { setBusy(false); }
   };
 
-  return (
-    <Dialog open={open} onOpenChange={(value) => { onOpenChange(value); if (!value && !busy) reset(); }}>
-      <DialogContent className="max-h-[92dvh] w-[calc(100%-1rem)] overflow-y-auto rounded-3xl p-5 sm:max-w-2xl sm:p-6">
-        <DialogHeader><DialogTitle>Criar agenda</DialogTitle><DialogDescription>Cadastre a profissional e, se quiser, já libere o acesso de colaborador por e-mail.</DialogDescription></DialogHeader>
-        <div className="grid gap-4 py-2 sm:grid-cols-2">
-          <div><Label>Nome</Label><Input className="mt-2" value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome completo" /></div>
-          <div><Label>Cargo / especialidade</Label><Input className="mt-2" value={specialty} onChange={(e) => setSpecialty(e.target.value)} placeholder="Ex.: Dentista" /></div>
-          <div className="sm:col-span-2"><Label>E-mail do colaborador <span className="font-normal text-muted-foreground">(opcional)</span></Label><Input className="mt-2" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="colaborador@email.com" /><p className="mt-1.5 text-[11px] text-muted-foreground">Se ficar vazio, a agenda será criada normalmente e o acesso poderá ser liberado depois em Acessos.</p></div>
-          <div className="sm:col-span-2"><Label>Serviços atendidos</Label><div className="mt-2 grid max-h-56 gap-2 overflow-y-auto rounded-2xl border border-border p-2 sm:grid-cols-2">{services.map((service: any) => { const selected = serviceIds.includes(service.id); return <button key={service.id} type="button" onClick={() => toggleService(service.id)} className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left text-xs transition ${selected ? "border-primary bg-primary-soft text-primary" : "border-border bg-background hover:border-primary/30"}`}><span className={`grid size-4 shrink-0 place-items-center rounded-md border ${selected ? "border-primary bg-primary text-primary-foreground" : "border-border"}`}>{selected ? <Check className="size-3" /> : null}</span><span className="truncate font-medium">{service.name}</span></button>; })}</div></div>
-        </div>
-        <DialogFooter><Button className="w-full rounded-full sm:w-auto" disabled={busy} onClick={save}>{busy ? "Criando..." : "Criar agenda"}</Button></DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
+  return <ModalShell open={open} onClose={close} title="Criar agenda" description="Cadastre a profissional, o acesso e os serviços atendidos." footer={<><Button variant="outline" onClick={close} disabled={busy}>Cancelar</Button><Button onClick={save} disabled={busy}>{busy ? "Criando..." : "Criar agenda"}</Button></>}>
+    <div className="grid gap-4 sm:grid-cols-2">
+      <Field label="Nome"><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome completo" /></Field>
+      <Field label="Especialidade"><Input value={specialty} onChange={(e) => setSpecialty(e.target.value)} placeholder="Ex.: Cabeleireira" /></Field>
+      <div className="sm:col-span-2"><Field label="E-mail do colaborador (opcional)"><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="colaborador@email.com" /></Field></div>
+      <div className="sm:col-span-2"><Label>Serviços atendidos</Label><div className="mt-2 grid max-h-56 gap-2 overflow-y-auto rounded-2xl border border-border p-2 sm:grid-cols-2">{services.map((service: any) => { const selected = serviceIds.includes(service.id); return <button key={service.id} type="button" onClick={() => setServiceIds((current) => selected ? current.filter((id) => id !== service.id) : [...current, service.id])} className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-xs ${selected ? "border-primary bg-primary-soft text-primary" : "border-border"}`}><span className={`grid size-4 place-items-center rounded border ${selected ? "border-primary bg-primary text-primary-foreground" : "border-border"}`}>{selected ? <Check className="size-3" /> : null}</span>{service.name}</button>; })}</div></div>
+    </div>
+  </ModalShell>;
 }
 
-function EditAgendaDialog({ trigger, professional, access, services, linkedServiceIds, onSaved }: any) {
-  const [open, setOpen] = useState(false);
-  const [name, setName] = useState(professional.name ?? "");
+function EditAgendaModal({ open, onClose, professional, access, services, linkedServiceIds, onSaved }: any) {
+  const [name, setName] = useState(professional.name);
   const [specialty, setSpecialty] = useState(professional.specialty ?? "");
   const [email, setEmail] = useState(access?.email ?? "");
   const [enabled, setEnabled] = useState(access?.enabled ?? true);
-  const [active, setActive] = useState(professional.is_active ?? true);
-  const [serviceIds, setServiceIds] = useState<string[]>(linkedServiceIds ?? []);
+  const [active, setActive] = useState(professional.is_active);
+  const [serviceIds, setServiceIds] = useState<string[]>(linkedServiceIds);
   const [busy, setBusy] = useState(false);
 
-  const resetFromProps = () => { setName(professional.name ?? ""); setSpecialty(professional.specialty ?? ""); setEmail(access?.email ?? ""); setEnabled(access?.enabled ?? true); setActive(professional.is_active ?? true); setServiceIds(linkedServiceIds ?? []); };
-  const toggleService = (id: string) => setServiceIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
+  useEffect(() => { if (open) { setName(professional.name); setSpecialty(professional.specialty ?? ""); setEmail(access?.email ?? ""); setEnabled(access?.enabled ?? true); setActive(professional.is_active); setServiceIds(linkedServiceIds); } }, [open, professional, access, linkedServiceIds]);
 
   const save = async () => {
-    const normalizedEmail = email.trim().toLowerCase();
     if (name.trim().length < 2) return toast.error("Informe um nome válido.");
-    if (normalizedEmail && !normalizedEmail.includes("@")) return toast.error("Informe um e-mail válido ou deixe o campo vazio.");
+    const normalizedEmail = email.trim().toLowerCase();
     setBusy(true);
     try {
-      const professionalResult = await db.from("professionals").update({ name: name.trim(), specialty: specialty.trim(), is_active: active }).eq("id", professional.id);
-      if (professionalResult.error) throw professionalResult.error;
-
+      const { error: pError } = await db.from("professionals").update({ name: name.trim(), specialty: specialty.trim(), is_active: active }).eq("id", professional.id);
+      if (pError) throw pError;
       if (normalizedEmail) {
-        const { data: userData } = await supabase.auth.getUser();
-        const accessResult = await db.from("professional_access").upsert({ professional_id: professional.id, email: normalizedEmail, enabled, created_by: access?.created_by ?? userData.user?.id ?? null, updated_at: new Date().toISOString() }, { onConflict: "professional_id" });
-        if (accessResult.error) throw accessResult.error;
+        const { data: authData } = await supabase.auth.getUser();
+        const { error: aError } = await db.from("professional_access").upsert({ professional_id: professional.id, email: normalizedEmail, enabled, created_by: access?.created_by ?? authData.user?.id ?? null, updated_at: new Date().toISOString() }, { onConflict: "professional_id" });
+        if (aError) throw aError;
       } else if (access?.id) {
-        const removeAccess = await db.from("professional_access").delete().eq("id", access.id);
-        if (removeAccess.error) throw removeAccess.error;
+        const { error: removeError } = await db.from("professional_access").delete().eq("id", access.id);
+        if (removeError) throw removeError;
       }
-
-      const removeLinks = await db.from("service_professionals").delete().eq("professional_id", professional.id);
-      if (removeLinks.error) throw removeLinks.error;
+      const { error: clearError } = await db.from("service_professionals").delete().eq("professional_id", professional.id);
+      if (clearError) throw clearError;
       if (serviceIds.length) {
-        const insertLinks = await db.from("service_professionals").insert(serviceIds.map((serviceId) => ({ service_id: serviceId, professional_id: professional.id })));
-        if (insertLinks.error) throw insertLinks.error;
+        const { error: linkError } = await db.from("service_professionals").insert(serviceIds.map((serviceId) => ({ service_id: serviceId, professional_id: professional.id })));
+        if (linkError) throw linkError;
       }
-
-      toast.success("Agenda atualizada."); setOpen(false); onSaved();
-    } catch (error: any) {
-      const message = String(error?.message || "Não foi possível atualizar a agenda.");
-      toast.error(message.includes("professional_access_email_unique") ? "Este e-mail já está vinculado a outra agenda." : message);
-    } finally { setBusy(false); }
+      toast.success("Agenda atualizada."); onClose(); await onSaved();
+    } catch (err: any) { toast.error(err?.message || "Não foi possível atualizar a agenda."); }
+    finally { setBusy(false); }
   };
 
-  return (
-    <Dialog open={open} onOpenChange={(value) => { setOpen(value); if (value) resetFromProps(); }}>
-      <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className="max-h-[92dvh] w-[calc(100%-1rem)] overflow-y-auto rounded-3xl p-5 sm:max-w-2xl sm:p-6">
-        <DialogHeader><DialogTitle>Editar agenda de {professional.name}</DialogTitle><DialogDescription>Altere perfil, serviços, estado da agenda e acesso do colaborador.</DialogDescription></DialogHeader>
-        <div className="grid gap-4 py-2 sm:grid-cols-2">
-          <div><Label>Nome</Label><Input className="mt-2" value={name} onChange={(e) => setName(e.target.value)} /></div>
-          <div><Label>Cargo / especialidade</Label><Input className="mt-2" value={specialty} onChange={(e) => setSpecialty(e.target.value)} /></div>
-          <div className="sm:col-span-2"><Label>E-mail do colaborador</Label><Input className="mt-2" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Deixe vazio para remover o acesso" /></div>
-          <div className="flex items-center justify-between rounded-2xl border border-border px-3.5 py-3"><div><p className="text-sm font-medium">Agenda ativa</p><p className="text-[10px] text-muted-foreground">Disponível para novos agendamentos.</p></div><Switch checked={active} onCheckedChange={setActive} /></div>
-          <div className="flex items-center justify-between rounded-2xl border border-border px-3.5 py-3"><div><p className="text-sm font-medium">Acesso do colaborador</p><p className="text-[10px] text-muted-foreground">Permite abrir o portal individual.</p></div><Switch checked={enabled} disabled={!email.trim()} onCheckedChange={setEnabled} /></div>
-          <div className="sm:col-span-2"><Label>Serviços vinculados</Label><div className="mt-2 grid max-h-56 gap-2 overflow-y-auto rounded-2xl border border-border p-2 sm:grid-cols-2">{services.map((service: any) => { const selected = serviceIds.includes(service.id); return <button key={service.id} type="button" onClick={() => toggleService(service.id)} className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left text-xs transition ${selected ? "border-primary bg-primary-soft text-primary" : "border-border bg-background hover:border-primary/30"}`}><span className={`grid size-4 shrink-0 place-items-center rounded-md border ${selected ? "border-primary bg-primary text-primary-foreground" : "border-border"}`}>{selected ? <Check className="size-3" /> : null}</span><span className="truncate font-medium">{service.name}</span></button>; })}</div></div>
-        </div>
-        <DialogFooter><Button type="button" className="w-full rounded-full sm:w-auto" disabled={busy} onClick={save}>{busy ? "Salvando..." : "Salvar alterações"}</Button></DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
+  return <ModalShell open={open} onClose={onClose} title={`Editar agenda de ${professional.name}`} description="Altere dados, acesso e serviços desta agenda." footer={<><Button variant="outline" onClick={onClose} disabled={busy}>Cancelar</Button><Button onClick={save} disabled={busy}>{busy ? "Salvando..." : "Salvar alterações"}</Button></>}>
+    <div className="grid gap-4 sm:grid-cols-2">
+      <Field label="Nome"><Input value={name} onChange={(e) => setName(e.target.value)} /></Field>
+      <Field label="Especialidade"><Input value={specialty} onChange={(e) => setSpecialty(e.target.value)} /></Field>
+      <div className="sm:col-span-2"><Field label="E-mail do colaborador"><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Deixe vazio para remover o acesso" /></Field></div>
+      <ToggleBox title="Agenda ativa" detail="Permite novos agendamentos." checked={active} onChange={setActive} />
+      <ToggleBox title="Acesso do colaborador" detail="Permite entrar no portal individual." checked={enabled} onChange={setEnabled} disabled={!email.trim()} />
+      <div className="sm:col-span-2"><Label>Serviços vinculados</Label><div className="mt-2 grid max-h-56 gap-2 overflow-y-auto rounded-2xl border border-border p-2 sm:grid-cols-2">{services.map((service: any) => { const selected = serviceIds.includes(service.id); return <button key={service.id} type="button" onClick={() => setServiceIds((current) => selected ? current.filter((id) => id !== service.id) : [...current, service.id])} className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-xs ${selected ? "border-primary bg-primary-soft text-primary" : "border-border"}`}><span className={`grid size-4 place-items-center rounded border ${selected ? "border-primary bg-primary text-primary-foreground" : "border-border"}`}>{selected ? <Check className="size-3" /> : null}</span>{service.name}</button>; })}</div></div>
+    </div>
+  </ModalShell>;
 }
 
-function NewAppointmentDialog({ trigger, professional, services, serviceProfessionals, timeSlots, onSaved }: any) {
-  const [open, setOpen] = useState(false);
+function NewAppointmentModal({ open, onClose, professional, services, slots, onSaved }: any) {
   const [serviceId, setServiceId] = useState("");
   const [patientName, setPatientName] = useState("");
   const [patientEmail, setPatientEmail] = useState("");
   const [patientPhone, setPatientPhone] = useState("");
-  const [scheduledDate, setScheduledDate] = useState(todayIso());
-  const [scheduledTime, setScheduledTime] = useState("");
+  const [date, setDate] = useState(todayIso());
+  const [time, setTime] = useState("");
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const availableServices = useMemo(() => {
-    const linked = new Set(serviceProfessionals.filter((item: any) => item.professional_id === professional.id).map((item: any) => item.service_id));
-    return services.filter((service: any) => linked.has(service.id));
-  }, [professional.id, services, serviceProfessionals]);
-  const reset = () => { setServiceId(""); setPatientName(""); setPatientEmail(""); setPatientPhone(""); setScheduledDate(todayIso()); setScheduledTime(""); setNotes(""); };
-
+  const reset = () => { setServiceId(""); setPatientName(""); setPatientEmail(""); setPatientPhone(""); setDate(todayIso()); setTime(""); setNotes(""); };
   const save = async () => {
-    if (!serviceId || !patientName.trim() || !scheduledDate || !scheduledTime) return toast.error("Preencha serviço, cliente, data e horário.");
-    const selectedService = availableServices.find((service: any) => service.id === serviceId);
+    if (!serviceId || !patientName.trim() || !date || !time) return toast.error("Preencha serviço, cliente, data e horário.");
+    const selectedService = services.find((service: any) => service.id === serviceId);
     setBusy(true);
-    const { error } = await db.from("appointments").insert({
-      user_id: null,
-      professional_id: professional.id,
-      service_id: serviceId,
-      patient_name: patientName.trim(),
-      patient_email: patientEmail.trim().toLowerCase(),
-      patient_phone: patientPhone.trim(),
-      scheduled_date: scheduledDate,
-      scheduled_time: scheduledTime,
-      notes: notes.trim(),
-      status: "pendente",
-      payment_choice: "onsite",
-      service_price_snapshot: Number(selectedService?.price ?? 0),
-      deposit_percent: 0,
-      deposit_amount: 0,
-      balance_amount: Number(selectedService?.price ?? 0),
-    });
+    const { error } = await db.from("appointments").insert({ user_id: null, professional_id: professional.id, service_id: serviceId, patient_name: patientName.trim(), patient_email: patientEmail.trim().toLowerCase(), patient_phone: patientPhone.trim(), scheduled_date: date, scheduled_time: time, notes: notes.trim(), status: "confirmado", payment_choice: "onsite", service_price_snapshot: Number(selectedService?.price ?? 0), deposit_percent: 0, deposit_amount: 0, balance_amount: Number(selectedService?.price ?? 0) });
     setBusy(false);
     if (error) return toast.error(error.message);
-    toast.success(`Agendamento adicionado à agenda de ${professional.name}.`);
-    reset(); setOpen(false); onSaved();
+    toast.success("Agendamento criado."); reset(); onClose(); await onSaved();
   };
 
-  return (
-    <Dialog open={open} onOpenChange={(value) => { setOpen(value); if (!value && !busy) reset(); }}>
-      <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className="max-h-[92dvh] w-[calc(100%-1rem)] overflow-y-auto rounded-3xl p-5 sm:max-w-xl sm:p-6">
-        <DialogHeader><DialogTitle>Novo agendamento</DialogTitle><DialogDescription>Cadastre um atendimento diretamente na agenda de {professional.name}.</DialogDescription></DialogHeader>
-        <div className="grid gap-4 py-2 sm:grid-cols-2">
-          <div className="sm:col-span-2"><Label>Serviço</Label><Select value={serviceId} onValueChange={setServiceId} disabled={!availableServices.length}><SelectTrigger className="mt-2"><SelectValue placeholder={availableServices.length ? "Selecione o serviço" : "Nenhum serviço vinculado"} /></SelectTrigger><SelectContent>{availableServices.map((service: any) => <SelectItem key={service.id} value={service.id}>{service.name}</SelectItem>)}</SelectContent></Select></div>
-          <div className="sm:col-span-2"><Label>Cliente / paciente</Label><Input className="mt-2" value={patientName} onChange={(e) => setPatientName(e.target.value)} /></div>
-          <div><Label>Telefone</Label><Input className="mt-2" value={patientPhone} onChange={(e) => setPatientPhone(e.target.value)} /></div>
-          <div><Label>E-mail <span className="font-normal text-muted-foreground">(opcional)</span></Label><Input className="mt-2" type="email" value={patientEmail} onChange={(e) => setPatientEmail(e.target.value)} /></div>
-          <div><Label>Data</Label><Input className="mt-2" type="date" min={todayIso()} value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} /></div>
-          <div><Label>Horário</Label><Select value={scheduledTime} onValueChange={setScheduledTime}><SelectTrigger className="mt-2"><SelectValue placeholder="Selecione" /></SelectTrigger><SelectContent>{timeSlots.map((slot: any) => <SelectItem key={slot.slot} value={slot.slot}>{slot.slot}</SelectItem>)}</SelectContent></Select></div>
-          <div className="sm:col-span-2"><Label>Observações</Label><Textarea className="mt-2" value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
-        </div>
-        <DialogFooter><Button type="button" className="w-full rounded-full sm:w-auto" disabled={busy || !availableServices.length} onClick={save}>{busy ? "Adicionando..." : "Adicionar à agenda"}</Button></DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
+  return <ModalShell open={open} onClose={() => { if (!busy) { reset(); onClose(); } }} title="Novo agendamento" description={`Adicionar atendimento diretamente à agenda de ${professional.name}.`} width="max-w-xl" footer={<><Button variant="outline" onClick={onClose} disabled={busy}>Cancelar</Button><Button onClick={save} disabled={busy || !services.length || !slots.length}>{busy ? "Salvando..." : "Criar agendamento"}</Button></>}>
+    <div className="grid gap-4 sm:grid-cols-2">
+      <div className="sm:col-span-2"><Field label="Serviço"><Select value={serviceId} onValueChange={setServiceId}><SelectTrigger><SelectValue placeholder="Selecione o serviço" /></SelectTrigger><SelectContent>{services.map((service: any) => <SelectItem key={service.id} value={service.id}>{service.name}</SelectItem>)}</SelectContent></Select></Field></div>
+      <div className="sm:col-span-2"><Field label="Cliente / paciente"><Input value={patientName} onChange={(e) => setPatientName(e.target.value)} /></Field></div>
+      <Field label="Telefone"><Input value={patientPhone} onChange={(e) => setPatientPhone(e.target.value)} /></Field>
+      <Field label="E-mail"><Input type="email" value={patientEmail} onChange={(e) => setPatientEmail(e.target.value)} /></Field>
+      <Field label="Data"><Input type="date" min={todayIso()} value={date} onChange={(e) => setDate(e.target.value)} /></Field>
+      <Field label="Horário"><Select value={time} onValueChange={setTime}><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger><SelectContent>{slots.map((slot: any) => <SelectItem key={slot.id} value={slot.slot}>{slot.slot}</SelectItem>)}</SelectContent></Select></Field>
+      <div className="sm:col-span-2"><Field label="Observações"><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} /></Field></div>
+    </div>
+  </ModalShell>;
 }
 
-function AppointmentCard({ appointment, onSaved }: any) {
-  const [deleting, setDeleting] = useState(false);
-  const updateStatus = async (status: string) => {
-    if (status === "aguardando_pagamento") return;
-    const { error } = await db.from("appointments").update({ status }).eq("id", appointment.id);
+function HoursModal({ open, onClose, professional, slots, onSaved }: any) {
+  const [newTime, setNewTime] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const add = async () => {
+    if (!newTime) return toast.error("Escolha um horário.");
+    setBusy(true);
+    const { error } = await db.from("professional_time_slots").upsert({ professional_id: professional.id, slot: newTime, is_available: true, sort_order: Number(newTime.replace(":", "")) }, { onConflict: "professional_id,slot" });
+    setBusy(false);
     if (error) return toast.error(error.message);
-    toast.success("Status atualizado."); onSaved?.();
+    setNewTime(""); toast.success("Horário adicionado."); await onSaved();
   };
-  const deleteAppointment = async () => {
-    if (!window.confirm(`Apagar o agendamento de ${appointment.patient_name}?`)) return;
-    setDeleting(true); const { error } = await db.from("appointments").delete().eq("id", appointment.id); setDeleting(false);
-    if (error) return toast.error(error.message);
-    toast.success("Agendamento apagado."); onSaved?.();
-  };
-  const professionalResponse = responseFor(appointment);
-  const statusValue = ["pendente", "confirmado", "cancelado", "aguardando_pagamento"].includes(appointment.status) ? appointment.status : "pendente";
 
-  return (
-    <article className={`rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-5 ${appointment.status === "cancelado" ? "opacity-60" : ""}`}>
-      <div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="text-base font-semibold">{appointment.patient_name}</p><StatusBadge status={appointment.status} />{professionalResponse?.response === "confirmado" ? <Badge className="rounded-full bg-primary-soft text-[10px] text-primary hover:bg-primary-soft"><CheckCircle2 className="mr-1 size-3" /> Profissional confirmou</Badge> : null}</div><p className="mt-1 text-xs text-muted-foreground">{appointment.service?.name || "Serviço"}</p></div><div className="shrink-0 text-right"><p className="text-base font-semibold tabular-nums">{appointment.scheduled_time}</p><p className="mt-0.5 text-[10px] text-muted-foreground">{formatDate(appointment.scheduled_date)}</p></div></div>
-      <div className="mt-3 grid gap-1 border-t border-border/70 pt-3 text-xs text-muted-foreground sm:grid-cols-2"><p>{appointment.patient_phone || "Telefone não informado"}</p><p className="truncate sm:text-right">{appointment.patient_email || "E-mail não informado"}</p></div>
-      {appointment.notes ? <p className="mt-2 rounded-xl bg-secondary/60 px-3 py-2 text-xs leading-relaxed text-muted-foreground">{appointment.notes}</p> : null}
-      <div className="mt-3 flex items-center justify-end gap-2"><Button type="button" variant="ghost" size="icon" className="size-9 rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive" onClick={deleteAppointment} disabled={deleting}><Trash2 className="size-3.5" /></Button><Select value={statusValue} onValueChange={updateStatus}><SelectTrigger className="h-9 w-[178px] rounded-xl text-xs font-medium"><SelectValue /></SelectTrigger><SelectContent>{statusValue === "aguardando_pagamento" ? <SelectItem value="aguardando_pagamento" disabled>Aguardando pagamento</SelectItem> : null}<SelectItem value="pendente">Pendente</SelectItem><SelectItem value="confirmado">Confirmado</SelectItem><SelectItem value="cancelado">Cancelado</SelectItem></SelectContent></Select></div>
-    </article>
-  );
+  return <ModalShell open={open} onClose={onClose} title={`Horários de ${professional.name}`} description="Ative, pause, adicione ou remova horários específicos desta profissional." width="max-w-xl">
+    <div className="flex gap-2"><Input type="time" value={newTime} onChange={(e) => setNewTime(e.target.value)} /><Button type="button" onClick={add} disabled={busy}><Plus className="size-4" /> Adicionar horário</Button></div>
+    <div className="mt-5 space-y-2">
+      {slots.length === 0 ? <p className="rounded-2xl border border-dashed border-border p-5 text-center text-sm text-muted-foreground">Nenhum horário cadastrado.</p> : slots.map((slot: any) => (
+        <div key={slot.id} className="flex items-center justify-between rounded-2xl border border-border px-4 py-3"><div><p className="font-semibold tabular-nums">{slot.slot}</p><p className="text-[10px] text-muted-foreground">{slot.is_available ? "Disponível para agendamento" : "Pausado"}</p></div><div className="flex items-center gap-2"><Switch checked={slot.is_available} onCheckedChange={async (checked) => { const { error } = await db.from("professional_time_slots").update({ is_available: checked, updated_at: new Date().toISOString() }).eq("id", slot.id); if (error) return toast.error(error.message); await onSaved(); }} /><Button type="button" variant="ghost" size="icon" className="text-destructive" onClick={async () => { if (!window.confirm(`Remover o horário ${slot.slot}?`)) return; const { error } = await db.from("professional_time_slots").delete().eq("id", slot.id); if (error) return toast.error(error.message); toast.success("Horário removido."); await onSaved(); }}><Trash2 className="size-4" /></Button></div></div>
+      ))}
+    </div>
+  </ModalShell>;
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const variant = status === "confirmado" ? "default" : status === "cancelado" ? "secondary" : "outline";
-  const label = status === "confirmado" ? "Confirmado" : status === "cancelado" ? "Cancelado" : status === "aguardando_pagamento" ? "Aguardando pagamento" : "Pendente";
-  return <Badge variant={variant as any} className="rounded-full text-[10px]">{label}</Badge>;
-}
-
-function CardStat({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-xl border border-border/70 bg-background/60 px-2 py-2.5 text-center"><p className="text-lg font-semibold tabular-nums">{value}</p><p className="mt-0.5 text-[9px] text-muted-foreground">{label}</p></div>;
-}
-
-function Metric({ icon: Icon, label, value }: any) {
-  return <div className="rounded-2xl border border-border bg-card p-3.5 shadow-soft sm:p-5"><span className="grid size-8 place-items-center rounded-xl bg-primary-soft text-primary"><Icon className="size-4" /></span><p className="mt-3 text-2xl font-semibold tabular-nums">{value}</p><p className="mt-0.5 text-[11px] text-muted-foreground sm:text-xs">{label}</p></div>;
-}
-
-function CenteredMessage({ title, detail, action }: any) {
-  return <div className="grid min-h-screen place-items-center bg-background px-5"><div className="max-w-md text-center"><span className="mx-auto grid size-12 place-items-center rounded-2xl bg-primary-soft text-primary"><ShieldCheck className="size-5" /></span><h1 className="mt-4 text-xl font-semibold">{title}</h1>{detail ? <p className="mt-2 text-sm text-muted-foreground">{detail}</p> : null}{action ? <div className="mt-5">{action}</div> : null}</div></div>;
-}
+function Field({ label, children }: any) { return <div><Label>{label}</Label><div className="mt-2">{children}</div></div>; }
+function ToggleBox({ title, detail, checked, onChange, disabled }: any) { return <div className="flex items-center justify-between rounded-2xl border border-border px-4 py-3"><div><p className="text-sm font-medium">{title}</p><p className="text-[10px] text-muted-foreground">{detail}</p></div><Switch checked={checked} disabled={disabled} onCheckedChange={onChange} /></div>; }
+function MiniStat({ label, value }: any) { return <div className="rounded-xl bg-secondary/60 px-2 py-2.5 text-center"><p className="text-lg font-semibold">{value}</p><p className="text-[9px] text-muted-foreground">{label}</p></div>; }
+function Metric({ icon: Icon, label, value }: any) { return <div className="rounded-2xl border border-border bg-card p-3.5 shadow-soft sm:p-5"><span className="grid size-8 place-items-center rounded-xl bg-primary-soft text-primary"><Icon className="size-4" /></span><p className="mt-3 text-2xl font-semibold">{value}</p><p className="mt-0.5 text-[11px] text-muted-foreground">{label}</p></div>; }
+function CenteredMessage({ title, detail, action }: any) { return <div className="grid min-h-screen place-items-center bg-background px-5"><div className="max-w-md text-center"><span className="mx-auto grid size-12 place-items-center rounded-2xl bg-primary-soft text-primary"><ShieldCheck className="size-5" /></span><h1 className="mt-4 text-xl font-semibold">{title}</h1>{detail ? <p className="mt-2 text-sm text-muted-foreground">{detail}</p> : null}{action ? <div className="mt-5">{action}</div> : null}</div></div>; }
