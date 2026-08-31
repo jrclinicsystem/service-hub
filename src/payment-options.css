@@ -17,19 +17,24 @@ button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.te
   background: color-mix(in srgb, var(--card) 94%, var(--secondary)) !important;
   box-shadow: 0 10px 28px -24px rgb(15 77 62 / 0.3) !important;
   --tw-ring-shadow: 0 0 #0000 !important;
-  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease, color 180ms ease;
 }
 
+/* Hover is temporary: brown while the pointer is over the card, then it returns to normal. */
 button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center:not(:disabled):hover {
   transform: translateY(-2px);
-  border-color: color-mix(in srgb, var(--accent) 55%, var(--border)) !important;
-  box-shadow: 0 18px 38px -28px color-mix(in srgb, var(--accent) 55%, transparent) !important;
+  border-color: var(--accent) !important;
+  background: var(--accent) !important;
+  color: #fff !important;
+  box-shadow: 0 18px 38px -28px color-mix(in srgb, var(--accent) 72%, transparent) !important;
 }
 
+/* Only the clicked/selected card stays brown. */
 button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center[class*="border-primary"] {
-  border-color: color-mix(in srgb, var(--accent) 70%, var(--border)) !important;
-  background: color-mix(in srgb, var(--card) 94%, var(--secondary)) !important;
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent), 0 14px 30px -25px color-mix(in srgb, var(--accent) 45%, transparent) !important;
+  border-color: var(--accent) !important;
+  background: var(--accent) !important;
+  color: #fff !important;
+  box-shadow: 0 16px 32px -24px color-mix(in srgb, var(--accent) 72%, transparent) !important;
 }
 
 button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center > span.absolute {
@@ -69,6 +74,12 @@ button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.te
   letter-spacing: -0.025em;
 }
 
+/* Make all text readable whenever a card is brown. */
+button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center:not(:disabled):hover > p,
+button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center[class*="border-primary"] > p {
+  color: #fff !important;
+}
+
 button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center > span.mt-4.flex.w-full {
   margin-top: auto !important;
   border-color: var(--primary) !important;
@@ -79,12 +90,12 @@ button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.te
   transition: transform 180ms ease, background-color 180ms ease, border-color 180ms ease, color 180ms ease, box-shadow 180ms ease;
 }
 
-/* Selected payment method stays brown, matching the hover state. */
-button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center[class*="border-primary"] > span.mt-4.flex.w-full,
-button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center:not(:disabled):hover > span.mt-4.flex.w-full {
+/* The small action stays green normally; brown only while hovered or when selected. */
+button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center:not(:disabled):hover > span.mt-4.flex.w-full,
+button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center[class*="border-primary"] > span.mt-4.flex.w-full {
   transform: translateY(-1px);
-  border-color: var(--accent) !important;
-  background: var(--accent) !important;
+  border-color: color-mix(in srgb, var(--accent) 72%, #fff) !important;
+  background: color-mix(in srgb, var(--accent) 82%, #fff) !important;
   color: #fff !important;
   box-shadow: 0 12px 24px -16px color-mix(in srgb, var(--accent) 78%, transparent) !important;
 }
