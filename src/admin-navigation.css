@@ -1,0 +1,74 @@
+/* JR Clinic admin navigation refinements. */
+.admin-sidebar-shortcut {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .admin-sidebar-shortcut {
+    position: fixed !important;
+    left: 18px !important;
+    z-index: 66 !important;
+    display: flex !important;
+    width: 214px !important;
+    height: 44px !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 10px !important;
+    padding: 0 12px !important;
+    border: 1px solid transparent !important;
+    border-radius: 12px !important;
+    background: transparent !important;
+    color: rgb(255 250 246 / 0.68) !important;
+    box-shadow: none !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    line-height: 1 !important;
+    text-decoration: none !important;
+    transform: none !important;
+    transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease !important;
+  }
+
+  .admin-sidebar-shortcut:hover {
+    border-color: transparent !important;
+    background: rgb(255 250 246 / 0.07) !important;
+    color: rgb(255 250 246 / 0.94) !important;
+    transform: none !important;
+  }
+
+  .admin-catalog-shortcut {
+    top: 382px !important;
+    bottom: auto !important;
+  }
+
+  body:has(.admin-team-shortcut) a.admin-team-shortcut {
+    top: 452px !important;
+    bottom: auto !important;
+    left: 18px !important;
+    border: 1px solid transparent !important;
+    background: transparent !important;
+    color: rgb(255 250 246 / 0.68) !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+  }
+
+  body:has(.admin-team-shortcut) a.admin-team-shortcut:hover {
+    background: rgb(255 250 246 / 0.07) !important;
+    color: rgb(255 250 246 / 0.94) !important;
+  }
+
+  .admin-team-shortcut::before {
+    content: "";
+    position: absolute;
+    top: -15px;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: rgb(255 250 246 / 0.12);
+    pointer-events: none;
+  }
+
+  .admin-finance-shortcut {
+    top: 501px !important;
+    bottom: auto !important;
+  }
+}
