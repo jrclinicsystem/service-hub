@@ -241,7 +241,7 @@ function MinhaConta() {
         </Tabs>
       </main>
 
-      <AppointmentDetailsDialog appointment={selectedAppointment} onOpenChange={(open) => !open && setSelectedAppointment(null)} onRemove={removeFromHistory} removing={removing} />
+      <AppointmentDetailsDialog appointment={selectedAppointment} onOpenChange={(open: boolean) => !open && setSelectedAppointment(null)} onRemove={removeFromHistory} removing={removing} />
       <SiteFooter />
     </div>
   );

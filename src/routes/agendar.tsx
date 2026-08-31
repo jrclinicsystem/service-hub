@@ -266,7 +266,7 @@ function Agendar() {
               <div className="mt-4">
                 <Label htmlFor="servico">Escolha o atendimento</Label>
                 <Select
-                  value={selectedSlug || undefined}
+                  value={selectedSlug ?? ""}
                   onValueChange={(value) => {
                     resetPreparedPayment();
                     navigate({ search: { servico: value }, replace: true });
@@ -282,7 +282,7 @@ function Agendar() {
               <div className="mt-4">
                 <Label htmlFor="profissional">Quem você prefere?</Label>
                 <Select
-                  value={professionalId || undefined}
+                  value={professionalId ?? ""}
                   disabled={!service}
                   onValueChange={(value) => { setProfessionalId(value); setTime(null); resetPreparedPayment(); }}
                 >
