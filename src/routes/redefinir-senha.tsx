@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { CheckCircle2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -21,7 +22,7 @@ export const Route = createFileRoute("/redefinir-senha")({
   component: RedefinirSenha,
 });
 
-type RecoveryStatus = "checking" | "ready" | "invalid";
+type RecoveryStatus = "checking" | "ready" | "invalid" | "success";
 type RecoveryTarget = "/admin" | "/minha-conta";
 
 function RedefinirSenha() {
@@ -30,6 +31,7 @@ function RedefinirSenha() {
   const [status, setStatus] = useState<RecoveryStatus>("checking");
   const [busy, setBusy] = useState(false);
   const [recoveryTarget, setRecoveryTarget] = useState<RecoveryTarget>("/minha-conta");
+  const [successTarget, setSuccessTarget] = useState<RecoveryTarget>("/minha-conta");
 
   useEffect(() => {
     let mounted = true;
@@ -47,6 +49,18 @@ function RedefinirSenha() {
       window.history.replaceState({}, document.title, `${cleanUrl.pathname}${cleanUrl.search}`);
     };
 
+    const hasValidUserSession = async () => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) return false;
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      return !userError && Boolean(userData.user);
+    };
+
+    const finishReady = () => {
+      cleanRecoveryUrl();
+      if (mounted) setStatus("ready");
+    };
+
     const establishRecoverySession = async () => {
       const url = new URL(window.location.href);
       const authCode = url.searchParams.get("code");
@@ -56,17 +70,10 @@ function RedefinirSenha() {
       const refreshToken = hash.get("refresh_token");
       const recoveryType = hash.get("type");
       const hashError = hash.get("error_description") || hash.get("error");
-
-      if (queryError || hashError) {
-        console.error("[JR Clinic] Password recovery URL error:", queryError || hashError);
-        if (mounted) setStatus("invalid");
-        return;
-      }
+      const callbackError = queryError || hashError;
 
       let recoveryError: Error | null = null;
 
-      // Process the recovery payload before considering any pre-existing session.
-      // This prevents an older login session from masking the password-recovery session.
       if (authCode) {
         const { error } = await supabase.auth.exchangeCodeForSession(authCode);
         recoveryError = error;
@@ -77,34 +84,33 @@ function RedefinirSenha() {
         });
         recoveryError = error;
       } else {
-        const { data } = await supabase.auth.getSession();
-        if (!data.session) {
-          if (mounted) setStatus("invalid");
-          return;
-        }
+        // The Supabase client can consume the callback automatically before this
+        // effect runs. Give that event a brief moment before declaring the link invalid.
+        await new Promise((resolve) => window.setTimeout(resolve, 250));
       }
 
+      // A stale callback error or an already-consumed code must never override a
+      // session that Supabase successfully established. This prevents a false
+      // "link inválido" screen after the backend has already accepted the link.
+      if (await hasValidUserSession()) {
+        finishReady();
+        return;
+      }
+
+      if (callbackError) {
+        console.error("[JR Clinic] Password recovery URL error:", callbackError);
+      }
       if (recoveryError) {
         console.error("[JR Clinic] Password recovery session error:", recoveryError);
-        if (mounted) setStatus("invalid");
-        return;
       }
 
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (userError || !userData.user) {
-        console.error("[JR Clinic] Password recovery user validation error:", userError);
-        if (mounted) setStatus("invalid");
-        return;
-      }
-
-      cleanRecoveryUrl();
-      if (mounted) setStatus("ready");
+      if (mounted) setStatus("invalid");
     };
 
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
       if (event === "PASSWORD_RECOVERY" && session) {
-        setStatus("ready");
+        finishReady();
       }
     });
 
@@ -154,11 +160,15 @@ function RedefinirSenha() {
     }
 
     const { data: isAdmin } = await (supabase as any).rpc("is_current_user_admin");
+    const destination: RecoveryTarget = isAdmin || recoveryTarget === "/admin" ? "/admin" : "/minha-conta";
     window.localStorage.removeItem(RECOVERY_TARGET_KEY);
+    setSuccessTarget(destination);
     setBusy(false);
+    setStatus("success");
+    setPassword("");
+    setConfirmPassword("");
 
     toast.success("Senha alterada com sucesso.");
-    window.location.replace(isAdmin || recoveryTarget === "/admin" ? "/admin" : "/minha-conta");
   };
 
   return (
@@ -185,6 +195,19 @@ function RedefinirSenha() {
               </p>
               <Button asChild variant="outline" className="mt-5 rounded-full">
                 <a href={recoveryTarget === "/admin" ? "/auth?next=%2Fadmin" : "/auth"}>Solicitar novo link</a>
+              </Button>
+            </div>
+          ) : status === "success" ? (
+            <div className="py-5 text-center">
+              <span className="mx-auto grid size-12 place-items-center rounded-full bg-primary-soft text-primary">
+                <CheckCircle2 className="size-6" />
+              </span>
+              <h2 className="mt-4 text-lg font-semibold">Senha alterada com sucesso</h2>
+              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                Sua nova senha já está ativa. Você pode continuar normalmente para sua conta.
+              </p>
+              <Button asChild className="mt-5 h-11 rounded-full px-6">
+                <a href={successTarget}>Continuar</a>
               </Button>
             </div>
           ) : (
