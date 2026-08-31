@@ -1,10 +1,13 @@
 /* JR Clinic admin navigation refinements. */
-.admin-sidebar-shortcut,
 .persistent-admin-sidebar {
+  display: none !important;
+}
+
+.admin-sidebar-shortcut {
   display: none;
 }
 
-/* Presence marker keeps the original /admin desktop layout offsets active. */
+/* Presence marker keeps the original /admin desktop shell active. */
 body:has(a.admin-sidebar-presence-anchor) a.admin-sidebar-presence-anchor {
   display: none !important;
   visibility: hidden !important;
@@ -17,153 +20,88 @@ body:has(a.admin-sidebar-presence-anchor) a.admin-sidebar-presence-anchor {
 }
 
 @media (min-width: 1024px) {
-  /* This is the visible sidebar. It stays mounted while internal panels change. */
-  .persistent-admin-sidebar {
-    position: fixed;
-    inset: 0 auto 0 0;
-    z-index: 120;
-    display: flex;
-    width: 250px;
-    height: 100dvh;
-    flex-direction: column;
-    overflow: hidden;
-    border-right: 1px solid rgb(255 250 246 / 0.1);
-    background: var(--sidebar);
-    color: var(--sidebar-foreground);
-    box-shadow: 14px 0 42px rgb(15 77 62 / 0.11);
-  }
-
-  .persistent-admin-sidebar-logo {
-    display: flex;
-    height: 92px;
-    flex: 0 0 92px;
-    align-items: center;
-    padding: 0 24px;
-    border-bottom: 1px solid rgb(255 250 246 / 0.1);
-  }
-
-  .persistent-admin-sidebar-logo img {
-    width: auto;
-    height: 42px;
-    filter: brightness(0) invert(1);
-    opacity: 0.98;
-  }
-
-  .persistent-admin-sidebar-heading {
-    padding: 24px 20px 10px;
-  }
-
-  .persistent-admin-sidebar-heading p {
-    margin: 0;
-    color: rgb(255 250 246 / 0.45);
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-  }
-
-  .persistent-admin-sidebar-heading span {
-    display: block;
-    margin-top: 5px;
-    color: rgb(255 250 246 / 0.88);
-    font-size: 14px;
-    font-weight: 600;
-  }
-
-  .persistent-admin-sidebar-nav {
-    display: flex;
-    flex: 1;
-    min-height: 0;
-    flex-direction: column;
-    gap: 5px;
-    padding: 8px 17px 18px;
-    overflow-y: auto;
-  }
-
-  .persistent-admin-sidebar-item {
-    display: flex;
-    box-sizing: border-box;
-    width: 100%;
-    min-height: 44px;
-    flex: 0 0 44px;
-    align-items: center;
-    justify-content: flex-start;
-    gap: 10px;
-    margin: 0;
-    padding: 0 12px;
-    border: 1px solid transparent;
-    border-radius: 12px;
-    outline: none;
-    background: transparent;
-    color: rgb(255 250 246 / 0.7);
-    font-family: inherit;
-    font-size: 13px;
-    font-weight: 500;
-    line-height: 1;
-    text-align: left;
-    cursor: pointer;
-    box-shadow: none;
-    transform: none;
-    appearance: none;
-    -webkit-appearance: none;
-    transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease;
-  }
-
-  .persistent-admin-sidebar-item svg {
-    opacity: 0.82;
-  }
-
-  .persistent-admin-sidebar-item:hover {
-    background: rgb(255 250 246 / 0.07);
-    color: rgb(255 250 246 / 0.96);
-  }
-
-  .persistent-admin-sidebar-item:focus,
-  .persistent-admin-sidebar-item:focus-visible {
-    outline: none;
-    box-shadow: none;
-  }
-
-  .persistent-admin-sidebar-item.is-active {
-    border-color: rgb(255 250 246 / 0.12);
-    background: rgb(255 250 246 / 0.12);
-    color: #fffaf6;
-    outline: none;
-    box-shadow: none;
-    transform: none;
-  }
-
-  .persistent-admin-sidebar-divider {
-    height: 1px;
-    flex: 0 0 1px;
-    margin: 9px 0 8px;
-    background: rgb(255 250 246 / 0.12);
-  }
-
-  .persistent-admin-sidebar-site-link {
-    display: flex;
-    min-height: 42px;
-    margin: 0 17px 18px;
-    flex: 0 0 42px;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 12px;
-    border: 1px solid rgb(255 250 246 / 0.12);
-    border-radius: 12px;
-    color: rgb(255 250 246 / 0.65);
-    font-size: 12px;
-    font-weight: 500;
-    text-decoration: none;
-    transition: background-color 160ms ease, color 160ms ease;
-  }
-
-  .persistent-admin-sidebar-site-link:hover {
-    background: rgb(255 250 246 / 0.08);
-    color: #fffaf6;
-  }
-
-  /* Old floating shortcuts are now replaced by the persistent sidebar. */
+  /* Keep the original admin sidebar visible/clickable. Only the three extra items are injected. */
   .admin-sidebar-shortcut {
-    display: none !important;
+    position: fixed !important;
+    left: 18px !important;
+    right: auto !important;
+    z-index: 121 !important;
+    display: flex !important;
+    width: 214px !important;
+    min-width: 214px !important;
+    max-width: 214px !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 10px !important;
+    padding: 0 12px !important;
+    border: 1px solid transparent !important;
+    border-radius: 12px !important;
+    outline: none !important;
+    background: transparent !important;
+    color: rgb(255 250 246 / 0.68) !important;
+    box-shadow: none !important;
+    font-family: inherit !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    line-height: 1 !important;
+    text-align: left !important;
+    text-decoration: none !important;
+    transform: none !important;
+    cursor: pointer !important;
+    transition: background-color 160ms ease, color 160ms ease !important;
+  }
+
+  .admin-sidebar-shortcut:hover {
+    background: rgb(255 250 246 / 0.07) !important;
+    color: rgb(255 250 246 / 0.94) !important;
+  }
+
+  .admin-sidebar-shortcut:focus,
+  .admin-sidebar-shortcut:focus-visible,
+  .admin-sidebar-shortcut:active {
+    outline: none !important;
+    box-shadow: none !important;
+    transform: none !important;
+  }
+
+  .admin-sidebar-shortcut.is-active {
+    border-color: transparent !important;
+    background: rgb(255 250 246 / 0.12) !important;
+    color: #fffaf6 !important;
+    box-shadow: inset 0 0 0 1px rgb(255 250 246 / 0.12) !important;
+  }
+
+  .admin-catalog-shortcut {
+    top: 374px !important;
+    bottom: auto !important;
+  }
+
+  .admin-team-shortcut {
+    top: 443px !important;
+    bottom: auto !important;
+    left: 18px !important;
+    width: 214px !important;
+    margin: 0 !important;
+    padding: 0 12px !important;
+  }
+
+  .admin-team-shortcut::before {
+    content: "";
+    position: absolute;
+    top: -14px;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: rgb(255 250 246 / 0.12);
+    pointer-events: none;
+  }
+
+  .admin-finance-shortcut {
+    top: 492px !important;
+    bottom: auto !important;
   }
 }
