@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight, CalendarCheck2, UsersRound } from "lucide-react";
 
-import heroAsset from "@/assets/hero-clinic-reception.png.asset.json";
+import heroAsset from "@/assets/hero-clinic-recepcao-2.jpg.asset.json";
 
 const heroImage = heroAsset.url;
 import { SiteHeader } from "@/components/site-header";
