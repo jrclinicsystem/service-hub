@@ -80,7 +80,7 @@ function FinancePage() {
     <div className="finance-coming-soon-page min-h-screen bg-background lg:pl-[252px]">
       <AdminSubpageSidebar active="finance" />
 
-      <main className="finance-coming-soon-main grid min-h-screen place-items-center px-5 py-16 sm:px-8">
+      <main className="finance-coming-soon-main grid min-h-screen place-items-center px-5 py-16 sm:px-8 lg:pr-[252px]">
         <section className="text-center">
           <div className="relative mx-auto grid size-20 place-items-center">
             <span className="absolute inset-2 animate-ping rounded-full bg-primary/10 [animation-duration:2.4s]" />
