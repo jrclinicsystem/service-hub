@@ -33,6 +33,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -277,8 +278,6 @@ function TeamCardsView({ data, onOpenAgenda, onSaved, onRefresh }: any) {
 }
 
 function ProfessionalAgendaView({ professional, access, appointments, services, serviceProfessionals, timeSlots, dateFilter, setDateFilter, onBack, onDeleted, onSaved }: any) {
-  const [editOpen, setEditOpen] = useState(false);
-  const [appointmentOpen, setAppointmentOpen] = useState(false);
   const today = todayIso();
   const filteredAppointments = useMemo(() => appointments.filter((item: any) => dateFilter ? item.scheduled_date === dateFilter : true), [appointments, dateFilter]);
   const upcoming = appointments.filter((item: any) => item.scheduled_date >= today && item.status !== "cancelado");
@@ -295,15 +294,29 @@ function ProfessionalAgendaView({ professional, access, appointments, services, 
 
   return (
     <main className="mx-auto max-w-[1240px] px-4 pb-16 pt-6 sm:px-8 sm:py-10">
-      <Button variant="ghost" className="-ml-2 rounded-full" onClick={onBack}><ArrowLeft className="size-4" /> Voltar para equipe</Button>
+      <Button type="button" variant="ghost" className="-ml-2 rounded-full" onClick={onBack}><ArrowLeft className="size-4" /> Voltar para equipe</Button>
       <section className="mt-4 overflow-hidden rounded-3xl border border-border bg-card shadow-soft">
         <div className="bg-primary px-5 py-5 text-primary-foreground sm:px-7 sm:py-6">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-center gap-4"><ProfessionalAvatar professional={professional} className="size-16 sm:size-20" /><div className="min-w-0"><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/65">Agenda individual</p><h1 className="mt-1 truncate text-3xl font-semibold leading-tight sm:text-4xl">{professional.name}</h1><p className="mt-1 text-sm text-white/70">{professional.specialty || "Profissional JR Clinic"}</p></div></div>
             <div className="flex flex-wrap gap-2">
-              <Button variant="secondary" className="rounded-full bg-white/12 text-white hover:bg-white/20" onClick={() => setEditOpen(true)}><Pencil className="size-4" /> Editar agenda</Button>
-              <Button className="rounded-full bg-white text-primary hover:bg-white/90" onClick={() => setAppointmentOpen(true)}><CalendarPlus className="size-4" /> Novo agendamento</Button>
-              <Button variant="secondary" className="rounded-full bg-white/12 text-white hover:bg-destructive hover:text-destructive-foreground" onClick={deleteAgenda}><Trash2 className="size-4" /> Excluir agenda</Button>
+              <EditAgendaDialog
+                professional={professional}
+                access={access}
+                services={services}
+                linkedServiceIds={linkedServiceIds}
+                onSaved={onSaved}
+                trigger={<Button type="button" variant="secondary" className="rounded-full bg-white/12 text-white hover:bg-white/20"><Pencil className="size-4" /> Editar agenda</Button>}
+              />
+              <NewAppointmentDialog
+                professional={professional}
+                services={services}
+                serviceProfessionals={serviceProfessionals}
+                timeSlots={timeSlots}
+                onSaved={onSaved}
+                trigger={<Button type="button" className="rounded-full bg-white text-primary hover:bg-white/90"><CalendarPlus className="size-4" /> Novo agendamento</Button>}
+              />
+              <Button type="button" variant="secondary" className="rounded-full bg-white/12 text-white hover:bg-destructive hover:text-destructive-foreground" onClick={deleteAgenda}><Trash2 className="size-4" /> Excluir agenda</Button>
             </div>
           </div>
         </div>
@@ -316,9 +329,6 @@ function ProfessionalAgendaView({ professional, access, appointments, services, 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><h2 className="text-xl font-semibold sm:text-2xl">Atendimentos de {professional.name.split(" ")[0]}</h2><p className="mt-1 text-xs text-muted-foreground">Somente administradores gerais podem editar os compromissos desta agenda.</p></div><div className="flex gap-2"><Input type="date" value={dateFilter} onChange={(event) => setDateFilter(event.target.value)} className="h-10 rounded-xl sm:w-[180px]" />{dateFilter ? <Button variant="outline" className="rounded-xl" onClick={() => setDateFilter("")}>Limpar</Button> : null}</div></div>
         <div className="mt-4 space-y-3">{filteredAppointments.length === 0 ? <div className="rounded-3xl border border-dashed border-border bg-card p-10 text-center"><CalendarDays className="mx-auto size-6 text-muted-foreground" /><p className="mt-3 text-sm font-medium">Nenhum atendimento nesta agenda.</p></div> : filteredAppointments.map((appointment: any) => <AppointmentCard key={appointment.id} appointment={appointment} onSaved={onSaved} />)}</div>
       </section>
-
-      <EditAgendaDialog open={editOpen} onOpenChange={setEditOpen} professional={professional} access={access} services={services} linkedServiceIds={linkedServiceIds} onSaved={onSaved} />
-      <NewAppointmentDialog open={appointmentOpen} onOpenChange={setAppointmentOpen} professional={professional} services={services} serviceProfessionals={serviceProfessionals} timeSlots={timeSlots} onSaved={onSaved} />
     </main>
   );
 }
@@ -386,7 +396,8 @@ function CreateAgendaDialog({ open, onOpenChange, professionals, services, onSav
   );
 }
 
-function EditAgendaDialog({ open, onOpenChange, professional, access, services, linkedServiceIds, onSaved }: any) {
+function EditAgendaDialog({ trigger, professional, access, services, linkedServiceIds, onSaved }: any) {
+  const [open, setOpen] = useState(false);
   const [name, setName] = useState(professional.name ?? "");
   const [specialty, setSpecialty] = useState(professional.specialty ?? "");
   const [email, setEmail] = useState(access?.email ?? "");
@@ -423,7 +434,7 @@ function EditAgendaDialog({ open, onOpenChange, professional, access, services, 
         if (insertLinks.error) throw insertLinks.error;
       }
 
-      toast.success("Agenda atualizada."); onOpenChange(false); onSaved();
+      toast.success("Agenda atualizada."); setOpen(false); onSaved();
     } catch (error: any) {
       const message = String(error?.message || "Não foi possível atualizar a agenda.");
       toast.error(message.includes("professional_access_email_unique") ? "Este e-mail já está vinculado a outra agenda." : message);
@@ -431,7 +442,8 @@ function EditAgendaDialog({ open, onOpenChange, professional, access, services, 
   };
 
   return (
-    <Dialog open={open} onOpenChange={(value) => { onOpenChange(value); if (value) resetFromProps(); }}>
+    <Dialog open={open} onOpenChange={(value) => { setOpen(value); if (value) resetFromProps(); }}>
+      <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent className="max-h-[92dvh] w-[calc(100%-1rem)] overflow-y-auto rounded-3xl p-5 sm:max-w-2xl sm:p-6">
         <DialogHeader><DialogTitle>Editar agenda de {professional.name}</DialogTitle><DialogDescription>Altere perfil, serviços, estado da agenda e acesso do colaborador.</DialogDescription></DialogHeader>
         <div className="grid gap-4 py-2 sm:grid-cols-2">
@@ -442,13 +454,14 @@ function EditAgendaDialog({ open, onOpenChange, professional, access, services, 
           <div className="flex items-center justify-between rounded-2xl border border-border px-3.5 py-3"><div><p className="text-sm font-medium">Acesso do colaborador</p><p className="text-[10px] text-muted-foreground">Permite abrir o portal individual.</p></div><Switch checked={enabled} disabled={!email.trim()} onCheckedChange={setEnabled} /></div>
           <div className="sm:col-span-2"><Label>Serviços vinculados</Label><div className="mt-2 grid max-h-56 gap-2 overflow-y-auto rounded-2xl border border-border p-2 sm:grid-cols-2">{services.map((service: any) => { const selected = serviceIds.includes(service.id); return <button key={service.id} type="button" onClick={() => toggleService(service.id)} className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left text-xs transition ${selected ? "border-primary bg-primary-soft text-primary" : "border-border bg-background hover:border-primary/30"}`}><span className={`grid size-4 shrink-0 place-items-center rounded-md border ${selected ? "border-primary bg-primary text-primary-foreground" : "border-border"}`}>{selected ? <Check className="size-3" /> : null}</span><span className="truncate font-medium">{service.name}</span></button>; })}</div></div>
         </div>
-        <DialogFooter><Button className="w-full rounded-full sm:w-auto" disabled={busy} onClick={save}>{busy ? "Salvando..." : "Salvar alterações"}</Button></DialogFooter>
+        <DialogFooter><Button type="button" className="w-full rounded-full sm:w-auto" disabled={busy} onClick={save}>{busy ? "Salvando..." : "Salvar alterações"}</Button></DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
 
-function NewAppointmentDialog({ open, onOpenChange, professional, services, serviceProfessionals, timeSlots, onSaved }: any) {
+function NewAppointmentDialog({ trigger, professional, services, serviceProfessionals, timeSlots, onSaved }: any) {
+  const [open, setOpen] = useState(false);
   const [serviceId, setServiceId] = useState("");
   const [patientName, setPatientName] = useState("");
   const [patientEmail, setPatientEmail] = useState("");
@@ -488,11 +501,12 @@ function NewAppointmentDialog({ open, onOpenChange, professional, services, serv
     setBusy(false);
     if (error) return toast.error(error.message);
     toast.success(`Agendamento adicionado à agenda de ${professional.name}.`);
-    reset(); onOpenChange(false); onSaved();
+    reset(); setOpen(false); onSaved();
   };
 
   return (
-    <Dialog open={open} onOpenChange={(value) => { onOpenChange(value); if (!value && !busy) reset(); }}>
+    <Dialog open={open} onOpenChange={(value) => { setOpen(value); if (!value && !busy) reset(); }}>
+      <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent className="max-h-[92dvh] w-[calc(100%-1rem)] overflow-y-auto rounded-3xl p-5 sm:max-w-xl sm:p-6">
         <DialogHeader><DialogTitle>Novo agendamento</DialogTitle><DialogDescription>Cadastre um atendimento diretamente na agenda de {professional.name}.</DialogDescription></DialogHeader>
         <div className="grid gap-4 py-2 sm:grid-cols-2">
@@ -504,7 +518,7 @@ function NewAppointmentDialog({ open, onOpenChange, professional, services, serv
           <div><Label>Horário</Label><Select value={scheduledTime} onValueChange={setScheduledTime}><SelectTrigger className="mt-2"><SelectValue placeholder="Selecione" /></SelectTrigger><SelectContent>{timeSlots.map((slot: any) => <SelectItem key={slot.slot} value={slot.slot}>{slot.slot}</SelectItem>)}</SelectContent></Select></div>
           <div className="sm:col-span-2"><Label>Observações</Label><Textarea className="mt-2" value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
         </div>
-        <DialogFooter><Button className="w-full rounded-full sm:w-auto" disabled={busy || !availableServices.length} onClick={save}>{busy ? "Adicionando..." : "Adicionar à agenda"}</Button></DialogFooter>
+        <DialogFooter><Button type="button" className="w-full rounded-full sm:w-auto" disabled={busy || !availableServices.length} onClick={save}>{busy ? "Adicionando..." : "Adicionar à agenda"}</Button></DialogFooter>
       </DialogContent>
     </Dialog>
   );
