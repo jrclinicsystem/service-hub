@@ -8,9 +8,19 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { CalendarDays, CircleDollarSign, Sparkles } from "lucide-react";
+import {
+  CalendarDays,
+  CircleDollarSign,
+  Clock3,
+  ExternalLink,
+  ShieldCheck,
+  Sparkles,
+  Stethoscope,
+  Tag,
+} from "lucide-react";
 import { lazy, Suspense, useEffect, useState, type ComponentType, type ReactNode } from "react";
 
+import logo from "@/assets/jr-clinic-logo.png";
 import { jrClinicIconDataUrl } from "@/assets/jr-clinic-icon";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 import { SupportWhatsapp } from "@/components/support-whatsapp";
@@ -141,10 +151,106 @@ function RootShell({ children }: { children: ReactNode }) {
 }
 
 type InlineAdminSection = "catalog" | "team" | "finance" | null;
+type MainAdminSection = "agendamentos" | "servicos" | "promocoes" | "horarios" | "acessos";
+
+const mainSectionLabels: Record<MainAdminSection, string> = {
+  agendamentos: "Agendamentos",
+  servicos: "Serviços",
+  promocoes: "Promoções",
+  horarios: "Horários",
+  acessos: "Acessos",
+};
+
+const mainSectionIcons: Record<MainAdminSection, ComponentType<{ className?: string }>> = {
+  agendamentos: CalendarDays,
+  servicos: Stethoscope,
+  promocoes: Tag,
+  horarios: Clock3,
+  acessos: ShieldCheck,
+};
+
+function PersistentAdminSidebar({
+  inlineSection,
+  activeMainSection,
+  onMainSection,
+  onInlineSection,
+}: {
+  inlineSection: InlineAdminSection;
+  activeMainSection: MainAdminSection;
+  onMainSection: (section: MainAdminSection) => void;
+  onInlineSection: (section: Exclude<InlineAdminSection, null>) => void;
+}) {
+  return (
+    <aside className="persistent-admin-sidebar" aria-label="Navegação administrativa">
+      <div className="persistent-admin-sidebar-logo">
+        <img src={logo} alt="JR Clinic" />
+      </div>
+
+      <div className="persistent-admin-sidebar-heading">
+        <p>Administração</p>
+        <span>Painel JR Clinic</span>
+      </div>
+
+      <nav className="persistent-admin-sidebar-nav">
+        {Object.entries(mainSectionLabels).map(([key, label]) => {
+          const section = key as MainAdminSection;
+          const Icon = mainSectionIcons[section];
+          const active = inlineSection === null && activeMainSection === section;
+          return (
+            <button
+              key={section}
+              type="button"
+              className={`persistent-admin-sidebar-item${active ? " is-active" : ""}`}
+              onClick={() => onMainSection(section)}
+            >
+              <Icon className="size-4 shrink-0" />
+              <span>{label}</span>
+            </button>
+          );
+        })}
+
+        <button
+          type="button"
+          className={`persistent-admin-sidebar-item${inlineSection === "catalog" ? " is-active" : ""}`}
+          onClick={() => onInlineSection("catalog")}
+        >
+          <Sparkles className="size-4 shrink-0" />
+          <span>Destaque do catálogo</span>
+        </button>
+
+        <div className="persistent-admin-sidebar-divider" />
+
+        <button
+          type="button"
+          className={`persistent-admin-sidebar-item${inlineSection === "team" ? " is-active" : ""}`}
+          onClick={() => onInlineSection("team")}
+        >
+          <CalendarDays className="size-4 shrink-0" />
+          <span>Agenda da equipe</span>
+        </button>
+
+        <button
+          type="button"
+          className={`persistent-admin-sidebar-item${inlineSection === "finance" ? " is-active" : ""}`}
+          onClick={() => onInlineSection("finance")}
+        >
+          <CircleDollarSign className="size-4 shrink-0" />
+          <span>Financeiro</span>
+        </button>
+      </nav>
+
+      <Link to="/" className="persistent-admin-sidebar-site-link">
+        <span>Ver site</span>
+        <ExternalLink className="size-3.5" />
+      </Link>
+    </aside>
+  );
+}
 
 function SystemAccess() {
   const location = useLocation();
   const [inlineSection, setInlineSection] = useState<InlineAdminSection>(null);
+  const [activeMainSection, setActiveMainSection] = useState<MainAdminSection>("agendamentos");
   const isInternalArea = location.pathname.startsWith("/admin") || location.pathname === "/profissional";
   const showAdminShortcuts = location.pathname === "/admin";
 
@@ -176,32 +282,30 @@ function SystemAccess() {
       return;
     }
 
-    const labels: Record<string, string> = {
-      agendamentos: "Agendamentos",
-      servicos: "Serviços",
-      promocoes: "Promoções",
-      horarios: "Horários",
-      acessos: "Acessos",
-    };
-    const targetLabel = labels[section];
-    if (!targetLabel) return;
-
-    setInlineSection(null);
-    const timer = window.setTimeout(() => {
-      const tabs = Array.from(document.querySelectorAll<HTMLElement>('[role="tab"]'));
-      const target = tabs.find((tab) => (tab.textContent || "").includes(targetLabel));
-      target?.click();
-    }, 0);
-
-    return () => window.clearTimeout(timer);
+    if (section in mainSectionLabels) {
+      const mainSection = section as MainAdminSection;
+      setInlineSection(null);
+      setActiveMainSection(mainSection);
+      const timer = window.setTimeout(() => {
+        const tabs = Array.from(document.querySelectorAll<HTMLElement>('[role="tab"]'));
+        const target = tabs.find((tab) => (tab.textContent || "").includes(mainSectionLabels[mainSection]));
+        target?.click();
+      }, 0);
+      return () => window.clearTimeout(timer);
+    }
   }, [location.hash, showAdminShortcuts]);
 
   useEffect(() => {
     if (!showAdminShortcuts) return;
 
     const handleTabClick = (event: MouseEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (!target?.closest('[role="tab"]')) return;
+      const target = (event.target as HTMLElement | null)?.closest<HTMLElement>('[role="tab"]');
+      if (!target) return;
+      const text = target.textContent || "";
+      const matched = (Object.keys(mainSectionLabels) as MainAdminSection[]).find((section) =>
+        text.includes(mainSectionLabels[section]),
+      );
+      if (matched) setActiveMainSection(matched);
       setInlineSection(null);
       window.history.replaceState(window.history.state, "", "/admin");
     };
@@ -209,6 +313,17 @@ function SystemAccess() {
     document.addEventListener("click", handleTabClick);
     return () => document.removeEventListener("click", handleTabClick);
   }, [showAdminShortcuts]);
+
+  const openMainSection = (section: MainAdminSection) => {
+    setInlineSection(null);
+    setActiveMainSection(section);
+    window.history.replaceState(window.history.state, "", `/admin#${section}`);
+    window.setTimeout(() => {
+      const tabs = Array.from(document.querySelectorAll<HTMLElement>('[role="tab"]'));
+      const target = tabs.find((tab) => (tab.textContent || "").includes(mainSectionLabels[section]));
+      target?.click();
+    }, 0);
+  };
 
   const openInlineSection = (section: Exclude<InlineAdminSection, null>) => {
     setInlineSection(section);
@@ -230,12 +345,15 @@ function SystemAccess() {
       <Outlet />
       {showAdminShortcuts ? (
         <>
-          <a
-            href="/admin/equipe"
-            className="admin-sidebar-presence-anchor"
-            aria-hidden="true"
-            tabIndex={-1}
+          <a href="/admin/equipe" className="admin-sidebar-presence-anchor" aria-hidden="true" tabIndex={-1} />
+
+          <PersistentAdminSidebar
+            inlineSection={inlineSection}
+            activeMainSection={activeMainSection}
+            onMainSection={openMainSection}
+            onInlineSection={openInlineSection}
           />
+
           <button
             type="button"
             onClick={() => openInlineSection("catalog")}
