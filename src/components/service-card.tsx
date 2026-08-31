@@ -20,14 +20,18 @@ export function ServiceCard({
     ? { name: categoryName }
     : getCategory(service.categoryId);
 
+  const procedureDescription = [service.summary, service.description]
+    .filter((value, index, values) => Boolean(value) && values.indexOf(value) === index)
+    .join(" ");
+
   return (
     <article
       className={cn(
-        "card-lift flex min-h-[350px] flex-col rounded-2xl border border-border bg-card p-5 shadow-soft",
+        "card-lift flex min-h-[380px] flex-col rounded-2xl border border-border bg-card p-5 shadow-soft",
         compactMobile &&
-          "max-sm:min-h-[260px] max-sm:rounded-2xl max-sm:p-4 max-sm:shadow-soft",
+          "max-sm:min-h-[310px] max-sm:rounded-2xl max-sm:p-4 max-sm:shadow-soft",
         compactDesktop &&
-          "md:min-h-[248px] md:rounded-xl md:p-4 md:shadow-[0_14px_30px_-26px_rgba(15,77,62,0.35)]",
+          "md:min-h-[290px] md:rounded-xl md:p-4 md:shadow-[0_14px_30px_-26px_rgba(15,77,62,0.35)]",
       )}
     >
       <Link
@@ -75,20 +79,20 @@ export function ServiceCard({
         <h3
           className={cn(
             "mt-4 text-xl font-semibold",
-            compactMobile && "max-sm:mt-3 max-sm:line-clamp-2 max-sm:text-[16px] max-sm:leading-[1.22]",
-            compactDesktop && "md:mt-3 md:line-clamp-2 md:text-[17px] md:leading-[1.2]",
+            compactMobile && "max-sm:mt-3 max-sm:line-clamp-2 max-sm:text-[17px] max-sm:leading-[1.25]",
+            compactDesktop && "md:mt-3 md:line-clamp-2 md:text-[17px] md:leading-[1.22]",
           )}
         >
           {service.name}
         </h3>
         <p
           className={cn(
-            "mt-2 text-sm leading-relaxed text-muted-foreground",
-            compactMobile && "max-sm:line-clamp-2 max-sm:text-[12px] max-sm:leading-5",
-            compactDesktop && "md:line-clamp-2 md:text-[12px] md:leading-5",
+            "mt-2 text-[15px] leading-6 text-muted-foreground",
+            compactMobile && "max-sm:line-clamp-4 max-sm:text-[13px] max-sm:leading-[1.55]",
+            compactDesktop && "md:line-clamp-4 md:text-[13px] md:leading-[1.5]",
           )}
         >
-          {service.summary}
+          {procedureDescription || "Confira os detalhes, indicações e etapas deste procedimento."}
         </p>
 
         <div
