@@ -21,6 +21,20 @@ body:has(a.admin-sidebar-presence-anchor) a.admin-sidebar-presence-anchor {
   opacity: 0 !important;
 }
 
+/* The unified access page has one primary CTA back to the team agenda. Force the
+ * clinic green here because legacy outline-button rules can otherwise win. */
+.admin-inline-overlay main.max-w-\[1180px\] a[href="/admin/equipe"] {
+  background: var(--primary) !important;
+  border-color: var(--primary) !important;
+  color: var(--primary-foreground) !important;
+}
+
+.admin-inline-overlay main.max-w-\[1180px\] a[href="/admin/equipe"]:hover {
+  background: color-mix(in srgb, var(--primary) 88%, black) !important;
+  border-color: color-mix(in srgb, var(--primary) 88%, black) !important;
+  color: var(--primary-foreground) !important;
+}
+
 /* Mobile admin navigation: four primary apps + a central expandable app launcher. */
 @media (max-width: 639px) {
   body:has(.admin-mobile-nav) main.max-w-\[1480px\] div:has(> [role="tablist"]) {
@@ -293,13 +307,15 @@ body:has(a.admin-sidebar-presence-anchor) a.admin-sidebar-presence-anchor {
     box-shadow: inset 0 0 0 1px rgb(255 250 246 / 0.12) !important;
   }
 
+  /* With the legacy Acessos row removed, pull every injected shortcut up by one row
+   * so the sidebar stays compact instead of leaving a blank slot. */
   .admin-catalog-shortcut {
-    top: 374px !important;
+    top: 325px !important;
     bottom: auto !important;
   }
 
   .admin-team-shortcut {
-    top: 443px !important;
+    top: 394px !important;
     bottom: auto !important;
     left: 18px !important;
     width: 214px !important;
@@ -319,12 +335,12 @@ body:has(a.admin-sidebar-presence-anchor) a.admin-sidebar-presence-anchor {
   }
 
   .admin-access-shortcut {
-    top: 492px !important;
+    top: 443px !important;
     bottom: auto !important;
   }
 
   .admin-finance-shortcut {
-    top: 541px !important;
+    top: 492px !important;
     bottom: auto !important;
   }
 }
