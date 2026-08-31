@@ -45,7 +45,7 @@ import { formatDate } from "@/lib/clinic";
 
 const db = supabase as any;
 
-export const Route = createFileRoute("/admin/equipe")({
+export const Route = createFileRoute("/admin_/equipe")({
   ssr: false,
   beforeLoad: async () => {
     const { data, error } = await supabase.auth.getUser();

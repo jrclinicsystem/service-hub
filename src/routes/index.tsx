@@ -1,7 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight, CalendarCheck2, UsersRound } from "lucide-react";
 
-import heroImage from "@/assets/hero-clinic-jr.svg";
+import heroAsset from "@/assets/hero-clinic-reception.png.asset.json";
+
+const heroImage = heroAsset.url;
 import { SiteHeader } from "@/components/site-header";
 import { Button } from "@/components/ui/button";
 import { getHomeOverview } from "@/lib/clinic.functions";

@@ -16,8 +16,12 @@ import { Route as AgendarRouteImport } from './routes/agendar'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as CatalogoRouteImport } from './routes/catalogo'
 import { Route as PrivacidadeRouteImport } from './routes/privacidade'
+import { Route as ProfissionalRouteImport } from './routes/profissional'
+import { Route as RedefinirSenhaRouteImport } from './routes/redefinir-senha'
 import { Route as TermosRouteImport } from './routes/termos'
 import { Route as AuthenticatedMinhaContaRouteImport } from './routes/_authenticated/minha-conta'
+import { Route as AdminCatalogoRouteImport } from './routes/admin_.catalogo'
+import { Route as AdminEquipeRouteImport } from './routes/admin_.equipe'
 import { Route as ServicoSlugRouteImport } from './routes/servico.$slug'
 
 const IndexRoute = IndexRouteImport.update({
@@ -54,6 +58,16 @@ const PrivacidadeRoute = PrivacidadeRouteImport.update({
   path: '/privacidade',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProfissionalRoute = ProfissionalRouteImport.update({
+  id: '/profissional',
+  path: '/profissional',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RedefinirSenhaRoute = RedefinirSenhaRouteImport.update({
+  id: '/redefinir-senha',
+  path: '/redefinir-senha',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TermosRoute = TermosRouteImport.update({
   id: '/termos',
   path: '/termos',
@@ -63,6 +77,16 @@ const AuthenticatedMinhaContaRoute = AuthenticatedMinhaContaRouteImport.update({
   id: '/minha-conta',
   path: '/minha-conta',
   getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AdminCatalogoRoute = AdminCatalogoRouteImport.update({
+  id: '/admin_/catalogo',
+  path: '/admin/catalogo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminEquipeRoute = AdminEquipeRouteImport.update({
+  id: '/admin_/equipe',
+  path: '/admin/equipe',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ServicoSlugRoute = ServicoSlugRouteImport.update({
   id: '/servico/$slug',
@@ -77,8 +101,12 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/catalogo': typeof CatalogoRoute
   '/privacidade': typeof PrivacidadeRoute
+  '/profissional': typeof ProfissionalRoute
+  '/redefinir-senha': typeof RedefinirSenhaRoute
   '/termos': typeof TermosRoute
   '/minha-conta': typeof AuthenticatedMinhaContaRoute
+  '/admin/catalogo': typeof AdminCatalogoRoute
+  '/admin/equipe': typeof AdminEquipeRoute
   '/servico/$slug': typeof ServicoSlugRoute
 }
 export interface FileRoutesByTo {
@@ -88,8 +116,12 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/catalogo': typeof CatalogoRoute
   '/privacidade': typeof PrivacidadeRoute
+  '/profissional': typeof ProfissionalRoute
+  '/redefinir-senha': typeof RedefinirSenhaRoute
   '/termos': typeof TermosRoute
   '/minha-conta': typeof AuthenticatedMinhaContaRoute
+  '/admin/catalogo': typeof AdminCatalogoRoute
+  '/admin/equipe': typeof AdminEquipeRoute
   '/servico/$slug': typeof ServicoSlugRoute
 }
 export interface FileRoutesById {
@@ -101,8 +133,12 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/catalogo': typeof CatalogoRoute
   '/privacidade': typeof PrivacidadeRoute
+  '/profissional': typeof ProfissionalRoute
+  '/redefinir-senha': typeof RedefinirSenhaRoute
   '/termos': typeof TermosRoute
   '/_authenticated/minha-conta': typeof AuthenticatedMinhaContaRoute
+  '/admin_/catalogo': typeof AdminCatalogoRoute
+  '/admin_/equipe': typeof AdminEquipeRoute
   '/servico/$slug': typeof ServicoSlugRoute
 }
 export interface FileRouteTypes {
@@ -114,8 +150,12 @@ export interface FileRouteTypes {
     | '/auth'
     | '/catalogo'
     | '/privacidade'
+    | '/profissional'
+    | '/redefinir-senha'
     | '/termos'
     | '/minha-conta'
+    | '/admin/catalogo'
+    | '/admin/equipe'
     | '/servico/$slug'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -125,8 +165,12 @@ export interface FileRouteTypes {
     | '/auth'
     | '/catalogo'
     | '/privacidade'
+    | '/profissional'
+    | '/redefinir-senha'
     | '/termos'
     | '/minha-conta'
+    | '/admin/catalogo'
+    | '/admin/equipe'
     | '/servico/$slug'
   id:
     | '__root__'
@@ -137,8 +181,12 @@ export interface FileRouteTypes {
     | '/auth'
     | '/catalogo'
     | '/privacidade'
+    | '/profissional'
+    | '/redefinir-senha'
     | '/termos'
     | '/_authenticated/minha-conta'
+    | '/admin_/catalogo'
+    | '/admin_/equipe'
     | '/servico/$slug'
   fileRoutesById: FileRoutesById
 }
@@ -150,7 +198,11 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   CatalogoRoute: typeof CatalogoRoute
   PrivacidadeRoute: typeof PrivacidadeRoute
+  ProfissionalRoute: typeof ProfissionalRoute
+  RedefinirSenhaRoute: typeof RedefinirSenhaRoute
   TermosRoute: typeof TermosRoute
+  AdminCatalogoRoute: typeof AdminCatalogoRoute
+  AdminEquipeRoute: typeof AdminEquipeRoute
   ServicoSlugRoute: typeof ServicoSlugRoute
 }
 
@@ -205,6 +257,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PrivacidadeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/profissional': {
+      id: '/profissional'
+      path: '/profissional'
+      fullPath: '/profissional'
+      preLoaderRoute: typeof ProfissionalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/redefinir-senha': {
+      id: '/redefinir-senha'
+      path: '/redefinir-senha'
+      fullPath: '/redefinir-senha'
+      preLoaderRoute: typeof RedefinirSenhaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/termos': {
       id: '/termos'
       path: '/termos'
@@ -218,6 +284,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/minha-conta'
       preLoaderRoute: typeof AuthenticatedMinhaContaRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/admin_/catalogo': {
+      id: '/admin_/catalogo'
+      path: '/admin/catalogo'
+      fullPath: '/admin/catalogo'
+      preLoaderRoute: typeof AdminCatalogoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin_/equipe': {
+      id: '/admin_/equipe'
+      path: '/admin/equipe'
+      fullPath: '/admin/equipe'
+      preLoaderRoute: typeof AdminEquipeRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/servico/$slug': {
       id: '/servico/$slug'
@@ -248,7 +328,11 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   CatalogoRoute: CatalogoRoute,
   PrivacidadeRoute: PrivacidadeRoute,
+  ProfissionalRoute: ProfissionalRoute,
+  RedefinirSenhaRoute: RedefinirSenhaRoute,
   TermosRoute: TermosRoute,
+  AdminCatalogoRoute: AdminCatalogoRoute,
+  AdminEquipeRoute: AdminEquipeRoute,
   ServicoSlugRoute: ServicoSlugRoute,
 }
 export const routeTree = rootRouteImport

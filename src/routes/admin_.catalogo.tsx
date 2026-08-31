@@ -10,7 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 const db = supabase as any;
 
-export const Route = createFileRoute("/admin/catalogo")({
+export const Route = createFileRoute("/admin_/catalogo")({
   ssr: false,
   beforeLoad: async () => {
     const { data, error } = await supabase.auth.getUser();
