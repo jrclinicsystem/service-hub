@@ -10,21 +10,6 @@ section:has(> div > button.group.relative.flex.flex-col.items-center.rounded-2xl
   align-items: stretch;
 }
 
-@keyframes jr-payment-selected {
-  0% {
-    transform: scale(0.96);
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 30%, transparent);
-  }
-  55% {
-    transform: scale(1.025);
-    box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 12%, transparent);
-  }
-  100% {
-    transform: scale(1);
-    box-shadow: 0 10px 22px -18px color-mix(in srgb, var(--accent) 72%, transparent);
-  }
-}
-
 button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center {
   min-height: 318px;
   height: 100%;
@@ -41,11 +26,11 @@ button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.te
 
 button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center:not(:disabled):hover {
   transform: translateY(-2px);
-  border-color: color-mix(in srgb, var(--primary) 42%, var(--border)) !important;
-  box-shadow: 0 18px 38px -28px rgb(15 77 62 / 0.42) !important;
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border)) !important;
+  box-shadow: 0 18px 38px -28px color-mix(in srgb, var(--accent) 55%, transparent) !important;
 }
 
-/* Selected card: subtle brand-brown outline so the state is clear without painting the full card. */
+/* Selected card stays neutral, with only a subtle brand-brown outline. */
 button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center[class*="border-primary"] {
   border-color: color-mix(in srgb, var(--accent) 70%, var(--border)) !important;
   background: color-mix(in srgb, var(--card) 94%, var(--secondary)) !important;
@@ -93,27 +78,30 @@ button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.te
   letter-spacing: -0.025em;
 }
 
-/* Unselected action stays green. */
-button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center > span.mt-4.flex.w-full {
+/* CTA is always green at rest, including the selected option. */
+button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center > span.mt-4.flex.w-full,
+button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center[class*="border-primary"] > span.mt-4.flex.w-full {
   margin-top: auto !important;
   border-color: var(--primary) !important;
   background: var(--primary) !important;
-  color: var(--primary-foreground) !important;
-  box-shadow: 0 10px 22px -18px rgb(15 77 62 / 0.6);
+  color: #fff !important;
+  box-shadow: 0 10px 22px -18px rgb(15 77 62 / 0.6) !important;
+  animation: none !important;
   transition:
     transform 180ms ease,
     background-color 180ms ease,
     border-color 180ms ease,
+    color 180ms ease,
     box-shadow 180ms ease;
 }
 
-/* Selected action turns to the light brand brown and gets a quick confirmation animation. */
-button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center[class*="border-primary"] > span.mt-4.flex.w-full {
+/* Brown appears only on hover. The label stays white for maximum contrast. */
+button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center:not(:disabled):hover > span.mt-4.flex.w-full {
+  transform: translateY(-1px);
   border-color: var(--accent) !important;
   background: var(--accent) !important;
-  color: var(--accent-foreground) !important;
-  box-shadow: 0 10px 22px -18px color-mix(in srgb, var(--accent) 72%, transparent) !important;
-  animation: jr-payment-selected 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  color: #fff !important;
+  box-shadow: 0 12px 24px -16px color-mix(in srgb, var(--accent) 78%, transparent) !important;
 }
 
 button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center:disabled {
@@ -150,7 +138,8 @@ button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.te
 }
 
 @media (prefers-reduced-motion: reduce) {
-  button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center[class*="border-primary"] > span.mt-4.flex.w-full {
-    animation: none !important;
+  button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center,
+  button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center > span.mt-4.flex.w-full {
+    transition: none !important;
   }
 }
