@@ -61,14 +61,12 @@
   }
 
   /*
-   * Financeiro must be centered against the viewport itself, not against the
-   * inline panel (which starts after the 250px admin sidebar). Fixed viewport
-   * coordinates remove every sidebar/overlay/padding compensation from the
-   * equation and keep the visual block at the exact screen center.
+   * Center Financeiro in the usable content area, excluding the 250px sidebar.
+   * The center of that region is 125px to the right of the viewport midpoint.
    */
   body:has(a.admin-sidebar-presence-anchor) .admin-inline-overlay .finance-coming-soon-main > section {
     position: fixed !important;
-    left: 50vw !important;
+    left: calc(50vw + 125px) !important;
     top: 50vh !important;
     margin: 0 !important;
     transform: translate(-50%, -50%) !important;
