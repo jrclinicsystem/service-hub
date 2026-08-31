@@ -234,6 +234,11 @@ body:has(a.admin-sidebar-presence-anchor) a.admin-sidebar-presence-anchor {
 }
 
 @media (min-width: 1024px) {
+  /* Hide the legacy Acessos tab in the original admin sidebar; the unified access manager lives below Agenda da equipe. */
+  body:has(a.admin-sidebar-presence-anchor) main.max-w-\[1480px\] [role="tablist"] > [role="tab"]:nth-child(5) {
+    display: none !important;
+  }
+
   .admin-sidebar-shortcut {
     position: fixed !important;
     left: 18px !important;
