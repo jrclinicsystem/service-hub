@@ -12,9 +12,9 @@ const nav = [
 export function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-primary-foreground/10 bg-primary/95 backdrop-blur-xl">
-      <div className="mx-auto flex h-16 max-w-[1520px] items-center justify-between px-4 sm:h-[72px] sm:px-8 md:h-20 lg:px-10">
+      <div className="mx-auto flex h-[72px] max-w-[1520px] items-center justify-between px-4 sm:h-[84px] sm:px-8 md:h-24 lg:px-10">
         <Link to="/" preload="intent" className="flex items-center">
-          <img src={logo} alt="JR Clinic" className="h-9 w-auto brightness-0 invert sm:h-12 md:h-[52px]" />
+          <img src={logo} alt="JR Clinic" className="h-10 w-auto brightness-0 invert sm:h-[54px] md:h-[62px]" />
         </Link>
 
         <nav className="hidden items-center gap-8 text-sm text-primary-foreground/70 md:flex lg:gap-9">
@@ -33,10 +33,10 @@ export function SiteHeader() {
         </nav>
 
         <div className="hidden items-center gap-2.5 md:flex">
-          <Button asChild variant="ghost" size="sm" className="h-10 rounded-full px-4 text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground">
+          <Button asChild variant="ghost" size="sm" className="h-11 rounded-full px-5 text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground">
             <Link to="/minha-conta" preload="intent">Minha conta</Link>
           </Button>
-          <Button asChild size="sm" className="h-10 rounded-full bg-accent px-4 text-primary-foreground hover:bg-accent/90 hover:text-primary-foreground">
+          <Button asChild size="sm" className="h-11 rounded-full bg-accent px-5 text-primary-foreground hover:bg-accent/90 hover:text-primary-foreground">
             <Link to="/agendar" preload="intent">Agendar consulta</Link>
           </Button>
         </div>
