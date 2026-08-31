@@ -1,178 +1,119 @@
-/* Booking payment cards — scoped to the PaymentOption buttons in /agendar. */
+/* Booking payment cards — scoped to the current PaymentOption markup in /agendar. */
 
-section:has(> div > button.group.rounded-xl.border.px-3.py-3.text-left) {
-  border-color: color-mix(in srgb, var(--primary) 10%, var(--border));
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--card) 96%, var(--primary-soft)) 0%, var(--card) 100%);
-  box-shadow: 0 18px 44px -34px rgb(15 77 62 / 0.32);
+section:has(> div > button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center) {
+  border-color: color-mix(in srgb, var(--primary) 9%, var(--border));
+  background: color-mix(in srgb, var(--card) 97%, var(--primary-soft));
+  box-shadow: 0 18px 44px -34px rgb(15 77 62 / 0.28);
 }
 
-section:has(> div > button.group.rounded-xl.border.px-3.py-3.text-left) > div:first-child h2 {
-  font-size: 1.15rem;
-  line-height: 1.2;
+section:has(> div > button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center) > div.mt-6.grid {
+  align-items: stretch;
 }
 
-section:has(> div > button.group.rounded-xl.border.px-3.py-3.text-left) > div:first-child p {
-  max-width: 52rem;
-  font-size: 0.875rem;
-  line-height: 1.55;
-}
-
-section:has(> div > button.group.rounded-xl.border.px-3.py-3.text-left) > div.mt-4.grid {
-  gap: 0.75rem;
-}
-
-button.group.rounded-xl.border.px-3.py-3.text-left {
-  position: relative;
-  min-height: 172px;
-  overflow: hidden;
-  padding: 1rem;
-  border-radius: 1.125rem;
-  background: color-mix(in srgb, var(--card) 94%, var(--secondary));
-  box-shadow: 0 8px 24px -22px rgb(15 77 62 / 0.3);
+button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center {
+  min-height: 318px;
+  height: 100%;
+  border-color: var(--border) !important;
+  background: color-mix(in srgb, var(--card) 94%, var(--secondary)) !important;
+  box-shadow: 0 10px 28px -24px rgb(15 77 62 / 0.3) !important;
+  --tw-ring-shadow: 0 0 #0000 !important;
   transition:
     transform 180ms ease,
     border-color 180ms ease,
-    background-color 180ms ease,
-    box-shadow 180ms ease;
+    box-shadow 180ms ease,
+    background-color 180ms ease;
 }
 
-button.group.rounded-xl.border.px-3.py-3.text-left:not(:disabled):hover {
+button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center:not(:disabled):hover {
   transform: translateY(-2px);
-  border-color: color-mix(in srgb, var(--primary) 38%, var(--border));
-  box-shadow: 0 18px 34px -26px rgb(15 77 62 / 0.4);
+  border-color: color-mix(in srgb, var(--primary) 42%, var(--border)) !important;
+  box-shadow: 0 18px 38px -28px rgb(15 77 62 / 0.42) !important;
 }
 
-button.group.rounded-xl.border.px-3.py-3.text-left[class*="border-primary"] {
-  border-color: var(--primary) !important;
-  background: linear-gradient(145deg, color-mix(in srgb, var(--primary-soft) 82%, white), color-mix(in srgb, var(--card) 88%, var(--primary-soft))) !important;
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--primary) 8%, transparent),
-    0 18px 34px -28px rgb(15 77 62 / 0.42);
+/* The selected card no longer gets a large green wash by default. */
+button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center[class*="border-primary"] {
+  border-color: color-mix(in srgb, var(--primary) 34%, var(--border)) !important;
+  background: color-mix(in srgb, var(--card) 94%, var(--secondary)) !important;
+  box-shadow: 0 10px 28px -24px rgb(15 77 62 / 0.3) !important;
 }
 
-button.group.rounded-xl.border.px-3.py-3.text-left[class*="border-primary"]::after {
-  content: "✓";
-  position: absolute;
-  right: 0.85rem;
-  top: 0.8rem;
-  display: grid;
-  width: 1.45rem;
-  height: 1.45rem;
-  place-items: center;
-  border-radius: 999px;
-  background: var(--primary);
-  color: var(--primary-foreground);
-  font-size: 0.72rem;
-  font-weight: 800;
-  box-shadow: 0 5px 14px -8px rgb(15 77 62 / 0.7);
-}
-
-button.group.rounded-xl.border.px-3.py-3.text-left > div {
-  display: grid;
-  grid-template-columns: 2.75rem minmax(0, 1fr);
-  align-items: start;
-  gap: 0.85rem;
-}
-
-button.group.rounded-xl.border.px-3.py-3.text-left > div > span {
-  width: 2.75rem;
-  height: 2.75rem;
-  border: 1px solid color-mix(in srgb, var(--primary) 10%, transparent);
-  border-radius: 0.9rem;
-  background: color-mix(in srgb, var(--primary-soft) 62%, var(--card)) !important;
-  color: var(--primary) !important;
-}
-
-button.group.rounded-xl.border.px-3.py-3.text-left[class*="border-primary"] > div > span {
+/* ONLINE / PRESENCIAL tags: always green and easy to identify. */
+button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center > span.absolute {
+  top: -0.65rem;
+  min-width: 4.25rem;
+  border: 1px solid color-mix(in srgb, var(--primary) 82%, white);
   background: var(--primary) !important;
   color: var(--primary-foreground) !important;
+  padding: 0.28rem 0.7rem;
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  box-shadow: 0 8px 18px -14px rgb(15 77 62 / 0.7);
 }
 
-button.group.rounded-xl.border.px-3.py-3.text-left > div > div {
-  min-width: 0;
-  padding-right: 0.15rem;
+/* Keep all three method icons in the same green visual language. */
+button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center > span.grid {
+  background: var(--primary) !important;
+  color: var(--primary-foreground) !important;
+  box-shadow: 0 10px 22px -16px rgb(15 77 62 / 0.6);
 }
 
-button.group.rounded-xl.border.px-3.py-3.text-left > div > div > div:first-child {
+button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center > p:first-of-type {
+  min-height: 2.55rem;
   display: flex;
-  min-height: 3.4rem;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: flex-start;
-  gap: 0.55rem;
-  padding-right: 1.45rem;
-}
-
-button.group.rounded-xl.border.px-3.py-3.text-left > div > div > div:first-child > p {
-  max-width: 100%;
-  font-size: 0.98rem;
-  font-weight: 700;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1rem;
+  font-size: 1rem;
   line-height: 1.28;
-  letter-spacing: -0.01em;
   text-wrap: balance;
 }
 
-button.group.rounded-xl.border.px-3.py-3.text-left > div > div > div:first-child > span {
-  display: inline-flex;
-  align-items: center;
-  min-height: 1.45rem;
-  border: 1px solid color-mix(in srgb, var(--primary) 14%, transparent);
-  border-radius: 999px;
+button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center > p:nth-of-type(3) {
+  margin-top: 0.95rem;
+  font-size: 1.45rem;
+  line-height: 1;
+  letter-spacing: -0.025em;
+}
+
+/* Both "Selecionar" and "Selecionado" use the same strong green CTA treatment. */
+button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center > span.mt-4.flex.w-full {
+  margin-top: auto !important;
+  border-color: var(--primary) !important;
   background: var(--primary) !important;
   color: var(--primary-foreground) !important;
-  padding: 0.22rem 0.58rem;
-  font-size: 0.61rem;
-  font-weight: 800;
-  letter-spacing: 0.09em;
-  line-height: 1;
-  box-shadow: 0 5px 12px -10px rgb(15 77 62 / 0.8);
+  box-shadow: 0 10px 22px -18px rgb(15 77 62 / 0.6);
 }
 
-button.group.rounded-xl.border.px-3.py-3.text-left > div > div > p {
-  margin-top: 0.95rem;
-  font-size: 1.32rem;
-  font-weight: 700;
-  line-height: 1.05;
-  letter-spacing: -0.025em;
-  color: var(--primary) !important;
-}
-
-button.group.rounded-xl.border.px-3.py-3.text-left:disabled {
+button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center:disabled {
   transform: none;
-  box-shadow: none;
+  box-shadow: none !important;
 }
 
 @media (min-width: 640px) {
-  section:has(> div > button.group.rounded-xl.border.px-3.py-3.text-left) > div.mt-4.grid {
-    gap: 0.9rem;
+  button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center {
+    min-height: 326px;
+    padding: 1.7rem 1.4rem 1.45rem;
   }
 
-  button.group.rounded-xl.border.px-3.py-3.text-left {
-    min-height: 186px;
-    padding: 1.15rem;
-  }
-
-  button.group.rounded-xl.border.px-3.py-3.text-left > div > div > div:first-child > p {
-    font-size: 1.02rem;
-  }
-
-  button.group.rounded-xl.border.px-3.py-3.text-left > div > div > p {
-    margin-top: 1rem;
-    font-size: 1.42rem;
+  /* All descriptions reserve exactly three lines; longer copy is clamped. */
+  button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center > p:nth-of-type(2) {
+    display: -webkit-box !important;
+    min-height: 4.05rem;
+    max-height: 4.05rem;
+    margin-top: 0.45rem;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    font-size: 0.75rem;
+    line-height: 1.35rem;
+    text-wrap: balance;
   }
 }
 
 @media (max-width: 639px) {
-  section:has(> div > button.group.rounded-xl.border.px-3.py-3.text-left) > div.mt-4.grid {
-    grid-template-columns: 1fr;
-  }
-
-  button.group.rounded-xl.border.px-3.py-3.text-left {
-    min-height: 146px;
-  }
-
-  button.group.rounded-xl.border.px-3.py-3.text-left > div > div > div:first-child {
-    min-height: auto;
+  button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center {
+    min-height: 228px;
   }
 }
