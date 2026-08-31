@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { CreditCard, HandCoins, Landmark, WalletCards } from "lucide-react";
+import { Check, CreditCard, HandCoins, Landmark, WalletCards } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -258,7 +258,7 @@ function Agendar() {
           <StepChip number="5" label="Pagamento" />
         </div>
 
-        <div className="mt-5 grid gap-4 sm:mt-10 sm:gap-8 lg:grid-cols-[1.15fr_0.85fr]">
+        <div className="mt-5 grid grid-cols-1 gap-4 sm:mt-10 sm:gap-8 lg:grid-cols-[1.15fr_0.85fr]">
           <div className="space-y-4 sm:space-y-8">
             <section className="rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-6">
               <h2 className="text-base font-semibold sm:text-lg">Serviço e profissional</h2>
@@ -346,22 +346,23 @@ function Agendar() {
               </div>
             </section>
 
-            <section className="rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-6">
-              <div>
-                <h2 className="text-base font-semibold sm:text-lg">Métodos de pagamento</h2>
-                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+            <section className="rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-8">
+              <div className="text-center">
+                <h2 className="text-lg font-semibold tracking-tight sm:text-2xl">Métodos de pagamento</h2>
+                <p className="mx-auto mt-1.5 max-w-[52ch] text-sm leading-relaxed text-muted-foreground">
                   {service
-                    ? "Escolha como deseja pagar este agendamento. Os detalhes completos aparecem na próxima etapa."
+                    ? "Selecione a forma mais conveniente para você. Os detalhes completos aparecem na próxima etapa."
                     : "Selecione um serviço acima para ver os valores reais de cada opção de pagamento."}
                 </p>
               </div>
 
-              <div className="mt-4 grid gap-2 sm:grid-cols-3">
+              <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-5">
                 <PaymentOption
                   icon={Landmark}
                   selected={paymentChoice === "deposit"}
                   disabled={!service || Boolean(paymentSession)}
                   title={`Pagar ${depositLabel} online`}
+                  description="Garanta seu horário pagando o sinal agora e o restante na clínica."
                   value={service ? formatPrice(depositValue) : "—"}
                   badge="Online"
                   onClick={() => { setPaymentChoice("deposit"); resetPreparedPayment(); }}
@@ -371,6 +372,7 @@ function Agendar() {
                   selected={paymentChoice === "full"}
                   disabled={!service || Boolean(paymentSession)}
                   title="Pagar valor total"
+                  description="Agilize seu atendimento com o pagamento integral, seguro e rápido."
                   value={service ? formatPrice(total) : "—"}
                   badge="Online"
                   onClick={() => { setPaymentChoice("full"); resetPreparedPayment(); }}
@@ -380,6 +382,7 @@ function Agendar() {
                   selected={paymentChoice === "onsite"}
                   disabled={!service || Boolean(paymentSession)}
                   title="Pagar presencialmente"
+                  description="Reserve seu horário e pague diretamente na recepção no dia do atendimento."
                   value={service ? "Na clínica" : "—"}
                   badge="Presencial"
                   onClick={() => { setPaymentChoice("onsite"); resetPreparedPayment(); }}
@@ -429,11 +432,12 @@ function Agendar() {
   );
 }
 
-function PaymentOption({ icon: Icon, selected, disabled, title, value, badge, onClick }: {
+function PaymentOption({ icon: Icon, selected, disabled, title, description, value, badge, onClick }: {
   icon: typeof WalletCards;
   selected: boolean;
   disabled: boolean;
   title: string;
+  description: string;
   value: string;
   badge: string;
   onClick: () => void;
@@ -443,20 +447,41 @@ function PaymentOption({ icon: Icon, selected, disabled, title, value, badge, on
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className={`group rounded-xl border px-3 py-3 text-left transition disabled:cursor-not-allowed disabled:opacity-45 ${selected ? "border-primary bg-primary-soft/65 shadow-sm" : "border-border bg-background hover:border-primary/25 hover:bg-secondary/35"}`}
+      className={`group relative flex flex-col items-center rounded-2xl border px-4 py-6 text-center transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-45 sm:rounded-3xl sm:p-7 ${
+        selected
+          ? "border-primary bg-primary-soft/50 shadow-soft ring-4 ring-primary/10"
+          : "border-border bg-background hover:-translate-y-1 hover:border-primary/40 hover:shadow-elegant"
+      }`}
     >
-      <div className="flex items-start gap-2.5">
-        <span className={`grid size-8 shrink-0 place-items-center rounded-lg ${selected ? "bg-primary text-primary-foreground" : "bg-secondary text-primary"}`}>
-          <Icon className="size-4" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-[13px] font-semibold leading-tight sm:text-sm">{title}</p>
-            <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-[9px] font-medium uppercase tracking-wide text-muted-foreground">{badge}</span>
-          </div>
-          <p className="mt-2 text-[17px] font-semibold leading-none text-primary sm:text-lg">{value}</p>
-        </div>
-      </div>
+      <span className="absolute -top-2.5 rounded-full bg-secondary px-2.5 py-0.5 text-[9px] font-semibold uppercase tracking-widest text-muted-foreground">
+        {badge}
+      </span>
+      <span
+        className={`grid size-12 place-items-center rounded-2xl transition-colors duration-300 sm:size-14 ${
+          selected ? "bg-primary text-primary-foreground" : "bg-primary-soft text-primary group-hover:bg-primary group-hover:text-primary-foreground"
+        }`}
+      >
+        <Icon className="size-5 sm:size-6" />
+      </span>
+      <p className="mt-4 text-sm font-semibold leading-tight sm:text-base">{title}</p>
+      <p className="mt-1.5 hidden text-xs leading-relaxed text-muted-foreground sm:block">{description}</p>
+      <p className="mt-3 text-xl font-semibold leading-none text-primary sm:text-2xl">{value}</p>
+      <span
+        className={`mt-4 flex w-full items-center justify-center gap-1.5 rounded-xl border py-2.5 text-xs font-semibold transition-all duration-300 ${
+          selected
+            ? "border-primary bg-primary text-primary-foreground"
+            : "border-border text-muted-foreground group-hover:border-primary group-hover:bg-primary group-hover:text-primary-foreground"
+        }`}
+      >
+        {selected ? (
+          <>
+            <Check className="size-3.5" />
+            Selecionado
+          </>
+        ) : (
+          "Selecionar"
+        )}
+      </span>
     </button>
   );
 }
