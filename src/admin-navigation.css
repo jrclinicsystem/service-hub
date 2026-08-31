@@ -82,15 +82,18 @@ body:has(a.admin-sidebar-presence-anchor) a.admin-sidebar-presence-anchor {
 
   .persistent-admin-sidebar-item {
     display: flex;
+    box-sizing: border-box;
     width: 100%;
     min-height: 44px;
     flex: 0 0 44px;
     align-items: center;
     justify-content: flex-start;
     gap: 10px;
+    margin: 0;
     padding: 0 12px;
     border: 1px solid transparent;
     border-radius: 12px;
+    outline: none;
     background: transparent;
     color: rgb(255 250 246 / 0.7);
     font-family: inherit;
@@ -99,6 +102,10 @@ body:has(a.admin-sidebar-presence-anchor) a.admin-sidebar-presence-anchor {
     line-height: 1;
     text-align: left;
     cursor: pointer;
+    box-shadow: none;
+    transform: none;
+    appearance: none;
+    -webkit-appearance: none;
     transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease;
   }
 
@@ -111,10 +118,19 @@ body:has(a.admin-sidebar-presence-anchor) a.admin-sidebar-presence-anchor {
     color: rgb(255 250 246 / 0.96);
   }
 
+  .persistent-admin-sidebar-item:focus,
+  .persistent-admin-sidebar-item:focus-visible {
+    outline: none;
+    box-shadow: none;
+  }
+
   .persistent-admin-sidebar-item.is-active {
     border-color: rgb(255 250 246 / 0.12);
     background: rgb(255 250 246 / 0.12);
     color: #fffaf6;
+    outline: none;
+    box-shadow: none;
+    transform: none;
   }
 
   .persistent-admin-sidebar-divider {
