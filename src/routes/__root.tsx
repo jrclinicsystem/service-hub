@@ -230,6 +230,12 @@ function SystemAccess() {
       <Outlet />
       {showAdminShortcuts ? (
         <>
+          <a
+            href="/admin/equipe"
+            className="admin-sidebar-presence-anchor"
+            aria-hidden="true"
+            tabIndex={-1}
+          />
           <button
             type="button"
             onClick={() => openInlineSection("catalog")}
