@@ -47,6 +47,12 @@ async function invokeErrorMessage(error: any) {
   if (code === "nothing_to_pay") {
     return "Este agendamento não possui saldo pendente.";
   }
+  if (code === "appointment_cancelled") {
+    return "Este agendamento foi cancelado e não pode mais receber pagamentos.";
+  }
+  if (code === "initial_payment_not_available" || code === "balance_payment_not_available") {
+    return String(payload?.message || "Este pagamento não está mais disponível.");
+  }
 
   return String(
     payload?.message ||
@@ -122,7 +128,7 @@ export function InfinitePayPaymentDialog({
               <div className="min-w-0 flex-1">
                 <p className="break-words text-base font-semibold leading-snug">{session.serviceName}</p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {session.kind === "deposit" ? "Pagamento de 50% da reserva" : "Pagamento integral do serviço"}
+                  {session.kind === "deposit" ? "Pagamento do sinal da reserva" : "Pagamento integral do serviço"}
                 </p>
               </div>
               <div className="min-w-0 sm:text-right">
