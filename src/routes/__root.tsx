@@ -43,6 +43,11 @@ const TeamInlinePage = lazy(async () => {
   return { default: module.Route.options.component as ComponentType };
 });
 
+const AccessInlinePage = lazy(async () => {
+  const module = await import("./admin_.acessos");
+  return { default: module.Route.options.component as ComponentType };
+});
+
 const FinanceInlinePage = lazy(async () => {
   const module = await import("./admin_.financeiro");
   return { default: module.Route.options.component as ComponentType };
@@ -151,7 +156,7 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
-type InlineAdminSection = "catalog" | "team" | "finance" | null;
+type InlineAdminSection = "catalog" | "team" | "access" | "finance" | null;
 type MainAdminSection = "agendamentos" | "servicos" | "promocoes" | "horarios" | "acessos";
 
 const mainSectionLabels: Record<MainAdminSection, string> = {
@@ -193,7 +198,7 @@ function PersistentAdminSidebar({
       </div>
 
       <nav className="persistent-admin-sidebar-nav">
-        {Object.entries(mainSectionLabels).map(([key, label]) => {
+        {Object.entries(mainSectionLabels).filter(([key]) => key !== "acessos").map(([key, label]) => {
           const section = key as MainAdminSection;
           const Icon = mainSectionIcons[section];
           const active = inlineSection === null && activeMainSection === section;
@@ -232,6 +237,15 @@ function PersistentAdminSidebar({
 
         <button
           type="button"
+          className={`persistent-admin-sidebar-item${inlineSection === "access" ? " is-active" : ""}`}
+          onClick={() => onInlineSection("access")}
+        >
+          <ShieldCheck className="size-4 shrink-0" />
+          <span>Acessos</span>
+        </button>
+
+        <button
+          type="button"
           className={`persistent-admin-sidebar-item${inlineSection === "finance" ? " is-active" : ""}`}
           onClick={() => onInlineSection("finance")}
         >
@@ -260,10 +274,7 @@ function MobileAdminNav({
   onInlineSection: (section: Exclude<InlineAdminSection, null>) => void;
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
-  const moreActive =
-    inlineSection === "team" ||
-    inlineSection === "finance" ||
-    (inlineSection === null && activeMainSection === "acessos");
+  const moreActive = inlineSection === "team" || inlineSection === "access" || inlineSection === "finance";
 
   const selectMain = (section: MainAdminSection) => {
     setMoreOpen(false);
@@ -316,9 +327,9 @@ function MobileAdminNav({
               <span className="admin-mobile-more-option-icon"><CalendarDays /></span>
               <span><strong>Agenda da equipe</strong><small>Agendas e profissionais</small></span>
             </button>
-            <button type="button" className="admin-mobile-more-option" role="menuitem" onClick={() => selectMain("acessos")}>
+            <button type="button" className="admin-mobile-more-option" role="menuitem" onClick={() => selectInline("access")}>
               <span className="admin-mobile-more-option-icon"><ShieldCheck /></span>
-              <span><strong>Acessos</strong><small>Permissões administrativas</small></span>
+              <span><strong>Acessos</strong><small>Administradores e colaboradores</small></span>
             </button>
           </div>
         ) : null}
@@ -358,14 +369,8 @@ function SystemAccess() {
     const target = tabs.find((tab) => (tab.textContent || "").includes(mainSectionLabels[section]));
     if (!target) return;
 
-    // Radix Tabs changes value on mouse down. A synthetic .click() alone does not
-    // activate a trigger that is visually hidden behind the custom mobile nav.
-    target.dispatchEvent(
-      new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0 }),
-    );
-    target.dispatchEvent(
-      new MouseEvent("mouseup", { bubbles: true, cancelable: true, button: 0 }),
-    );
+    target.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0 }));
+    target.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true, button: 0 }));
     target.click();
   };
 
@@ -377,6 +382,7 @@ function SystemAccess() {
 
     void import("./admin_.catalogo");
     void import("./admin_.equipe");
+    void import("./admin_.acessos");
     void import("./admin_.financeiro");
   }, [showAdminShortcuts]);
 
@@ -390,6 +396,10 @@ function SystemAccess() {
     }
     if (section === "equipe") {
       setInlineSection("team");
+      return;
+    }
+    if (section === "acessos") {
+      setInlineSection("access");
       return;
     }
     if (section === "financeiro") {
@@ -413,10 +423,17 @@ function SystemAccess() {
       const target = (event.target as HTMLElement | null)?.closest<HTMLElement>('[role="tab"]');
       if (!target) return;
       const text = target.textContent || "";
-      const matched = (Object.keys(mainSectionLabels) as MainAdminSection[]).find((section) =>
-        text.includes(mainSectionLabels[section]),
-      );
-      if (matched) setActiveMainSection(matched);
+      const matched = (Object.keys(mainSectionLabels) as MainAdminSection[]).find((section) => text.includes(mainSectionLabels[section]));
+      if (!matched) return;
+
+      if (matched === "acessos") {
+        event.preventDefault();
+        setInlineSection("access");
+        window.history.replaceState(window.history.state, "", "/admin#acessos");
+        return;
+      }
+
+      setActiveMainSection(matched);
       setInlineSection(null);
       window.history.replaceState(window.history.state, "", "/admin");
     };
@@ -426,6 +443,11 @@ function SystemAccess() {
   }, [showAdminShortcuts]);
 
   const openMainSection = (section: MainAdminSection) => {
+    if (section === "acessos") {
+      setInlineSection("access");
+      window.history.replaceState(window.history.state, "", "/admin#acessos");
+      return;
+    }
     setInlineSection(null);
     setActiveMainSection(section);
     window.history.replaceState(window.history.state, "", `/admin#${section}`);
@@ -434,7 +456,7 @@ function SystemAccess() {
 
   const openInlineSection = (section: Exclude<InlineAdminSection, null>) => {
     setInlineSection(section);
-    const hash = section === "catalog" ? "catalogo" : section === "team" ? "equipe" : "financeiro";
+    const hash = section === "catalog" ? "catalogo" : section === "team" ? "equipe" : section === "access" ? "acessos" : "financeiro";
     window.history.replaceState(window.history.state, "", `/admin#${hash}`);
   };
 
@@ -443,9 +465,11 @@ function SystemAccess() {
       ? CatalogInlinePage
       : inlineSection === "team"
         ? TeamInlinePage
-        : inlineSection === "finance"
-          ? FinanceInlinePage
-          : null;
+        : inlineSection === "access"
+          ? AccessInlinePage
+          : inlineSection === "finance"
+            ? FinanceInlinePage
+            : null;
 
   return (
     <>
@@ -485,6 +509,15 @@ function SystemAccess() {
           >
             <CalendarDays className="size-4 shrink-0 opacity-80" />
             <span>Agenda da equipe</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => openInlineSection("access")}
+            className={`admin-sidebar-shortcut admin-access-shortcut${inlineSection === "access" ? " is-active" : ""}`}
+            aria-pressed={inlineSection === "access"}
+          >
+            <ShieldCheck className="size-4 shrink-0 opacity-80" />
+            <span>Acessos</span>
           </button>
           <button
             type="button"
