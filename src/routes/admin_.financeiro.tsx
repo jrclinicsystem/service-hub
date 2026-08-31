@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
-import { CircleDollarSign, Clock3, ShieldCheck } from "lucide-react";
+import { CircleDollarSign, ShieldCheck } from "lucide-react";
 
 import { AdminSubpageSidebar } from "@/components/admin-subpage-sidebar";
 import { Button } from "@/components/ui/button";
@@ -44,7 +44,7 @@ async function loadAdminAccess() {
     isAdmin = Boolean(allow.data);
   }
 
-  return { isAdmin, email };
+  return { isAdmin };
 }
 
 function FinancePage() {
@@ -57,7 +57,7 @@ function FinancePage() {
   if (isLoading) {
     return (
       <div className="grid min-h-screen place-items-center bg-background">
-        <p className="text-sm text-muted-foreground">Carregando módulo financeiro...</p>
+        <div className="size-8 animate-pulse rounded-full bg-primary-soft" />
       </div>
     );
   }
@@ -70,9 +70,6 @@ function FinancePage() {
             <ShieldCheck className="size-5" />
           </span>
           <h1 className="mt-5 text-xl font-semibold">Acesso administrativo necessário</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {error instanceof Error ? error.message : "Esta área é exclusiva da administração da JR Clinic."}
-          </p>
           <Button asChild className="mt-5"><Link to="/admin">Voltar ao painel</Link></Button>
         </div>
       </div>
@@ -83,18 +80,22 @@ function FinancePage() {
     <div className="min-h-screen bg-background lg:pl-[252px]">
       <AdminSubpageSidebar active="finance" />
 
-      <main className="mx-auto grid min-h-screen max-w-[1100px] place-items-center px-5 py-16 sm:px-8">
-        <section className="w-full max-w-xl rounded-3xl border border-border bg-card p-8 text-center shadow-soft sm:p-12">
-          <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-primary-soft text-primary">
-            <CircleDollarSign className="size-6" />
-          </span>
-          <p className="mt-6 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Financeiro</p>
-          <h1 className="mt-2 text-3xl font-semibold text-primary sm:text-4xl">Em breve</h1>
-          <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-muted-foreground">
-            O módulo financeiro da JR Clinic está reservado para uma próxima etapa do sistema.
-          </p>
-          <div className="mx-auto mt-6 inline-flex items-center gap-2 rounded-full border border-border bg-secondary/45 px-4 py-2 text-xs font-medium text-muted-foreground">
-            <Clock3 className="size-3.5" /> Em desenvolvimento
+      <main className="grid min-h-screen place-items-center px-5 py-16 sm:px-8">
+        <section className="text-center">
+          <div className="relative mx-auto grid size-20 place-items-center">
+            <span className="absolute inset-2 animate-ping rounded-full bg-primary/10 [animation-duration:2.4s]" />
+            <span className="relative grid size-14 place-items-center rounded-2xl bg-primary-soft text-primary shadow-soft">
+              <CircleDollarSign className="size-6 animate-pulse" />
+            </span>
+          </div>
+
+          <p className="mt-7 text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Financeiro</p>
+          <h1 className="mt-2 text-4xl font-semibold text-primary sm:text-5xl">Em breve</h1>
+
+          <div className="mt-5 flex items-center justify-center gap-1.5" aria-label="Em desenvolvimento">
+            <span className="size-1.5 animate-bounce rounded-full bg-accent [animation-delay:-0.3s]" />
+            <span className="size-1.5 animate-bounce rounded-full bg-accent [animation-delay:-0.15s]" />
+            <span className="size-1.5 animate-bounce rounded-full bg-accent" />
           </div>
         </section>
       </main>
