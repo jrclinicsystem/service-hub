@@ -12,9 +12,9 @@ const nav = [
 export function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-primary-foreground/10 bg-primary/95 backdrop-blur-xl">
-      <div className="mx-auto flex h-14 max-w-[1520px] items-center justify-between px-4 sm:h-16 sm:px-8 md:h-[72px] lg:px-10">
+      <div className="mx-auto flex h-16 max-w-[1520px] items-center justify-between px-4 sm:h-[72px] sm:px-8 md:h-20 lg:px-10">
         <Link to="/" preload="intent" className="flex items-center">
-          <img src={logo} alt="JR Clinic" className="h-8 w-auto brightness-0 invert sm:h-11 md:h-12" />
+          <img src={logo} alt="JR Clinic" className="h-9 w-auto brightness-0 invert sm:h-12 md:h-[52px]" />
         </Link>
 
         <nav className="hidden items-center gap-8 text-sm text-primary-foreground/70 md:flex lg:gap-9">
