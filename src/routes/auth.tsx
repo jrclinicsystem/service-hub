@@ -132,8 +132,8 @@ function AuthPage() {
   };
 
   const signUp = async () => {
-    if (!name.trim() || !email.trim() || password.length < 6) {
-      toast.error("Preencha nome, e-mail e uma senha de pelo menos 6 caracteres.");
+    if (!name.trim() || !email.trim() || password.length < 8) {
+      toast.error("Preencha nome, e-mail e uma senha de pelo menos 8 caracteres.");
       return;
     }
 
@@ -265,7 +265,7 @@ function AuthPage() {
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   className="mt-2 h-11 rounded-xl"
-                  placeholder="Mínimo de 6 caracteres"
+                  placeholder="Mínimo de 8 caracteres"
                 />
               </div>
               <Button
