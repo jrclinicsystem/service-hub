@@ -4,6 +4,7 @@ import { ChevronLeft, Eye, Sparkles, Star } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { AdminSubpageSidebar } from "@/components/admin-subpage-sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -140,8 +141,10 @@ function CatalogHighlightPage() {
   const featured = data.categories.find((category: any) => category.is_featured);
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card/95 backdrop-blur-xl">
+    <div className="min-h-screen bg-background lg:pl-[252px]">
+      <AdminSubpageSidebar active="catalog" />
+
+      <header className="sticky top-0 z-40 border-b border-border bg-card/95 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-[1180px] items-center justify-between px-4 sm:px-8">
           <Button variant="ghost" size="sm" asChild>
             <Link to="/admin"><ChevronLeft className="size-4" /> Painel</Link>
