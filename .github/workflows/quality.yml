@@ -29,4 +29,5 @@ jobs:
         run: bun run lint
 
       - name: Production build
+        if: always()
         run: bun run build
