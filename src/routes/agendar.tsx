@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
+import { CreditCard, HandCoins, Landmark, WalletCards } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -77,8 +78,8 @@ function Agendar() {
   const { user } = useAuth();
   const submitAppointment = useServerFn(createBookingAppointment);
 
-  const selectedSlug = servico ?? services[0]?.slug ?? "";
-  const service = services.find((item) => item.slug === selectedSlug) ?? services[0];
+  const selectedSlug = servico ?? "";
+  const service = services.find((item) => item.slug === selectedSlug);
 
   const professionals = useMemo(() => {
     if (!service) return [];
@@ -101,14 +102,29 @@ function Agendar() {
   const [busy, setBusy] = useState(false);
 
   const selectedProfessional = professionals.find((item: any) => item.id === professionalId) ?? professionals[0];
+  const hasService = Boolean(service);
   const total = Number(service?.price ?? 0);
   const safeDepositPercent = Number.isFinite(Number(depositPercent)) ? Number(depositPercent) : 50;
-  const depositValue = Math.min(total, Math.max(0.01, Math.round(total * safeDepositPercent) / 100));
+  const depositValue = hasService
+    ? Math.min(total, Math.max(0.01, Math.round(total * safeDepositPercent) / 100))
+    : 0;
   const depositLabel = Number.isInteger(safeDepositPercent)
     ? `${safeDepositPercent}%`
     : `${safeDepositPercent.toFixed(1).replace(".", ",")}%`;
-  const paymentNow = paymentChoice === "deposit" ? depositValue : paymentChoice === "full" ? total : 0;
-  const remaining = paymentChoice === "deposit" ? Math.max(0, total - depositValue) : paymentChoice === "full" ? 0 : total;
+  const paymentNow = !hasService
+    ? 0
+    : paymentChoice === "deposit"
+      ? depositValue
+      : paymentChoice === "full"
+        ? total
+        : 0;
+  const remaining = !hasService
+    ? 0
+    : paymentChoice === "deposit"
+      ? Math.max(0, total - depositValue)
+      : paymentChoice === "full"
+        ? 0
+        : total;
 
   useEffect(() => {
     setProfessionalId(professionals[0]?.id ?? "");
@@ -116,7 +132,7 @@ function Agendar() {
     setPaymentChoice("deposit");
     setPaymentSession(null);
     setPaymentOpen(false);
-  }, [service?.id]);
+  }, [service?.id, professionals]);
 
   useEffect(() => {
     if (!user) return;
@@ -210,7 +226,7 @@ function Agendar() {
     }
   };
 
-  if (!service) {
+  if (services.length === 0) {
     return (
       <div className="min-h-screen">
         <SiteHeader />
@@ -250,32 +266,40 @@ function Agendar() {
               <div className="mt-4">
                 <Label htmlFor="servico">Escolha o atendimento</Label>
                 <Select
-                  value={selectedSlug}
+                  value={selectedSlug || undefined}
                   onValueChange={(value) => {
                     resetPreparedPayment();
                     navigate({ search: { servico: value }, replace: true });
                   }}
                 >
-                  <SelectTrigger id="servico" className="mt-2 h-11 rounded-xl"><SelectValue /></SelectTrigger>
+                  <SelectTrigger id="servico" className="mt-2 h-11 rounded-xl">
+                    <SelectValue placeholder="Selecione um serviço" />
+                  </SelectTrigger>
                   <SelectContent>{services.map((item) => <SelectItem key={item.slug} value={item.slug}>{item.name}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
 
               <div className="mt-4">
                 <Label htmlFor="profissional">Quem você prefere?</Label>
-                <Select value={professionalId} onValueChange={(value) => { setProfessionalId(value); setTime(null); resetPreparedPayment(); }}>
-                  <SelectTrigger id="profissional" className="mt-2 h-11 rounded-xl"><SelectValue placeholder="Escolha o profissional" /></SelectTrigger>
+                <Select
+                  value={professionalId || undefined}
+                  disabled={!service}
+                  onValueChange={(value) => { setProfessionalId(value); setTime(null); resetPreparedPayment(); }}
+                >
+                  <SelectTrigger id="profissional" className="mt-2 h-11 rounded-xl">
+                    <SelectValue placeholder={service ? "Escolha o profissional" : "Selecione um serviço primeiro"} />
+                  </SelectTrigger>
                   <SelectContent>{professionals.map((item: any) => <SelectItem key={item.id} value={item.id}>{item.name} · {item.specialty}</SelectItem>)}</SelectContent>
                 </Select>
-                {professionals.length === 0 ? <p className="mt-2 text-xs text-destructive">Nenhum profissional está vinculado a este serviço.</p> : null}
+                {service && professionals.length === 0 ? <p className="mt-2 text-xs text-destructive">Nenhum profissional está vinculado a este serviço.</p> : null}
               </div>
 
               <div className="mt-3 flex items-center justify-between rounded-xl bg-secondary/60 px-3 py-2.5 sm:hidden">
                 <div>
-                  <p className="text-xs font-medium">{selectedProfessional?.name ?? "Escolha o profissional"}</p>
-                  <p className="mt-0.5 text-[10px] text-muted-foreground">{service.duration_min} min</p>
+                  <p className="text-xs font-medium">{service ? (selectedProfessional?.name ?? "Escolha o profissional") : "Nenhum serviço selecionado"}</p>
+                  <p className="mt-0.5 text-[10px] text-muted-foreground">{service ? `${service.duration_min} min` : "Selecione um atendimento para continuar"}</p>
                 </div>
-                <p className="text-sm font-semibold text-primary">{formatPrice(total)}</p>
+                <p className="text-sm font-semibold text-primary">{service ? formatPrice(total) : "—"}</p>
               </div>
             </section>
 
@@ -286,9 +310,9 @@ function Agendar() {
                   <button
                     key={item.key}
                     type="button"
-                    disabled={item.disabled}
+                    disabled={item.disabled || !service}
                     onClick={() => { setDay(item.key); resetPreparedPayment(); }}
-                    className={`w-[54px] shrink-0 rounded-xl border px-2 py-2.5 text-center transition disabled:opacity-35 sm:w-auto ${day === item.key ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background hover:bg-secondary"}`}
+                    className={`w-[54px] shrink-0 rounded-xl border px-2 py-2.5 text-center transition disabled:opacity-35 sm:w-auto ${day === item.key && service ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background hover:bg-secondary"}`}
                   >
                     <span className="block text-[9px] opacity-70">{item.weekday}</span>
                     <span className="mt-0.5 block text-sm font-semibold">{item.label}</span>
@@ -302,7 +326,7 @@ function Agendar() {
                   <button
                     key={slot.slot}
                     type="button"
-                    disabled={!slot.is_available || !professionalId}
+                    disabled={!slot.is_available || !professionalId || !service}
                     onClick={() => { setTime(slot.slot); resetPreparedPayment(); }}
                     className={`rounded-xl border px-2 py-2.5 text-xs font-medium transition disabled:opacity-35 sm:text-sm ${time === slot.slot ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background hover:bg-secondary"}`}
                   >
@@ -324,36 +348,40 @@ function Agendar() {
 
             <section className="rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-6">
               <div>
-                <h2 className="text-base font-semibold sm:text-lg">Como deseja pagar?</h2>
-                <p className="mt-1 text-xs text-muted-foreground">Escolha a condição mais conveniente para este agendamento.</p>
+                <h2 className="text-base font-semibold sm:text-lg">Métodos de pagamento</h2>
+                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                  {service
+                    ? "Escolha como deseja pagar este agendamento. Os detalhes completos aparecem na próxima etapa."
+                    : "Selecione um serviço acima para ver os valores reais de cada opção de pagamento."}
+                </p>
               </div>
 
-              <div className="mt-4 grid gap-2.5 lg:grid-cols-3">
+              <div className="mt-4 grid gap-2 sm:grid-cols-3">
                 <PaymentOption
+                  icon={Landmark}
                   selected={paymentChoice === "deposit"}
-                  disabled={Boolean(paymentSession)}
+                  disabled={!service || Boolean(paymentSession)}
                   title={`Pagar ${depositLabel} online`}
-                  description="Reserva o horário pela InfinitePay e deixa o restante para a clínica."
-                  value={formatPrice(depositValue)}
-                  footer={`Restante: ${formatPrice(Math.max(0, total - depositValue))}`}
+                  value={service ? formatPrice(depositValue) : "—"}
+                  badge="Online"
                   onClick={() => { setPaymentChoice("deposit"); resetPreparedPayment(); }}
                 />
                 <PaymentOption
+                  icon={CreditCard}
                   selected={paymentChoice === "full"}
-                  disabled={Boolean(paymentSession)}
-                  title="Pagar tudo online"
-                  description="Quita o serviço inteiro agora pela InfinitePay."
-                  value={formatPrice(total)}
-                  footer="Restante: R$ 0,00"
+                  disabled={!service || Boolean(paymentSession)}
+                  title="Pagar valor total"
+                  value={service ? formatPrice(total) : "—"}
+                  badge="Online"
                   onClick={() => { setPaymentChoice("full"); resetPreparedPayment(); }}
                 />
                 <PaymentOption
+                  icon={HandCoins}
                   selected={paymentChoice === "onsite"}
-                  disabled={Boolean(paymentSession)}
+                  disabled={!service || Boolean(paymentSession)}
                   title="Pagar presencialmente"
-                  description="Não paga nada agora. A negociação e o pagamento ficam para a clínica."
-                  value={formatPrice(0)}
-                  footer={`Na clínica: ${formatPrice(total)}`}
+                  value={service ? "Na clínica" : "—"}
+                  badge="Presencial"
                   onClick={() => { setPaymentChoice("onsite"); resetPreparedPayment(); }}
                 />
               </div>
@@ -361,23 +389,23 @@ function Agendar() {
           </div>
 
           <aside className="hidden min-w-0 lg:block">
-            <div className="sticky top-24 rounded-2xl border border-border bg-card p-6 shadow-soft">
+            <div className="sticky top-[120px] rounded-2xl border border-border bg-card p-6 shadow-soft">
               <h2 className="text-lg font-semibold">Resumo</h2>
               <dl className="mt-4 space-y-3 text-sm">
-                <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Serviço</dt><dd className="text-right font-medium">{service.name}</dd></div>
+                <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Serviço</dt><dd className="text-right font-medium">{service?.name ?? "Não selecionado"}</dd></div>
                 <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Profissional</dt><dd className="text-right font-medium">{selectedProfessional?.name ?? "—"}</dd></div>
-                <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Data</dt><dd className="text-right font-medium">{new Date(`${day}T12:00:00`).toLocaleDateString("pt-BR")} · {time ?? "—"}</dd></div>
-                <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Duração</dt><dd className="text-right font-medium">{service.duration_min} min</dd></div>
+                <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Data</dt><dd className="text-right font-medium">{service ? `${new Date(`${day}T12:00:00`).toLocaleDateString("pt-BR")} · ${time ?? "—"}` : "—"}</dd></div>
+                <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Duração</dt><dd className="text-right font-medium">{service ? `${service.duration_min} min` : "—"}</dd></div>
               </dl>
 
               <Separator className="my-5" />
-              <div className="flex items-center justify-between"><span className="text-sm text-muted-foreground">Valor do serviço</span><span className="text-xl font-semibold">{formatPrice(total)}</span></div>
+              <div className="flex items-center justify-between"><span className="text-sm text-muted-foreground">Valor do serviço</span><span className="text-xl font-semibold">{service ? formatPrice(total) : "—"}</span></div>
               <div className="mt-3 rounded-xl bg-primary-soft/60 px-3 py-3">
-                <div className="flex items-center justify-between"><span className="text-sm font-medium text-primary">Pagar agora</span><span className="text-2xl font-semibold text-primary">{formatPrice(paymentNow)}</span></div>
-                <div className="mt-1 flex items-center justify-between text-xs"><span className="text-muted-foreground">Restante</span><span className="font-medium">{formatPrice(remaining)}</span></div>
+                <div className="flex items-center justify-between"><span className="text-sm font-medium text-primary">Pagar agora</span><span className="text-2xl font-semibold text-primary">{service ? formatPrice(paymentNow) : "—"}</span></div>
+                <div className="mt-1 flex items-center justify-between text-xs"><span className="text-muted-foreground">Restante</span><span className="font-medium">{service ? formatPrice(remaining) : "—"}</span></div>
               </div>
               <p className="mt-3 text-xs text-muted-foreground">
-                {paymentChoice === "deposit" ? `${depositLabel} online pela InfinitePay.` : paymentChoice === "full" ? "Pagamento integral online pela InfinitePay." : "Pagamento integral presencial na clínica."}
+                {!service ? "Selecione o serviço para calcular os valores." : paymentChoice === "deposit" ? `${depositLabel} online pela InfinitePay.` : paymentChoice === "full" ? "Pagamento integral online pela InfinitePay." : "Pagamento integral presencial na clínica."}
               </p>
               <Button size="lg" className="mt-6 w-full rounded-full" disabled={!canConfirm || busy} onClick={confirm}>{buttonLabel}</Button>
             </div>
@@ -385,13 +413,13 @@ function Agendar() {
         </div>
       </main>
 
-      <div className="fixed bottom-[calc(63px+env(safe-area-inset-bottom))] left-0 right-0 z-[60] border-t border-border bg-card/95 px-3 py-3 shadow-[0_-8px_30px_rgba(0,0,0,0.06)] backdrop-blur-xl md:bottom-0 lg:hidden">
+      <div className="fixed bottom-[calc(63px+env(safe-area-inset-bottom))] left-0 right-0 z-[60] border-t border-border bg-card/95 px-3 py-2.5 shadow-[0_-8px_30px_rgba(0,0,0,0.06)] backdrop-blur-xl md:bottom-0 lg:hidden">
         <div className="mx-auto flex max-w-lg items-center gap-2.5">
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[10px] text-muted-foreground">{paymentChoice === "deposit" ? `${depositLabel} online` : paymentChoice === "full" ? "Pagamento total online" : "Pagamento presencial"}</p>
-            <p className="text-base font-semibold leading-tight text-primary">{formatPrice(paymentNow)}</p>
+            <p className="truncate text-[10px] text-muted-foreground">{!service ? "Selecione um serviço" : paymentChoice === "deposit" ? `${depositLabel} online` : paymentChoice === "full" ? "Pagamento total online" : "Pagamento presencial"}</p>
+            <p className="text-base font-semibold leading-tight text-primary">{service ? (paymentChoice === "onsite" ? "Na clínica" : formatPrice(paymentNow)) : "—"}</p>
           </div>
-          <Button className="h-11 min-w-[162px] shrink-0 rounded-full px-4" disabled={!canConfirm || busy} onClick={confirm}>{buttonLabel}</Button>
+          <Button className="h-10 min-w-[146px] shrink-0 rounded-full px-4 text-sm" disabled={!canConfirm || busy} onClick={confirm}>{buttonLabel}</Button>
         </div>
       </div>
 
@@ -401,13 +429,13 @@ function Agendar() {
   );
 }
 
-function PaymentOption({ selected, disabled, title, description, value, footer, onClick }: {
+function PaymentOption({ icon: Icon, selected, disabled, title, value, badge, onClick }: {
+  icon: typeof WalletCards;
   selected: boolean;
   disabled: boolean;
   title: string;
-  description: string;
   value: string;
-  footer: string;
+  badge: string;
   onClick: () => void;
 }) {
   return (
@@ -415,13 +443,20 @@ function PaymentOption({ selected, disabled, title, description, value, footer, 
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className={`rounded-2xl border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-70 ${selected ? "border-primary bg-primary-soft/60 shadow-sm" : "border-border bg-background hover:bg-secondary/40"}`}
+      className={`group rounded-xl border px-3 py-3 text-left transition disabled:cursor-not-allowed disabled:opacity-45 ${selected ? "border-primary bg-primary-soft/65 shadow-sm" : "border-border bg-background hover:border-primary/25 hover:bg-secondary/35"}`}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0"><p className="text-sm font-semibold">{title}</p><p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">{description}</p></div>
-        <span className="shrink-0 text-base font-semibold text-primary">{value}</span>
+      <div className="flex items-start gap-2.5">
+        <span className={`grid size-8 shrink-0 place-items-center rounded-lg ${selected ? "bg-primary text-primary-foreground" : "bg-secondary text-primary"}`}>
+          <Icon className="size-4" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[13px] font-semibold leading-tight sm:text-sm">{title}</p>
+            <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-[9px] font-medium uppercase tracking-wide text-muted-foreground">{badge}</span>
+          </div>
+          <p className="mt-2 text-[17px] font-semibold leading-none text-primary sm:text-lg">{value}</p>
+        </div>
       </div>
-      <p className="mt-3 text-xs font-medium">{footer}</p>
     </button>
   );
 }
