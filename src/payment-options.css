@@ -18,26 +18,19 @@ button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.te
   color: inherit !important;
   box-shadow: 0 10px 28px -24px rgb(15 77 62 / 0.3) !important;
   --tw-ring-shadow: 0 0 #0000 !important;
-  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+  transition: transform 180ms ease, box-shadow 180ms ease;
 }
 
-/* Card itself stays neutral/vazado. Hover only gives subtle elevation. */
+/* The card itself never changes color; hover only adds a tiny lift. */
 button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center:not(:disabled):hover {
   transform: translateY(-2px);
-  border-color: color-mix(in srgb, var(--accent) 35%, var(--border)) !important;
+  border-color: var(--border) !important;
   background: color-mix(in srgb, var(--card) 94%, var(--secondary)) !important;
   color: inherit !important;
-  box-shadow: 0 18px 38px -28px color-mix(in srgb, var(--accent) 38%, transparent) !important;
+  box-shadow: 0 16px 34px -28px rgb(15 77 62 / 0.34) !important;
 }
 
-/* Selected card also stays neutral; only a subtle outline indicates selection. */
-button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center[class*="border-primary"] {
-  border-color: color-mix(in srgb, var(--accent) 62%, var(--border)) !important;
-  background: color-mix(in srgb, var(--card) 94%, var(--secondary)) !important;
-  color: inherit !important;
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 14%, transparent), 0 14px 30px -26px color-mix(in srgb, var(--accent) 32%, transparent) !important;
-}
-
+/* ONLINE / PRESENCIAL tags stay green. */
 button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center > span.absolute {
   top: -0.65rem;
   min-width: 4.25rem;
@@ -75,13 +68,7 @@ button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.te
   letter-spacing: -0.025em;
 }
 
-/* Keep card text unchanged even on hover/selected. */
-button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center:not(:disabled):hover > p,
-button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center[class*="border-primary"] > p {
-  color: inherit !important;
-}
-
-/* ONLY the small action button changes color. */
+/* Default state: ONLY the small Selecionar button is green. */
 button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center > span.mt-4.flex.w-full {
   margin-top: auto !important;
   border-color: var(--primary) !important;
@@ -92,7 +79,7 @@ button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.te
   transition: transform 180ms ease, background-color 180ms ease, border-color 180ms ease, color 180ms ease, box-shadow 180ms ease;
 }
 
-/* Hover: only the action button turns brown. */
+/* Hover: ONLY the small action button turns brand brown. */
 button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center:not(:disabled):hover > span.mt-4.flex.w-full {
   transform: translateY(-1px);
   border-color: var(--accent) !important;
@@ -101,8 +88,9 @@ button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.te
   box-shadow: 0 12px 24px -16px color-mix(in srgb, var(--accent) 78%, transparent) !important;
 }
 
-/* Selected: only the action button remains brown after the pointer leaves. */
-button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center[class*="border-primary"] > span.mt-4.flex.w-full {
+/* Selected is detected by the check icon rendered inside the action button.
+   This avoids matching Tailwind's hover:border-primary class on unselected cards. */
+button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center:has(> span.mt-4.flex.w-full > svg) > span.mt-4.flex.w-full {
   border-color: var(--accent) !important;
   background: var(--accent) !important;
   color: #fff !important;
