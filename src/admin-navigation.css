@@ -23,7 +23,6 @@ body:has(a.admin-sidebar-presence-anchor) a.admin-sidebar-presence-anchor {
 
 /* Mobile admin navigation: four primary apps + a central expandable app launcher. */
 @media (max-width: 639px) {
-  /* The old Radix tab list remains mounted for tab state, but is no longer the visible mobile nav. */
   body:has(.admin-mobile-nav) main.max-w-\[1480px\] div:has(> [role="tablist"]) {
     display: none !important;
   }
@@ -235,7 +234,6 @@ body:has(a.admin-sidebar-presence-anchor) a.admin-sidebar-presence-anchor {
 }
 
 @media (min-width: 1024px) {
-  /* Keep the original admin sidebar visible/clickable. Only the three extra items are injected. */
   .admin-sidebar-shortcut {
     position: fixed !important;
     left: 18px !important;
@@ -315,8 +313,13 @@ body:has(a.admin-sidebar-presence-anchor) a.admin-sidebar-presence-anchor {
     pointer-events: none;
   }
 
-  .admin-finance-shortcut {
+  .admin-access-shortcut {
     top: 492px !important;
+    bottom: auto !important;
+  }
+
+  .admin-finance-shortcut {
+    top: 541px !important;
     bottom: auto !important;
   }
 }
