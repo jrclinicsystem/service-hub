@@ -69,8 +69,7 @@ button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.te
   letter-spacing: -0.025em;
 }
 
-button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center > span.mt-4.flex.w-full,
-button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center[class*="border-primary"] > span.mt-4.flex.w-full {
+button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center > span.mt-4.flex.w-full {
   margin-top: auto !important;
   border-color: var(--primary) !important;
   background: var(--primary) !important;
@@ -80,11 +79,14 @@ button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.te
   transition: transform 180ms ease, background-color 180ms ease, border-color 180ms ease, color 180ms ease, box-shadow 180ms ease;
 }
 
+/* Selected payment method stays brown, matching the hover state. */
+button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center[class*="border-primary"] > span.mt-4.flex.w-full,
 button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center:not(:disabled):hover > span.mt-4.flex.w-full {
   transform: translateY(-1px);
   border-color: var(--accent) !important;
   background: var(--accent) !important;
   color: #fff !important;
+  box-shadow: 0 12px 24px -16px color-mix(in srgb, var(--accent) 78%, transparent) !important;
 }
 
 button.group.relative.flex.flex-col.items-center.rounded-2xl.border.px-4.py-6.text-center:disabled {
