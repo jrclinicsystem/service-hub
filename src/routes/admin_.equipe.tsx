@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   CalendarDays,
   CalendarPlus,
+  Camera,
   Check,
   CheckCircle2,
   ChevronLeft,
@@ -15,6 +16,7 @@ import {
   Plus,
   RefreshCw,
   ShieldCheck,
+  Trash2,
   UserRound,
   Users,
 } from "lucide-react";
@@ -22,6 +24,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import logo from "@/assets/jr-clinic-logo.png";
+import { AdminSubpageSidebar } from "@/components/admin-subpage-sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -48,6 +51,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { formatDate } from "@/lib/clinic";
 
 const db = supabase as any;
+const AVATAR_BUCKET = "professional-avatars";
+const MAX_AVATAR_SIZE = 5 * 1024 * 1024;
 
 export const Route = createFileRoute("/admin_/equipe")({
   ssr: false,
@@ -86,6 +91,52 @@ function initials(name: string) {
     .join("") || "JR";
 }
 
+function avatarPathFromUrl(url?: string | null) {
+  if (!url) return null;
+  const marker = `/storage/v1/object/public/${AVATAR_BUCKET}/`;
+  const index = url.indexOf(marker);
+  if (index < 0) return null;
+  return decodeURIComponent(url.slice(index + marker.length));
+}
+
+function validateAvatar(file: File) {
+  const allowed = ["image/jpeg", "image/png", "image/webp"];
+  if (!allowed.includes(file.type)) throw new Error("Use uma foto JPG, PNG ou WEBP.");
+  if (file.size > MAX_AVATAR_SIZE) throw new Error("A foto deve ter no máximo 5 MB.");
+}
+
+async function uploadProfessionalAvatar(professionalId: string, file: File) {
+  validateAvatar(file);
+  const extension = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+  const path = `${professionalId}/${Date.now()}.${extension}`;
+  const upload = await supabase.storage.from(AVATAR_BUCKET).upload(path, file, {
+    cacheControl: "3600",
+    contentType: file.type,
+    upsert: false,
+  });
+  if (upload.error) throw upload.error;
+  const { data } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(upload.data.path);
+  return { path: upload.data.path, url: data.publicUrl };
+}
+
+function ProfessionalAvatar({ professional, className = "size-14" }: { professional: any; className?: string }) {
+  if (professional.avatar_url) {
+    return (
+      <img
+        src={professional.avatar_url}
+        alt={`Foto de ${professional.name}`}
+        className={`${className} shrink-0 rounded-2xl object-cover shadow-sm ring-1 ring-black/5`}
+      />
+    );
+  }
+
+  return (
+    <div className={`grid ${className} shrink-0 place-items-center rounded-2xl bg-primary text-base font-semibold text-primary-foreground shadow-sm`}>
+      {initials(professional.name)}
+    </div>
+  );
+}
+
 async function loadTeamAgenda() {
   const { data: userData, error: userError } = await supabase.auth.getUser();
   if (userError || !userData.user) throw new Error("Sessão expirada. Entre novamente.");
@@ -96,8 +147,8 @@ async function loadTeamAgenda() {
   if (!isAdmin) return { isAdmin: false as const, currentEmail: userData.user.email ?? "" };
 
   const [professionals, access, appointments, services, serviceProfessionals] = await Promise.all([
-    db.from("professionals").select("id, name, specialty, is_active, sort_order").order("sort_order").order("name"),
-    db.from("professional_access").select("id, professional_id, email, enabled, created_at, updated_at").order("created_at"),
+    db.from("professionals").select("id, name, specialty, avatar_url, is_active, sort_order").order("sort_order").order("name"),
+    db.from("professional_access").select("id, professional_id, email, enabled, created_by, created_at, updated_at").order("created_at"),
     db
       .from("appointments")
       .select(
@@ -177,15 +228,17 @@ function TeamAgendaPage() {
     : null;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background lg:pl-[252px]">
+      <AdminSubpageSidebar active="team" />
+
       <header className="sticky top-0 z-40 border-b border-border/80 bg-card/95 backdrop-blur-xl">
         <div className="mx-auto flex h-14 max-w-[1480px] items-center justify-between px-4 sm:h-16 sm:px-8">
           <div className="flex min-w-0 items-center gap-3">
-            <img src={logo} alt="JR Clinic" className="h-7 w-auto sm:h-9" />
-            <span className="hidden h-6 w-px bg-border sm:block" />
-            <div className="hidden sm:block">
+            <img src={logo} alt="JR Clinic" className="h-7 w-auto sm:h-9 lg:hidden" />
+            <span className="hidden h-6 w-px bg-border sm:block lg:hidden" />
+            <div className="min-w-0">
               <p className="text-sm font-semibold">Agenda da equipe</p>
-              <p className="text-[11px] text-muted-foreground">Uma agenda para cada profissional</p>
+              <p className="hidden text-[11px] text-muted-foreground sm:block">Uma agenda para cada profissional</p>
             </div>
           </div>
           <div className="flex items-center gap-1.5">
@@ -231,7 +284,7 @@ function TeamCardsView({ data, onOpenAgenda, onSaved, onRefresh }: any) {
 
   return (
     <main className="mx-auto max-w-[1480px] px-4 pb-16 pt-6 sm:px-8 sm:py-10">
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+      <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
         <div>
           <span className="eyebrow text-muted-foreground">Equipe</span>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Agendas da equipe</h1>
@@ -240,11 +293,7 @@ function TeamCardsView({ data, onOpenAgenda, onSaved, onRefresh }: any) {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <CreateAgendaDialog
-            professionals={data.professionals}
-            services={data.services}
-            onSaved={onSaved}
-          />
+          <CreateAgendaDialog professionals={data.professionals} services={data.services} onSaved={onSaved} />
           <Button variant="outline" className="rounded-full" onClick={onRefresh}>
             <RefreshCw className="size-4" /> Atualizar
           </Button>
@@ -276,7 +325,7 @@ function TeamCardsView({ data, onOpenAgenda, onSaved, onRefresh }: any) {
             <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">Crie a primeira agenda da equipe e vincule o e-mail que o funcionário usará para entrar.</p>
           </div>
         ) : (
-          <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="mt-5 grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
             {data.professionals.map((professional: any) => {
               const access = data.access.find((item: any) => item.professional_id === professional.id);
               const appointments = data.appointments.filter((item: any) => item.professional_id === professional.id);
@@ -290,21 +339,19 @@ function TeamCardsView({ data, onOpenAgenda, onSaved, onRefresh }: any) {
                   key={professional.id}
                   className={`group relative overflow-hidden rounded-3xl border bg-card p-5 shadow-soft transition duration-200 hover:-translate-y-0.5 hover:shadow-elegant ${professional.is_active ? "border-border" : "border-border opacity-65"}`}
                 >
-                  <div className="flex items-start gap-3.5">
-                    <div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-primary text-sm font-semibold text-primary-foreground shadow-sm">
-                      {initials(professional.name)}
-                    </div>
+                  <div className="flex items-start gap-4">
+                    <ProfessionalAvatar professional={professional} className="size-14" />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <h3 className="truncate text-base font-semibold">{professional.name}</h3>
-                          <p className="mt-0.5 truncate text-xs text-muted-foreground">{professional.specialty || "Profissional JR Clinic"}</p>
+                          <h3 className="truncate text-xl font-semibold leading-tight tracking-tight">{professional.name}</h3>
+                          <p className="mt-1 truncate text-xs text-muted-foreground">{professional.specialty || "Profissional JR Clinic"}</p>
                         </div>
                         <Badge variant={professional.is_active ? "default" : "secondary"} className="shrink-0 rounded-full text-[9px]">
                           {professional.is_active ? "Ativa" : "Pausada"}
                         </Badge>
                       </div>
-                      <p className="mt-2 flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
+                      <p className="mt-2.5 flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
                         <Mail className="size-3 shrink-0" />
                         <span className="truncate">{access?.email || "E-mail de acesso não configurado"}</span>
                       </p>
@@ -377,12 +424,16 @@ function ProfessionalAgendaView({ professional, access, appointments, services, 
         <div className="bg-primary px-5 py-5 text-primary-foreground sm:px-7 sm:py-6">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-center gap-4">
-              <div className="grid size-14 shrink-0 place-items-center rounded-2xl bg-white/14 text-base font-semibold ring-1 ring-white/15">
-                {initials(professional.name)}
-              </div>
+              {professional.avatar_url ? (
+                <img src={professional.avatar_url} alt={`Foto de ${professional.name}`} className="size-16 shrink-0 rounded-2xl object-cover ring-2 ring-white/15 sm:size-20" />
+              ) : (
+                <div className="grid size-16 shrink-0 place-items-center rounded-2xl bg-white/14 text-lg font-semibold ring-1 ring-white/15 sm:size-20 sm:text-xl">
+                  {initials(professional.name)}
+                </div>
+              )}
               <div className="min-w-0">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/65">Agenda individual</p>
-                <h1 className="mt-1 truncate text-2xl font-semibold sm:text-3xl">{professional.name}</h1>
+                <h1 className="mt-1 truncate text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">{professional.name}</h1>
                 <p className="mt-1 text-sm text-white/70">{professional.specialty || "Profissional JR Clinic"}</p>
               </div>
             </div>
@@ -425,7 +476,7 @@ function ProfessionalAgendaView({ professional, access, appointments, services, 
       <section className="mt-8">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h2 className="text-lg font-semibold">Atendimentos de {professional.name.split(" ")[0]}</h2>
+            <h2 className="text-xl font-semibold sm:text-2xl">Atendimentos de {professional.name.split(" ")[0]}</h2>
             <p className="mt-1 text-xs text-muted-foreground">Cadastre e gerencie os compromissos diretamente nesta agenda.</p>
           </div>
           <div className="flex gap-2">
@@ -456,13 +507,32 @@ function CreateAgendaDialog({ professionals, services, onSaved }: any) {
   const [specialty, setSpecialty] = useState("");
   const [email, setEmail] = useState("");
   const [serviceIds, setServiceIds] = useState<string[]>([]);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  useEffect(() => () => { if (photoPreview) URL.revokeObjectURL(photoPreview); }, [photoPreview]);
+
   const reset = () => {
+    if (photoPreview) URL.revokeObjectURL(photoPreview);
     setName("");
     setSpecialty("");
     setEmail("");
     setServiceIds([]);
+    setPhotoFile(null);
+    setPhotoPreview(null);
+  };
+
+  const choosePhoto = (file?: File) => {
+    if (!file) return;
+    try {
+      validateAvatar(file);
+      if (photoPreview) URL.revokeObjectURL(photoPreview);
+      setPhotoFile(file);
+      setPhotoPreview(URL.createObjectURL(file));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Foto inválida.");
+    }
   };
 
   const toggleService = (id: string) => {
@@ -478,15 +548,23 @@ function CreateAgendaDialog({ professionals, services, onSaved }: any) {
 
     setBusy(true);
     let createdProfessionalId: string | null = null;
+    let uploadedPath: string | null = null;
     try {
       const maxSort = professionals.reduce((max: number, item: any) => Math.max(max, Number(item.sort_order ?? 0)), 0);
       const professionalResult = await db
         .from("professionals")
-        .insert({ name: name.trim(), specialty: specialty.trim(), is_active: true, sort_order: maxSort + 1 })
+        .insert({ name: name.trim(), specialty: specialty.trim(), is_active: true, sort_order: maxSort + 1, avatar_url: null })
         .select("id")
         .single();
       if (professionalResult.error) throw professionalResult.error;
       createdProfessionalId = professionalResult.data.id;
+
+      if (photoFile) {
+        const uploaded = await uploadProfessionalAvatar(createdProfessionalId, photoFile);
+        uploadedPath = uploaded.path;
+        const updatePhoto = await db.from("professionals").update({ avatar_url: uploaded.url }).eq("id", createdProfessionalId);
+        if (updatePhoto.error) throw updatePhoto.error;
+      }
 
       const { data: userData } = await supabase.auth.getUser();
       const accessResult = await db.from("professional_access").insert({
@@ -510,6 +588,7 @@ function CreateAgendaDialog({ professionals, services, onSaved }: any) {
       reset();
       onSaved();
     } catch (error: any) {
+      if (uploadedPath) await supabase.storage.from(AVATAR_BUCKET).remove([uploadedPath]);
       if (createdProfessionalId) {
         await db.from("professional_access").delete().eq("professional_id", createdProfessionalId);
         await db.from("service_professionals").delete().eq("professional_id", createdProfessionalId);
@@ -536,22 +615,24 @@ function CreateAgendaDialog({ professionals, services, onSaved }: any) {
           <div className="sm:col-span-2 rounded-2xl bg-secondary/55 p-4">
             <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Prévia do perfil</p>
             <div className="mt-3 flex items-center gap-3">
-              <div className="grid size-11 place-items-center rounded-2xl bg-primary text-sm font-semibold text-primary-foreground">{initials(name || "JR")}</div>
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold">{name.trim() || "Nome do funcionário"}</p>
+              {photoPreview ? (
+                <img src={photoPreview} alt="Prévia" className="size-14 rounded-2xl object-cover" />
+              ) : (
+                <div className="grid size-14 place-items-center rounded-2xl bg-primary text-base font-semibold text-primary-foreground">{initials(name || "JR")}</div>
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-lg font-semibold">{name.trim() || "Nome do funcionário"}</p>
                 <p className="truncate text-xs text-muted-foreground">{specialty.trim() || "Cargo / especialidade"}</p>
               </div>
+              <Label className="cursor-pointer rounded-full border border-border bg-background px-3 py-2 text-xs font-medium transition hover:bg-secondary">
+                <Camera className="mr-1 inline size-3.5" /> Foto
+                <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => choosePhoto(event.target.files?.[0])} />
+              </Label>
             </div>
           </div>
 
-          <div>
-            <Label>Nome</Label>
-            <Input className="mt-2" value={name} onChange={(event) => setName(event.target.value)} placeholder="Nome completo" />
-          </div>
-          <div>
-            <Label>Cargo / especialidade</Label>
-            <Input className="mt-2" value={specialty} onChange={(event) => setSpecialty(event.target.value)} placeholder="Ex.: Dentista" />
-          </div>
+          <div><Label>Nome</Label><Input className="mt-2" value={name} onChange={(event) => setName(event.target.value)} placeholder="Nome completo" /></div>
+          <div><Label>Cargo / especialidade</Label><Input className="mt-2" value={specialty} onChange={(event) => setSpecialty(event.target.value)} placeholder="Ex.: Dentista" /></div>
           <div className="sm:col-span-2">
             <Label>E-mail de acesso</Label>
             <Input className="mt-2" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="funcionario@email.com" />
@@ -564,15 +645,8 @@ function CreateAgendaDialog({ professionals, services, onSaved }: any) {
               {services.map((service: any) => {
                 const selected = serviceIds.includes(service.id);
                 return (
-                  <button
-                    key={service.id}
-                    type="button"
-                    onClick={() => toggleService(service.id)}
-                    className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left text-xs transition ${selected ? "border-primary bg-primary-soft text-primary" : "border-border bg-background hover:border-primary/30"}`}
-                  >
-                    <span className={`grid size-4 shrink-0 place-items-center rounded-md border ${selected ? "border-primary bg-primary text-primary-foreground" : "border-border"}`}>
-                      {selected ? <Check className="size-3" /> : null}
-                    </span>
+                  <button key={service.id} type="button" onClick={() => toggleService(service.id)} className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left text-xs transition ${selected ? "border-primary bg-primary-soft text-primary" : "border-border bg-background hover:border-primary/30"}`}>
+                    <span className={`grid size-4 shrink-0 place-items-center rounded-md border ${selected ? "border-primary bg-primary text-primary-foreground" : "border-border"}`}>{selected ? <Check className="size-3" /> : null}</span>
                     <span className="truncate font-medium">{service.name}</span>
                   </button>
                 );
@@ -581,9 +655,7 @@ function CreateAgendaDialog({ professionals, services, onSaved }: any) {
           </div>
         </div>
 
-        <DialogFooter>
-          <Button className="w-full rounded-full sm:w-auto" disabled={busy} onClick={save}>{busy ? "Criando..." : "Criar agenda"}</Button>
-        </DialogFooter>
+        <DialogFooter><Button className="w-full rounded-full sm:w-auto" disabled={busy} onClick={save}>{busy ? "Criando..." : "Criar agenda"}</Button></DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -597,6 +669,9 @@ function EditAgendaDialog({ professional, access, services, linkedServiceIds, on
   const [enabled, setEnabled] = useState(access?.enabled ?? true);
   const [active, setActive] = useState(professional.is_active ?? true);
   const [serviceIds, setServiceIds] = useState<string[]>(linkedServiceIds ?? []);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [removePhoto, setRemovePhoto] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -607,7 +682,25 @@ function EditAgendaDialog({ professional, access, services, linkedServiceIds, on
     setEnabled(access?.enabled ?? true);
     setActive(professional.is_active ?? true);
     setServiceIds(linkedServiceIds ?? []);
+    setPhotoFile(null);
+    setPhotoPreview(null);
+    setRemovePhoto(false);
   }, [open, professional, access, linkedServiceIds]);
+
+  useEffect(() => () => { if (photoPreview) URL.revokeObjectURL(photoPreview); }, [photoPreview]);
+
+  const choosePhoto = (file?: File) => {
+    if (!file) return;
+    try {
+      validateAvatar(file);
+      if (photoPreview) URL.revokeObjectURL(photoPreview);
+      setPhotoFile(file);
+      setPhotoPreview(URL.createObjectURL(file));
+      setRemovePhoto(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Foto inválida.");
+    }
+  };
 
   const toggleService = (id: string) => {
     setServiceIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
@@ -621,9 +714,17 @@ function EditAgendaDialog({ professional, access, services, linkedServiceIds, on
     }
 
     setBusy(true);
+    let uploadedPath: string | null = null;
     try {
+      let avatarUrl = removePhoto ? null : professional.avatar_url ?? null;
+      if (photoFile) {
+        const uploaded = await uploadProfessionalAvatar(professional.id, photoFile);
+        uploadedPath = uploaded.path;
+        avatarUrl = uploaded.url;
+      }
+
       const professionalResult = await db.from("professionals").update({
-        name: name.trim(), specialty: specialty.trim(), is_active: active,
+        name: name.trim(), specialty: specialty.trim(), is_active: active, avatar_url: avatarUrl,
       }).eq("id", professional.id);
       if (professionalResult.error) throw professionalResult.error;
 
@@ -637,8 +738,8 @@ function EditAgendaDialog({ professional, access, services, linkedServiceIds, on
       }, { onConflict: "professional_id" });
       if (accessResult.error) throw accessResult.error;
 
-      const removeResult = await db.from("service_professionals").delete().eq("professional_id", professional.id);
-      if (removeResult.error) throw removeResult.error;
+      const removeLinks = await db.from("service_professionals").delete().eq("professional_id", professional.id);
+      if (removeLinks.error) throw removeLinks.error;
       if (serviceIds.length > 0) {
         const insertResult = await db.from("service_professionals").insert(
           serviceIds.map((serviceId) => ({ service_id: serviceId, professional_id: professional.id })),
@@ -646,15 +747,23 @@ function EditAgendaDialog({ professional, access, services, linkedServiceIds, on
         if (insertResult.error) throw insertResult.error;
       }
 
+      if ((photoFile || removePhoto) && professional.avatar_url) {
+        const oldPath = avatarPathFromUrl(professional.avatar_url);
+        if (oldPath && oldPath !== uploadedPath) await supabase.storage.from(AVATAR_BUCKET).remove([oldPath]);
+      }
+
       toast.success("Perfil e agenda atualizados.");
       setOpen(false);
       onSaved();
     } catch (error: any) {
+      if (uploadedPath) await supabase.storage.from(AVATAR_BUCKET).remove([uploadedPath]);
       toast.error(error?.message || "Não foi possível atualizar a agenda.");
     } finally {
       setBusy(false);
     }
   };
+
+  const visiblePhoto = removePhoto ? null : photoPreview || professional.avatar_url;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -664,10 +773,33 @@ function EditAgendaDialog({ professional, access, services, linkedServiceIds, on
       <DialogContent className="max-h-[92dvh] w-[calc(100%-1rem)] overflow-y-auto rounded-3xl p-5 sm:max-w-2xl sm:p-6">
         <DialogHeader>
           <DialogTitle>Editar agenda de {professional.name}</DialogTitle>
-          <DialogDescription>Altere o perfil, o e-mail de acesso e os serviços vinculados.</DialogDescription>
+          <DialogDescription>Altere foto, perfil, e-mail de acesso e serviços vinculados.</DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-4 py-2 sm:grid-cols-2">
+          <div className="sm:col-span-2 flex flex-col gap-4 rounded-2xl border border-border bg-secondary/40 p-4 sm:flex-row sm:items-center">
+            {visiblePhoto ? (
+              <img src={visiblePhoto} alt="Foto do perfil" className="size-20 rounded-2xl object-cover shadow-sm" />
+            ) : (
+              <div className="grid size-20 place-items-center rounded-2xl bg-primary text-xl font-semibold text-primary-foreground">{initials(name || professional.name)}</div>
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold">Foto de perfil</p>
+              <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">JPG, PNG ou WEBP, até 5 MB. A foto aparece no card e na agenda individual.</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Label className="cursor-pointer rounded-full bg-primary px-3.5 py-2 text-xs font-medium text-primary-foreground transition hover:bg-primary/90">
+                  <Camera className="mr-1 inline size-3.5" /> Alterar foto
+                  <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => choosePhoto(event.target.files?.[0])} />
+                </Label>
+                {(professional.avatar_url || photoPreview) && !removePhoto ? (
+                  <Button type="button" variant="ghost" size="sm" className="rounded-full text-xs text-muted-foreground" onClick={() => { setPhotoFile(null); if (photoPreview) URL.revokeObjectURL(photoPreview); setPhotoPreview(null); setRemovePhoto(true); }}>
+                    Remover foto
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+          </div>
+
           <div><Label>Nome</Label><Input className="mt-2" value={name} onChange={(e) => setName(e.target.value)} /></div>
           <div><Label>Cargo / especialidade</Label><Input className="mt-2" value={specialty} onChange={(e) => setSpecialty(e.target.value)} /></div>
           <div className="sm:col-span-2"><Label>E-mail de acesso</Label><Input className="mt-2" type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
@@ -779,7 +911,7 @@ function NewAppointmentEditor({ professional, services, serviceProfessionals, on
 
         <div className="rounded-2xl bg-primary-soft/70 px-3.5 py-3">
           <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">Agenda selecionada</p>
-          <p className="mt-1 text-sm font-semibold">{professional.name}</p>
+          <p className="mt-1 text-base font-semibold">{professional.name}</p>
           <p className="text-xs text-muted-foreground">{professional.specialty}</p>
         </div>
 
@@ -806,21 +938,41 @@ function NewAppointmentEditor({ professional, services, serviceProfessionals, on
 }
 
 function AppointmentCard({ appointment, onSaved }: any) {
+  const [deleting, setDeleting] = useState(false);
+
   const updateStatus = async (status: string) => {
+    if (status === "aguardando_pagamento") return;
     const { error } = await db.from("appointments").update({ status }).eq("id", appointment.id);
     if (error) { toast.error(error.message); return; }
     toast.success("Status atualizado.");
     onSaved?.();
   };
 
+  const deleteAppointment = async () => {
+    const confirmed = window.confirm(`Apagar o agendamento de ${appointment.patient_name}? Esta ação não pode ser desfeita.`);
+    if (!confirmed) return;
+    setDeleting(true);
+    const { error } = await db.from("appointments").delete().eq("id", appointment.id);
+    setDeleting(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success("Agendamento apagado.");
+    onSaved?.();
+  };
+
   const professionalResponse = responseFor(appointment);
+  const statusValue = ["pendente", "confirmado", "cancelado", "aguardando_pagamento"].includes(appointment.status)
+    ? appointment.status
+    : "pendente";
 
   return (
     <article className={`rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-5 ${appointment.status === "cancelado" ? "opacity-60" : ""}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="font-semibold">{appointment.patient_name}</p>
+            <p className="text-base font-semibold">{appointment.patient_name}</p>
             <StatusBadge status={appointment.status} />
             <ProfessionalResponseBadge response={professionalResponse?.response} />
           </div>
@@ -841,10 +993,27 @@ function AppointmentCard({ appointment, onSaved }: any) {
         <p className="mt-2 text-[11px] text-primary">Profissional confirmou em {new Date(professionalResponse.responded_at).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}.</p>
       ) : null}
 
-      <div className="mt-3 flex justify-end">
-        <Select value={appointment.status} onValueChange={updateStatus}>
-          <SelectTrigger className="h-9 w-[145px] rounded-xl"><SelectValue /></SelectTrigger>
+      <div className="mt-3 flex items-center justify-end gap-2">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="size-9 rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+          onClick={deleteAppointment}
+          disabled={deleting}
+          title="Apagar agendamento"
+          aria-label="Apagar agendamento"
+        >
+          <Trash2 className="size-3.5" />
+        </Button>
+        <Select value={statusValue} onValueChange={updateStatus}>
+          <SelectTrigger className="h-9 w-[178px] rounded-xl text-xs font-medium">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
           <SelectContent>
+            {statusValue === "aguardando_pagamento" ? (
+              <SelectItem value="aguardando_pagamento" disabled>Aguardando pagamento</SelectItem>
+            ) : null}
             <SelectItem value="pendente">Pendente</SelectItem>
             <SelectItem value="confirmado">Confirmado</SelectItem>
             <SelectItem value="cancelado">Cancelado</SelectItem>
