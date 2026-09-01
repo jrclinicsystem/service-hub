@@ -26,6 +26,12 @@
   margin-inline: auto !important;
 }
 
+/* Team page uses the persistent sidebar for these destinations; avoid duplicate/reloading shortcuts. */
+main.max-w-\[1480px\] a[href="/admin/acessos"],
+main.max-w-\[1480px\] a[href="/profissional"][target="_blank"] {
+  display: none !important;
+}
+
 /* Access page CTA: keep the "Gerenciar agendas" action visually prominent. */
 main.max-w-\[1180px\] a[href="/admin/equipe"] {
   border-color: var(--primary) !important;
