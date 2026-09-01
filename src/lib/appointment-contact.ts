@@ -54,25 +54,25 @@ export function appointmentWhatsAppMessage(appointment: AppointmentContactData, 
   const total = Number(appointment.service_price_snapshot ?? appointment.service?.price ?? 0);
   const lines = kind === "reminder"
     ? [
-        `Olá, ${appointment.patient_name ?? "cliente"}! Tudo bem? 😊`,
+        `Olá, ${appointment.patient_name ?? "cliente"}! Tudo bem?`,
         "Passando para lembrar que seu atendimento na JR Clinic é amanhã.",
       ]
     : [
-        `Olá, ${appointment.patient_name ?? "cliente"}! Tudo bem? 😊`,
+        `Olá, ${appointment.patient_name ?? "cliente"}! Tudo bem?`,
         "Estamos entrando em contato para confirmar os dados do seu agendamento na JR Clinic:",
       ];
 
   lines.push(
     "",
-    `📅 Data: ${formatAppointmentDate(appointment.scheduled_date)}`,
-    `⏰ Horário: ${appointment.scheduled_time ?? "não informado"}`,
-    `👩‍⚕️ Profissional: ${appointment.professional?.name ?? "JR Clinic"}`,
-    `✨ Serviço: ${appointment.service?.name ?? "Atendimento"}`,
-    `💰 Valor: ${formatMoney(Number.isFinite(total) ? total : 0)}`,
+    `Data: ${formatAppointmentDate(appointment.scheduled_date)}`,
+    `Horário: ${appointment.scheduled_time ?? "não informado"}`,
+    `Profissional: ${appointment.professional?.name ?? "JR Clinic"}`,
+    `Serviço: ${appointment.service?.name ?? "Atendimento"}`,
+    `Valor: ${formatMoney(Number.isFinite(total) ? total : 0)}`,
     "",
     kind === "reminder"
-      ? "Pode confirmar, por favor, se está tudo certo para o seu atendimento? 💚"
-      : "Pode confirmar por aqui se está tudo certo com o seu horário? 💚",
+      ? "Pode confirmar, por favor, se está tudo certo para o seu atendimento?"
+      : "Pode confirmar por aqui se está tudo certo com o seu horário?",
   );
 
   return lines.join("\n");
