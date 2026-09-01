@@ -19,6 +19,9 @@ export function ServiceCard({
   const category = categoryName
     ? { name: categoryName }
     : getCategory(service.categoryId);
+  const quoteOnly = ["Retirada de sinal", "Sessão de clareamento"].includes(
+    service.name,
+  );
 
   const procedureDescription = [service.summary, service.description]
     .filter((value, index, values) => Boolean(value) && values.indexOf(value) === index)
@@ -95,7 +98,7 @@ export function ServiceCard({
           compactMobile && "max-sm:mt-3 max-sm:gap-2",
           compactDesktop && "md:mt-3 md:gap-2",
         )}
-        aria-label={`Agendar ${service.name} por ${formatPrice(service.price)}`}
+        aria-label={`${quoteOnly ? "Consultar orçamento de" : "Agendar"} ${service.name} por ${formatPrice(service.price)}`}
       >
         <div>
           <p className="text-[9px] uppercase tracking-[0.14em] text-muted-foreground">
@@ -106,7 +109,7 @@ export function ServiceCard({
           </p>
         </div>
         <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-transparent bg-accent px-3.5 py-2.5 text-xs font-semibold text-white transition-[border-color] duration-200 ease-out group-hover/booking:border-white/80 group-focus-visible/booking:border-white/80 motion-reduce:transition-none">
-          Agendar
+          {quoteOnly ? "Consultar orçamento" : "Agendar"}
           <ArrowRight className="size-3.5" />
         </span>
       </Link>
