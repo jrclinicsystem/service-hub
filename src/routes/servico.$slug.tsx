@@ -40,6 +40,9 @@ export const Route = createFileRoute("/servico/$slug")({
 
 function ServiceDetail() {
   const { service, reviews, categoryName } = Route.useLoaderData();
+  const quoteOnly = ["Retirada de sinal", "Sessão de clareamento"].includes(
+    service.name,
+  );
 
   return (
     <div className="min-h-screen">
@@ -142,11 +145,13 @@ function ServiceDetail() {
 
               <Button asChild size="lg" className="mt-6 w-full rounded-full">
                 <Link to="/agendar" search={{ servico: service.slug }}>
-                  Agendar este serviço
+                  {quoteOnly ? "Consultar orçamento" : "Agendar este serviço"}
                 </Link>
               </Button>
               <p className="mt-3 text-center text-xs text-muted-foreground">
-                Sem cobrança nesta etapa. Confirmação por e-mail.
+                {quoteOnly
+                  ? "Valor definido após avaliação da região e necessidade do procedimento."
+                  : "Sem cobrança nesta etapa. Confirmação por e-mail."}
               </p>
             </div>
           </aside>
@@ -161,7 +166,7 @@ function ServiceDetail() {
           </div>
           <Button asChild className="h-11 min-w-[170px] rounded-full px-5">
             <Link to="/agendar" search={{ servico: service.slug }}>
-              Agendar agora
+              {quoteOnly ? "Consultar orçamento" : "Agendar agora"}
             </Link>
           </Button>
         </div>
