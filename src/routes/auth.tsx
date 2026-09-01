@@ -15,6 +15,21 @@ const title = "Entrar na JR Clinic";
 const description =
   "Entre ou crie sua conta JR Clinic para acessar agendamentos, perfil e histórico.";
 const RECOVERY_TARGET_KEY = "jrclinic:password-recovery-target";
+const PUBLIC_APP_ORIGIN = "https://jrclinic.lovable.app";
+
+function publicAuthOrigin() {
+  if (typeof window === "undefined") return PUBLIC_APP_ORIGIN;
+
+  const hostname = window.location.hostname.toLowerCase();
+  const localOrPreview =
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "0.0.0.0" ||
+    hostname.endsWith(".localhost") ||
+    hostname.includes("lovableproject.com");
+
+  return localOrPreview ? PUBLIC_APP_ORIGIN : window.location.origin;
+}
 
 function safeNext(value: unknown) {
   if (typeof value !== "string") return undefined;
@@ -112,9 +127,9 @@ function AuthPage() {
     const recoveryTarget = next === "/admin" ? "/admin" : "/minha-conta";
     window.localStorage.setItem(RECOVERY_TARGET_KEY, recoveryTarget);
 
-    // Keep the redirect URL clean. Supabase can safely append/consume its recovery
-    // code without competing with our own query string.
-    const redirectTo = `${window.location.origin}/redefinir-senha`;
+    // Recovery emails must always return to the public JR Clinic app. In local or
+    // Lovable preview environments, window.location.origin is not a valid customer URL.
+    const redirectTo = `${publicAuthOrigin()}/redefinir-senha`;
     const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
       redirectTo,
     });
@@ -138,7 +153,7 @@ function AuthPage() {
     }
 
     setBusy(true);
-    const redirectTo = `${window.location.origin}/auth${next ? `?next=${encodeURIComponent(next)}` : ""}`;
+    const redirectTo = `${publicAuthOrigin()}/auth${next ? `?next=${encodeURIComponent(next)}` : ""}`;
     const { error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
