@@ -5,6 +5,7 @@ import {
   CalendarDays,
   Camera,
   CheckCircle2,
+  ChevronDown,
   Clock3,
   LogOut,
   Mail,
@@ -118,6 +119,8 @@ function ProfessionalAgenda() {
   const [savingTime, setSavingTime] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [daysOpen, setDaysOpen] = useState(false);
+  const [hoursOpen, setHoursOpen] = useState(false);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
   const audioRef = useRef<AudioContext | null>(null);
   const notifiedIds = useRef(new Set<string>());
@@ -193,12 +196,12 @@ function ProfessionalAgenda() {
 
     setUploadingPhoto(true);
     try {
-      const path = `${data.professional.id}/profile`;
-      const { error: uploadError } = await supabase.storage.from("professional-avatars").upload(path, file, { upsert: true, contentType: file.type, cacheControl: "3600" });
+      const extension = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+      const path = `${data.professional.id}/profile-${Date.now()}.${extension}`;
+      const { error: uploadError } = await supabase.storage.from("professional-avatars").upload(path, file, { upsert: false, contentType: file.type, cacheControl: "3600" });
       if (uploadError) throw uploadError;
       const { data: publicData } = supabase.storage.from("professional-avatars").getPublicUrl(path);
-      const avatarUrl = `${publicData.publicUrl}?v=${Date.now()}`;
-      const { error: saveError } = await db.rpc("set_my_professional_avatar", { _avatar_url: avatarUrl });
+      const { error: saveError } = await db.rpc("set_my_professional_avatar", { _avatar_url: publicData.publicUrl });
       if (saveError) throw saveError;
       toast.success("Foto da agenda atualizada.");
       await refetch();
@@ -261,17 +264,27 @@ function ProfessionalAgenda() {
 
         <div className="mt-4 grid grid-cols-3 gap-2.5 sm:mt-6 sm:gap-4"><Metric icon={CalendarDays} label="Hoje" value={String(todayAppointments.length)} /><Metric icon={Clock3} label="Turnos ativos" value={String(activePeriods)} /><Metric icon={Stethoscope} label="Próximos" value={String(upcomingAppointments.length)} /></div>
 
-        <section className="mt-7 rounded-3xl border border-border bg-card p-5 shadow-soft sm:p-6">
-          <div><h2 className="text-lg font-semibold">Meus dias e turnos</h2><p className="mt-1 text-xs text-muted-foreground">Escolha em quais dias você atende de manhã, à tarde ou à noite. Turnos desligados não aceitarão novos agendamentos.</p></div>
-          <div className="mt-5 space-y-3">
+        <section className="mt-7 rounded-3xl border border-border bg-card p-4 shadow-soft sm:p-6">
+          <button type="button" className="flex w-full items-center justify-between gap-4 text-left sm:cursor-default" onClick={() => setDaysOpen((open) => !open)}>
+            <div><h2 className="text-lg font-semibold">Meus dias e turnos</h2><p className="mt-1 text-xs text-muted-foreground">{activePeriods} turno(s) ativo(s). Toque para visualizar e alterar.</p></div>
+            <ChevronDown className={`size-5 shrink-0 text-muted-foreground transition-transform sm:hidden ${daysOpen ? "rotate-180" : ""}`} />
+          </button>
+          <div className={`${daysOpen ? "block" : "hidden"} mt-5 space-y-3 sm:block`}>
+            <p className="text-xs text-muted-foreground">Escolha em quais dias você atende de manhã, à tarde ou à noite. Turnos desligados não aceitarão novos agendamentos.</p>
             {weekdays.map((day) => <div key={day.value} className="rounded-2xl border border-border p-4"><p className="mb-3 text-sm font-semibold">{day.label}</p><div className="grid gap-2 sm:grid-cols-3">{periods.map((period) => { const row = data.availability.find((item: any) => item.weekday === day.value && item.period === period.value); const checked = row?.is_available ?? false; return <div key={period.value} className="flex items-center justify-between rounded-xl bg-secondary/50 px-3 py-2.5"><div><p className="text-xs font-medium">{period.label}</p><p className="text-[9px] text-muted-foreground">{period.detail}</p></div><Switch checked={checked} onCheckedChange={(value) => setAvailability(day.value, period.value, value)} /></div>; })}</div></div>)}
           </div>
         </section>
 
-        <section className="mt-7 rounded-3xl border border-border bg-card p-5 shadow-soft sm:p-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><h2 className="text-lg font-semibold">Meus horários disponíveis</h2><p className="mt-1 text-xs text-muted-foreground">Além do dia e turno, defina os horários exatos que podem receber agendamentos.</p></div><div className="flex gap-2"><Input type="time" value={newTime} onChange={(e) => setNewTime(e.target.value)} className="w-[150px]" /><Button type="button" onClick={addTime} disabled={savingTime}><Plus className="size-4" /> Adicionar horário</Button></div></div>
-          <div className="mt-5 grid gap-2 sm:grid-cols-2">
-            {data.slots.length === 0 ? <p className="col-span-full rounded-2xl border border-dashed border-border p-5 text-center text-sm text-muted-foreground">Nenhum horário cadastrado.</p> : data.slots.map((slot: any) => <div key={slot.id} className="flex items-center justify-between rounded-2xl border border-border px-4 py-3"><div><p className="font-semibold tabular-nums">{slot.slot}</p><p className="text-[10px] text-muted-foreground">{slot.is_available ? "Disponível" : "Pausado"}</p></div><div className="flex items-center gap-2"><Switch checked={slot.is_available} onCheckedChange={async (checked) => { const { error: updateError } = await db.from("professional_time_slots").update({ is_available: checked, updated_at: new Date().toISOString() }).eq("id", slot.id); if (updateError) { toast.error(updateError.message); return; } await refetch(); }} /><Button type="button" variant="ghost" size="icon" className="text-destructive" onClick={async () => { if (!window.confirm(`Remover o horário ${slot.slot}?`)) return; const { error: removeError } = await db.from("professional_time_slots").delete().eq("id", slot.id); if (removeError) { toast.error(removeError.message); return; } toast.success("Horário removido."); await refetch(); }}><Trash2 className="size-4" /></Button></div></div>)}
+        <section className="mt-4 rounded-3xl border border-border bg-card p-4 shadow-soft sm:mt-7 sm:p-6">
+          <button type="button" className="flex w-full items-center justify-between gap-4 text-left sm:cursor-default" onClick={() => setHoursOpen((open) => !open)}>
+            <div><h2 className="text-lg font-semibold">Meus horários disponíveis</h2><p className="mt-1 text-xs text-muted-foreground">{data.slots.filter((slot: any) => slot.is_available).length} horário(s) ativo(s). Toque para visualizar e alterar.</p></div>
+            <ChevronDown className={`size-5 shrink-0 text-muted-foreground transition-transform sm:hidden ${hoursOpen ? "rotate-180" : ""}`} />
+          </button>
+          <div className={`${hoursOpen ? "block" : "hidden"} mt-5 sm:block`}>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><p className="text-xs text-muted-foreground">Além do dia e turno, defina os horários exatos que podem receber agendamentos.</p><div className="flex gap-2"><Input type="time" value={newTime} onChange={(e) => setNewTime(e.target.value)} className="min-w-0 flex-1 sm:w-[150px] sm:flex-none" /><Button type="button" onClick={addTime} disabled={savingTime}><Plus className="size-4" /> Adicionar</Button></div></div>
+            <div className="mt-5 grid gap-2 sm:grid-cols-2">
+              {data.slots.length === 0 ? <p className="col-span-full rounded-2xl border border-dashed border-border p-5 text-center text-sm text-muted-foreground">Nenhum horário cadastrado.</p> : data.slots.map((slot: any) => <div key={slot.id} className="flex items-center justify-between rounded-2xl border border-border px-4 py-3"><div><p className="font-semibold tabular-nums">{slot.slot}</p><p className="text-[10px] text-muted-foreground">{slot.is_available ? "Disponível" : "Pausado"}</p></div><div className="flex items-center gap-2"><Switch checked={slot.is_available} onCheckedChange={async (checked) => { const { error: updateError } = await db.from("professional_time_slots").update({ is_available: checked, updated_at: new Date().toISOString() }).eq("id", slot.id); if (updateError) { toast.error(updateError.message); return; } await refetch(); }} /><Button type="button" variant="ghost" size="icon" className="text-destructive" onClick={async () => { if (!window.confirm(`Remover o horário ${slot.slot}?`)) return; const { error: removeError } = await db.from("professional_time_slots").delete().eq("id", slot.id); if (removeError) { toast.error(removeError.message); return; } toast.success("Horário removido."); await refetch(); }}><Trash2 className="size-4" /></Button></div></div>)}
+            </div>
           </div>
         </section>
 
