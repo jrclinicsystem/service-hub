@@ -54,9 +54,17 @@ const days = Array.from({ length: 14 }).map((_, index) => {
     key,
     label: String(date.getDate()).padStart(2, "0"),
     weekday: weekDays[date.getDay()],
+    weekdayNumber: date.getDay(),
     disabled: date.getDay() === 0,
   };
 });
+
+function periodForTime(time: string) {
+  const hour = Number(time.slice(0, 2));
+  if (hour < 12) return "morning";
+  if (hour < 18) return "afternoon";
+  return "evening";
+}
 
 type PaymentChoice = "deposit" | "full" | "onsite";
 type PaymentKind = "deposit" | "full";
@@ -92,6 +100,7 @@ function Agendar() {
 
   const [professionalId, setProfessionalId] = useState("");
   const [professionalSlots, setProfessionalSlots] = useState<any[] | null>(null);
+  const [professionalAvailability, setProfessionalAvailability] = useState<any[]>([]);
   const [day, setDay] = useState(days.find((item) => !item.disabled)?.key ?? days[0]!.key);
   const [time, setTime] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -104,7 +113,13 @@ function Agendar() {
   const [busy, setBusy] = useState(false);
 
   const selectedProfessional = professionals.find((item: any) => item.id === professionalId) ?? professionals[0];
-  const displayedTimeSlots = professionalSlots ?? timeSlots;
+  const selectedDay = days.find((item) => item.key === day) ?? days[0]!;
+  const baseTimeSlots = professionalSlots ?? timeSlots;
+  const displayedTimeSlots = useMemo(() => baseTimeSlots.filter((slot: any) => {
+    if (!slot.is_available) return false;
+    if (!professionalAvailability.length) return true;
+    return professionalAvailability.some((item: any) => item.weekday === selectedDay.weekdayNumber && item.period === periodForTime(slot.slot) && item.is_available);
+  }), [baseTimeSlots, professionalAvailability, selectedDay.weekdayNumber]);
   const hasService = Boolean(service);
   const total = Number(service?.price ?? 0);
   const safeDepositPercent = Number.isFinite(Number(depositPercent)) ? Number(depositPercent) : 50;
@@ -129,9 +144,16 @@ function Agendar() {
         ? 0
         : total;
 
+  const isDayAvailable = (weekdayNumber: number) => {
+    if (weekdayNumber === 0) return false;
+    if (!professionalAvailability.length) return true;
+    return professionalAvailability.some((item: any) => item.weekday === weekdayNumber && item.is_available);
+  };
+
   useEffect(() => {
     setProfessionalId(professionals[0]?.id ?? "");
     setProfessionalSlots(null);
+    setProfessionalAvailability([]);
     setTime(null);
     setPaymentChoice("deposit");
     setPaymentSession(null);
@@ -142,24 +164,36 @@ function Agendar() {
     let cancelled = false;
     if (!professionalId) {
       setProfessionalSlots(null);
+      setProfessionalAvailability([]);
       return;
     }
 
-    void supabase
-      .from("professional_time_slots")
-      .select("slot, is_available, sort_order")
-      .eq("professional_id", professionalId)
-      .order("sort_order")
-      .order("slot")
-      .then(({ data, error }) => {
-        if (cancelled) return;
-        if (error || !data?.length) setProfessionalSlots(timeSlots as any[]);
-        else setProfessionalSlots(data as any[]);
-        setTime(null);
-      });
+    void Promise.all([
+      supabase.from("professional_time_slots").select("slot, is_available, sort_order").eq("professional_id", professionalId).order("sort_order").order("slot"),
+      supabase.from("professional_availability_periods").select("weekday, period, is_available").eq("professional_id", professionalId).order("weekday").order("period"),
+    ]).then(([slotsResult, availabilityResult]) => {
+      if (cancelled) return;
+      if (slotsResult.error || !slotsResult.data?.length) setProfessionalSlots(timeSlots as any[]);
+      else setProfessionalSlots(slotsResult.data as any[]);
+      setProfessionalAvailability(availabilityResult.error ? [] : (availabilityResult.data as any[] ?? []));
+      setTime(null);
+    });
 
     return () => { cancelled = true; };
   }, [professionalId, timeSlots]);
+
+  useEffect(() => {
+    if (!professionalId) return;
+    const current = days.find((item) => item.key === day);
+    if (current && isDayAvailable(current.weekdayNumber)) return;
+    const firstAvailable = days.find((item) => isDayAvailable(item.weekdayNumber));
+    if (firstAvailable) setDay(firstAvailable.key);
+    setTime(null);
+  }, [professionalAvailability, professionalId]);
+
+  useEffect(() => {
+    if (time && !displayedTimeSlots.some((slot: any) => slot.slot === time)) setTime(null);
+  }, [displayedTimeSlots, time]);
 
   useEffect(() => {
     if (!user) return;
@@ -292,40 +326,23 @@ function Agendar() {
 
               <div className="mt-4">
                 <Label htmlFor="servico">Escolha o atendimento</Label>
-                <Select
-                  value={selectedSlug ?? ""}
-                  onValueChange={(value) => {
-                    resetPreparedPayment();
-                    navigate({ search: { servico: value }, replace: true });
-                  }}
-                >
-                  <SelectTrigger id="servico" className="mt-2 h-11 rounded-xl">
-                    <SelectValue placeholder="Selecione um serviço" />
-                  </SelectTrigger>
+                <Select value={selectedSlug ?? ""} onValueChange={(value) => { resetPreparedPayment(); navigate({ search: { servico: value }, replace: true }); }}>
+                  <SelectTrigger id="servico" className="mt-2 h-11 rounded-xl"><SelectValue placeholder="Selecione um serviço" /></SelectTrigger>
                   <SelectContent>{services.map((item) => <SelectItem key={item.slug} value={item.slug}>{item.name}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
 
               <div className="mt-4">
                 <Label htmlFor="profissional">Quem você prefere?</Label>
-                <Select
-                  value={professionalId ?? ""}
-                  disabled={!service}
-                  onValueChange={(value) => { setProfessionalId(value); setTime(null); resetPreparedPayment(); }}
-                >
-                  <SelectTrigger id="profissional" className="mt-2 h-11 rounded-xl">
-                    <SelectValue placeholder={service ? "Escolha o profissional" : "Selecione um serviço primeiro"} />
-                  </SelectTrigger>
+                <Select value={professionalId ?? ""} disabled={!service} onValueChange={(value) => { setProfessionalId(value); setTime(null); resetPreparedPayment(); }}>
+                  <SelectTrigger id="profissional" className="mt-2 h-11 rounded-xl"><SelectValue placeholder={service ? "Escolha o profissional" : "Selecione um serviço primeiro"} /></SelectTrigger>
                   <SelectContent>{professionals.map((item: any) => <SelectItem key={item.id} value={item.id}>{item.name} · {item.specialty}</SelectItem>)}</SelectContent>
                 </Select>
                 {service && professionals.length === 0 ? <p className="mt-2 text-xs text-destructive">Nenhum profissional está vinculado a este serviço.</p> : null}
               </div>
 
               <div className="mt-3 flex items-center justify-between rounded-xl bg-secondary/60 px-3 py-2.5 sm:hidden">
-                <div>
-                  <p className="text-xs font-medium">{service ? (selectedProfessional?.name ?? "Escolha o profissional") : "Nenhum serviço selecionado"}</p>
-                  <p className="mt-0.5 text-[10px] text-muted-foreground">{service ? `${service.duration_min} min` : "Selecione um atendimento para continuar"}</p>
-                </div>
+                <div><p className="text-xs font-medium">{service ? (selectedProfessional?.name ?? "Escolha o profissional") : "Nenhum serviço selecionado"}</p><p className="mt-0.5 text-[10px] text-muted-foreground">{service ? `${service.duration_min} min` : "Selecione um atendimento para continuar"}</p></div>
                 <p className="text-sm font-semibold text-primary">{service ? formatPrice(total) : "—"}</p>
               </div>
             </section>
@@ -333,35 +350,19 @@ function Agendar() {
             <section className="rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-6">
               <h2 className="text-base font-semibold sm:text-lg">Data e horário</h2>
               <div className="mt-4 flex gap-2 overflow-x-auto pb-1 sm:grid sm:grid-cols-7 sm:overflow-visible">
-                {days.map((item) => (
-                  <button
-                    key={item.key}
-                    type="button"
-                    disabled={item.disabled || !service}
-                    onClick={() => { setDay(item.key); resetPreparedPayment(); }}
-                    className={`w-[54px] shrink-0 rounded-xl border px-2 py-2.5 text-center transition disabled:opacity-35 sm:w-auto ${day === item.key && service ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background hover:bg-secondary"}`}
-                  >
-                    <span className="block text-[9px] opacity-70">{item.weekday}</span>
-                    <span className="mt-0.5 block text-sm font-semibold">{item.label}</span>
-                  </button>
-                ))}
+                {days.map((item) => {
+                  const unavailable = item.disabled || !isDayAvailable(item.weekdayNumber);
+                  return <button key={item.key} type="button" disabled={unavailable || !service || !professionalId} onClick={() => { setDay(item.key); setTime(null); resetPreparedPayment(); }} className={`w-[54px] shrink-0 rounded-xl border px-2 py-2.5 text-center transition disabled:opacity-35 sm:w-auto ${day === item.key && service && !unavailable ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background hover:bg-secondary"}`}><span className="block text-[9px] opacity-70">{item.weekday}</span><span className="mt-0.5 block text-sm font-semibold">{item.label}</span></button>;
+                })}
               </div>
 
               <p className="mt-5 text-xs font-medium text-muted-foreground">Horários disponíveis para {selectedProfessional?.name ?? "o profissional"}</p>
               <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {displayedTimeSlots.map((slot: any) => (
-                  <button
-                    key={slot.slot}
-                    type="button"
-                    disabled={!slot.is_available || !professionalId || !service}
-                    onClick={() => { setTime(slot.slot); resetPreparedPayment(); }}
-                    className={`rounded-xl border px-2 py-2.5 text-xs font-medium transition disabled:opacity-35 sm:text-sm ${time === slot.slot ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background hover:bg-secondary"}`}
-                  >
-                    {slot.slot}
-                  </button>
+                  <button key={slot.slot} type="button" disabled={!professionalId || !service} onClick={() => { setTime(slot.slot); resetPreparedPayment(); }} className={`rounded-xl border px-2 py-2.5 text-xs font-medium transition disabled:opacity-35 sm:text-sm ${time === slot.slot ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background hover:bg-secondary"}`}>{slot.slot}</button>
                 ))}
               </div>
-              {professionalId && displayedTimeSlots.filter((slot: any) => slot.is_available).length === 0 ? <p className="mt-3 text-xs text-destructive">Este profissional ainda não liberou horários para agendamento.</p> : null}
+              {professionalId && displayedTimeSlots.length === 0 ? <p className="mt-3 text-xs text-destructive">Este profissional não atende nesse dia/turno ou ainda não liberou horários.</p> : null}
             </section>
 
             <section className="rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-6">
@@ -375,46 +376,11 @@ function Agendar() {
             </section>
 
             <section className="rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-8">
-              <div className="text-center">
-                <h2 className="text-lg font-semibold tracking-tight sm:text-2xl">Métodos de pagamento</h2>
-                <p className="mx-auto mt-1.5 max-w-[52ch] text-sm leading-relaxed text-muted-foreground">
-                  {service
-                    ? "Selecione a forma mais conveniente para você. Os detalhes completos aparecem na próxima etapa."
-                    : "Selecione um serviço acima para ver os valores reais de cada opção de pagamento."}
-                </p>
-              </div>
-
+              <div className="text-center"><h2 className="text-lg font-semibold tracking-tight sm:text-2xl">Métodos de pagamento</h2><p className="mx-auto mt-1.5 max-w-[52ch] text-sm leading-relaxed text-muted-foreground">{service ? "Selecione a forma mais conveniente para você. Os detalhes completos aparecem na próxima etapa." : "Selecione um serviço acima para ver os valores reais de cada opção de pagamento."}</p></div>
               <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-5">
-                <PaymentOption
-                  icon={Landmark}
-                  selected={paymentChoice === "deposit"}
-                  disabled={!service || Boolean(paymentSession)}
-                  title={`Pagar ${depositLabel} online`}
-                  description="Garanta seu horário pagando o sinal agora e o restante na clínica."
-                  value={service ? formatPrice(depositValue) : "—"}
-                  badge="Online"
-                  onClick={() => { setPaymentChoice("deposit"); resetPreparedPayment(); }}
-                />
-                <PaymentOption
-                  icon={CreditCard}
-                  selected={paymentChoice === "full"}
-                  disabled={!service || Boolean(paymentSession)}
-                  title="Pagar valor total"
-                  description="Agilize seu atendimento com o pagamento integral, seguro e rápido."
-                  value={service ? formatPrice(total) : "—"}
-                  badge="Online"
-                  onClick={() => { setPaymentChoice("full"); resetPreparedPayment(); }}
-                />
-                <PaymentOption
-                  icon={HandCoins}
-                  selected={paymentChoice === "onsite"}
-                  disabled={!service || Boolean(paymentSession)}
-                  title="Pagar presencialmente"
-                  description="Reserve seu horário e pague diretamente na recepção no dia do atendimento."
-                  value={service ? "Na clínica" : "—"}
-                  badge="Presencial"
-                  onClick={() => { setPaymentChoice("onsite"); resetPreparedPayment(); }}
-                />
+                <PaymentOption icon={Landmark} selected={paymentChoice === "deposit"} disabled={!service || Boolean(paymentSession)} title={`Pagar ${depositLabel} online`} description="Garanta seu horário pagando o sinal agora e o restante na clínica." value={service ? formatPrice(depositValue) : "—"} badge="Online" onClick={() => { setPaymentChoice("deposit"); resetPreparedPayment(); }} />
+                <PaymentOption icon={CreditCard} selected={paymentChoice === "full"} disabled={!service || Boolean(paymentSession)} title="Pagar valor total" description="Agilize seu atendimento com o pagamento integral, seguro e rápido." value={service ? formatPrice(total) : "—"} badge="Online" onClick={() => { setPaymentChoice("full"); resetPreparedPayment(); }} />
+                <PaymentOption icon={HandCoins} selected={paymentChoice === "onsite"} disabled={!service || Boolean(paymentSession)} title="Pagar presencialmente" description="Reserve seu horário e pague diretamente na recepção no dia do atendimento." value={service ? "Na clínica" : "—"} badge="Presencial" onClick={() => { setPaymentChoice("onsite"); resetPreparedPayment(); }} />
               </div>
             </section>
           </div>
@@ -428,16 +394,10 @@ function Agendar() {
                 <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Data</dt><dd className="text-right font-medium">{service ? `${new Date(`${day}T12:00:00`).toLocaleDateString("pt-BR")} · ${time ?? "—"}` : "—"}</dd></div>
                 <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Duração</dt><dd className="text-right font-medium">{service ? `${service.duration_min} min` : "—"}</dd></div>
               </dl>
-
               <Separator className="my-5" />
               <div className="flex items-center justify-between"><span className="text-sm text-muted-foreground">Valor do serviço</span><span className="text-xl font-semibold">{service ? formatPrice(total) : "—"}</span></div>
-              <div className="mt-3 rounded-xl bg-primary-soft/60 px-3 py-3">
-                <div className="flex items-center justify-between"><span className="text-sm font-medium text-primary">Pagar agora</span><span className="text-2xl font-semibold text-primary">{service ? formatPrice(paymentNow) : "—"}</span></div>
-                <div className="mt-1 flex items-center justify-between text-xs"><span className="text-muted-foreground">Restante</span><span className="font-medium">{service ? formatPrice(remaining) : "—"}</span></div>
-              </div>
-              <p className="mt-3 text-xs text-muted-foreground">
-                {!service ? "Selecione o serviço para calcular os valores." : paymentChoice === "deposit" ? `${depositLabel} online pela InfinitePay.` : paymentChoice === "full" ? "Pagamento integral online pela InfinitePay." : "Pagamento integral presencial na clínica."}
-              </p>
+              <div className="mt-3 rounded-xl bg-primary-soft/60 px-3 py-3"><div className="flex items-center justify-between"><span className="text-sm font-medium text-primary">Pagar agora</span><span className="text-2xl font-semibold text-primary">{service ? formatPrice(paymentNow) : "—"}</span></div><div className="mt-1 flex items-center justify-between text-xs"><span className="text-muted-foreground">Restante</span><span className="font-medium">{service ? formatPrice(remaining) : "—"}</span></div></div>
+              <p className="mt-3 text-xs text-muted-foreground">{!service ? "Selecione o serviço para calcular os valores." : paymentChoice === "deposit" ? `${depositLabel} online pela InfinitePay.` : paymentChoice === "full" ? "Pagamento integral online pela InfinitePay." : "Pagamento integral presencial na clínica."}</p>
               <Button size="lg" className="mt-6 w-full rounded-full" disabled={!canConfirm || busy} onClick={confirm}>{buttonLabel}</Button>
             </div>
           </aside>
@@ -445,13 +405,7 @@ function Agendar() {
       </main>
 
       <div className="fixed bottom-[calc(63px+env(safe-area-inset-bottom))] left-0 right-0 z-[60] border-t border-border bg-card/95 px-3 py-2.5 shadow-[0_-8px_30px_rgba(0,0,0,0.06)] backdrop-blur-xl md:bottom-0 lg:hidden">
-        <div className="mx-auto flex max-w-lg items-center gap-2.5">
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[10px] text-muted-foreground">{!service ? "Selecione um serviço" : paymentChoice === "deposit" ? `${depositLabel} online` : paymentChoice === "full" ? "Pagamento total online" : "Pagamento presencial"}</p>
-            <p className="text-base font-semibold leading-tight text-primary">{service ? (paymentChoice === "onsite" ? "Na clínica" : formatPrice(paymentNow)) : "—"}</p>
-          </div>
-          <Button className="h-10 min-w-[146px] shrink-0 rounded-full px-4 text-sm" disabled={!canConfirm || busy} onClick={confirm}>{buttonLabel}</Button>
-        </div>
+        <div className="mx-auto flex max-w-lg items-center gap-2.5"><div className="min-w-0 flex-1"><p className="truncate text-[10px] text-muted-foreground">{!service ? "Selecione um serviço" : paymentChoice === "deposit" ? `${depositLabel} online` : paymentChoice === "full" ? "Pagamento total online" : "Pagamento presencial"}</p><p className="text-base font-semibold leading-tight text-primary">{service ? (paymentChoice === "onsite" ? "Na clínica" : formatPrice(paymentNow)) : "—"}</p></div><Button className="h-10 min-w-[146px] shrink-0 rounded-full px-4 text-sm" disabled={!canConfirm || busy} onClick={confirm}>{buttonLabel}</Button></div>
       </div>
 
       <InfinitePayPaymentDialog open={paymentOpen} onOpenChange={setPaymentOpen} session={paymentSession} />
@@ -460,65 +414,19 @@ function Agendar() {
   );
 }
 
-function PaymentOption({ icon: Icon, selected, disabled, title, description, value, badge, onClick }: {
-  icon: typeof WalletCards;
-  selected: boolean;
-  disabled: boolean;
-  title: string;
-  description: string;
-  value: string;
-  badge: string;
-  onClick: () => void;
-}) {
+function PaymentOption({ icon: Icon, selected, disabled, title, description, value, badge, onClick }: { icon: typeof WalletCards; selected: boolean; disabled: boolean; title: string; description: string; value: string; badge: string; onClick: () => void; }) {
   return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      className={`group relative flex flex-col items-center rounded-2xl border px-4 py-6 text-center transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-45 sm:rounded-3xl sm:p-7 ${
-        selected
-          ? "border-primary bg-primary-soft/50 shadow-soft ring-4 ring-primary/10"
-          : "border-border bg-background hover:-translate-y-1 hover:border-primary/40 hover:shadow-elegant"
-      }`}
-    >
-      <span className="absolute -top-2.5 rounded-full bg-secondary px-2.5 py-0.5 text-[9px] font-semibold uppercase tracking-widest text-muted-foreground">
-        {badge}
-      </span>
-      <span
-        className={`grid size-12 place-items-center rounded-2xl transition-colors duration-300 sm:size-14 ${
-          selected ? "bg-primary text-primary-foreground" : "bg-primary-soft text-primary group-hover:bg-primary group-hover:text-primary-foreground"
-        }`}
-      >
-        <Icon className="size-5 sm:size-6" />
-      </span>
+    <button type="button" disabled={disabled} onClick={onClick} className={`group relative flex flex-col items-center rounded-2xl border px-4 py-6 text-center transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-45 sm:rounded-3xl sm:p-7 ${selected ? "border-primary bg-primary-soft/50 shadow-soft ring-4 ring-primary/10" : "border-border bg-background hover:-translate-y-1 hover:border-primary/40 hover:shadow-elegant"}`}>
+      <span className="absolute -top-2.5 rounded-full bg-secondary px-2.5 py-0.5 text-[9px] font-semibold uppercase tracking-widest text-muted-foreground">{badge}</span>
+      <span className={`grid size-12 place-items-center rounded-2xl transition-colors duration-300 sm:size-14 ${selected ? "bg-primary text-primary-foreground" : "bg-primary-soft text-primary group-hover:bg-primary group-hover:text-primary-foreground"}`}><Icon className="size-5 sm:size-6" /></span>
       <p className="mt-4 text-sm font-semibold leading-tight sm:text-base">{title}</p>
       <p className="mt-1.5 hidden text-xs leading-relaxed text-muted-foreground sm:block">{description}</p>
       <p className="mt-3 text-xl font-semibold leading-none text-primary sm:text-2xl">{value}</p>
-      <span
-        className={`mt-4 flex w-full items-center justify-center gap-1.5 rounded-xl border py-2.5 text-xs font-semibold transition-all duration-300 ${
-          selected
-            ? "border-primary bg-primary text-primary-foreground"
-            : "border-border text-muted-foreground group-hover:border-primary group-hover:bg-primary group-hover:text-primary-foreground"
-        }`}
-      >
-        {selected ? (
-          <>
-            <Check className="size-3.5" />
-            Selecionado
-          </>
-        ) : (
-          "Selecionar"
-        )}
-      </span>
+      <span className={`mt-4 flex w-full items-center justify-center gap-1.5 rounded-xl border py-2.5 text-xs font-semibold transition-all duration-300 ${selected ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground group-hover:border-primary group-hover:bg-primary group-hover:text-primary-foreground"}`}>{selected ? <><Check className="size-3.5" />Selecionado</> : "Selecionar"}</span>
     </button>
   );
 }
 
 function StepChip({ number, label }: { number: string; label: string }) {
-  return (
-    <div className="flex min-w-0 items-center justify-center gap-1 rounded-xl bg-secondary/70 px-1 py-2">
-      <span className="grid size-4 shrink-0 place-items-center rounded-full bg-primary text-[9px] font-semibold text-primary-foreground">{number}</span>
-      <span className="truncate text-[9px] font-medium">{label}</span>
-    </div>
-  );
+  return <div className="flex min-w-0 items-center justify-center gap-1 rounded-xl bg-secondary/70 px-1 py-2"><span className="grid size-4 shrink-0 place-items-center rounded-full bg-primary text-[9px] font-semibold text-primary-foreground">{number}</span><span className="truncate text-[9px] font-medium">{label}</span></div>;
 }
