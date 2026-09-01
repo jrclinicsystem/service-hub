@@ -17,6 +17,7 @@ const description =
   "Entre ou crie sua conta JR Clinic para acessar agendamentos, perfil e histórico.";
 const RECOVERY_TARGET_KEY = "jrclinic:password-recovery-target";
 const PUBLIC_APP_ORIGIN = "https://jrclinic.lovable.app";
+const db = supabase as any;
 
 function publicAuthOrigin() {
   if (typeof window === "undefined") return PUBLIC_APP_ORIGIN;
@@ -51,9 +52,19 @@ function adminDestination(value?: string) {
   return "/admin";
 }
 
+async function resolveAuthenticatedDestination(next?: string) {
+  const { data: destination, error } = await db.rpc("current_portal_destination");
+  if (error) throw error;
+
+  if (destination === "admin") return adminDestination(next);
+  if (destination === "professional") return "/profissional";
+  if (isPanelDestination(next)) return null;
+  return next ?? "/";
+}
+
 export const Route = createFileRoute("/auth")({
   validateSearch: (search: Record<string, unknown>) => ({
-    next: safeNext(search['next']),
+    next: safeNext(search["next"]),
   }),
   head: () => ({
     meta: [
@@ -117,52 +128,31 @@ function AuthPage() {
   const [resetBusy, setResetBusy] = useState(false);
   const [checkingAccess, setCheckingAccess] = useState(false);
 
+  const finishAuthenticatedLogin = async () => {
+    setCheckingAccess(true);
+    try {
+      const destination = await resolveAuthenticatedDestination(next);
+      if (destination) {
+        window.location.replace(destination);
+        return;
+      }
+
+      toast.error("Este e-mail não está autorizado a acessar o painel da JR Clinic.");
+      await supabase.auth.signOut();
+      setCheckingAccess(false);
+    } catch (accessError: any) {
+      console.error(accessError);
+      toast.error("Não foi possível verificar seu acesso agora. Tente novamente.");
+      setCheckingAccess(false);
+    }
+  };
+
   useEffect(() => {
-    if (loading || !user || checkingAccess) return;
-
-    const finishLogin = async () => {
-      const hasExplicitPublicDestination = Boolean(next) && !isPanelDestination(next);
-      if (hasExplicitPublicDestination) {
-        window.location.replace(next!);
-        return;
-      }
-
-      setCheckingAccess(true);
-
-      const { data: isAdmin, error: adminError } = await (supabase as any).rpc(
-        "is_current_user_admin",
-      );
-
-      if (!adminError && isAdmin) {
-        window.location.replace(adminDestination(next));
-        return;
-      }
-
-      const normalizedEmail = (user.email ?? "").trim().toLowerCase();
-      const { data: staffAccess, error: staffError } = await (supabase as any)
-        .from("professional_access")
-        .select("professional_id, enabled")
-        .eq("email", normalizedEmail)
-        .eq("enabled", true)
-        .maybeSingle();
-
-      if (!staffError && staffAccess?.professional_id) {
-        window.location.replace("/profissional");
-        return;
-      }
-
-      if (isPanelDestination(next)) {
-        await supabase.auth.signOut();
-        toast.error("Este e-mail não está autorizado a acessar o painel da JR Clinic.");
-        setCheckingAccess(false);
-        return;
-      }
-
-      window.location.replace(next ?? "/");
-    };
-
-    void finishLogin();
-  }, [loading, user, next, checkingAccess]);
+    if (loading || !user || checkingAccess || busy) return;
+    void finishAuthenticatedLogin();
+    // finishAuthenticatedLogin is intentionally driven only by authenticated state/search target.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, user, next]);
 
   const signIn = async () => {
     if (!email.trim() || !password) {
@@ -171,13 +161,15 @@ function AuthPage() {
     }
 
     setBusy(true);
+    setCheckingAccess(true);
     const { error } = await supabase.auth.signInWithPassword({
       email: email.trim(),
       password,
     });
-    setBusy(false);
 
     if (error) {
+      setBusy(false);
+      setCheckingAccess(false);
       if (error.message.toLowerCase().includes("invalid login credentials")) {
         toast.error("E-mail ou senha incorretos. Se necessário, use ‘Esqueci minha senha’. ");
       } else {
@@ -186,7 +178,23 @@ function AuthPage() {
       return;
     }
 
-    toast.success("Bem-vindo de volta!");
+    try {
+      const destination = await resolveAuthenticatedDestination(next);
+      if (destination) {
+        toast.success("Bem-vindo de volta!");
+        window.location.replace(destination);
+        return;
+      }
+
+      await supabase.auth.signOut();
+      toast.error("Este e-mail não está autorizado a acessar o painel da JR Clinic.");
+    } catch (accessError: any) {
+      console.error(accessError);
+      toast.error("Login realizado, mas não foi possível verificar seu acesso. Tente novamente.");
+    } finally {
+      setBusy(false);
+      setCheckingAccess(false);
+    }
   };
 
   const sendPasswordReset = async () => {
@@ -265,7 +273,7 @@ function AuthPage() {
         <div className="mt-7 rounded-2xl border border-border bg-card p-5 shadow-soft sm:mt-8 sm:p-6">
           {isAdminAccess && (
             <p className="mb-5 text-center text-[11px] leading-relaxed text-muted-foreground">
-              Administradores acessam a gestão completa. Colaboradores autorizados são direcionados à própria agenda.
+              Administradores acessam a gestão completa. Colaboradores autorizados são direcionados automaticamente à própria agenda.
             </p>
           )}
 
