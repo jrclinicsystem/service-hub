@@ -3,6 +3,7 @@ import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-ro
 import {
   BellRing,
   CalendarDays,
+  Camera,
   CheckCircle2,
   Clock3,
   LogOut,
@@ -13,6 +14,7 @@ import {
   ShieldCheck,
   Stethoscope,
   Trash2,
+  XCircle,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -60,6 +62,10 @@ function responseFor(appointment: any) {
   return Array.isArray(response) ? response[0] ?? null : response ?? null;
 }
 
+function initials(name: string) {
+  return name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "JR";
+}
+
 function playNotificationSound(audioRef: { current: AudioContext | null }) {
   try {
     const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
@@ -88,7 +94,7 @@ async function loadProfessionalAgenda() {
   const email = (userData.user.email ?? "").trim().toLowerCase();
   if (!email) return { authorized: false as const, email: "" };
 
-  const access = await db.from("professional_access").select("professional_id, email, enabled, professional:professionals(id, name, specialty, is_active, deleted_at)").eq("email", email).eq("enabled", true).maybeSingle();
+  const access = await db.from("professional_access").select("professional_id, email, enabled, professional:professionals(id, name, specialty, avatar_url, is_active, deleted_at)").eq("email", email).eq("enabled", true).maybeSingle();
   if (access.error) throw access.error;
   if (!access.data?.professional_id || !access.data.professional?.is_active || access.data.professional?.deleted_at) return { authorized: false as const, email };
 
@@ -110,7 +116,9 @@ function ProfessionalAgenda() {
   const [scope, setScope] = useState<"upcoming" | "all">("upcoming");
   const [newTime, setNewTime] = useState("");
   const [savingTime, setSavingTime] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement | null>(null);
   const audioRef = useRef<AudioContext | null>(null);
   const notifiedIds = useRef(new Set<string>());
 
@@ -178,6 +186,30 @@ function ProfessionalAgenda() {
     }
   };
 
+  const uploadPhoto = async (file?: File) => {
+    if (!file || !data?.authorized) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) { toast.error("Use uma imagem JPG, PNG ou WebP."); return; }
+    if (file.size > 5 * 1024 * 1024) { toast.error("A foto deve ter no máximo 5 MB."); return; }
+
+    setUploadingPhoto(true);
+    try {
+      const path = `${data.professional.id}/profile`;
+      const { error: uploadError } = await supabase.storage.from("professional-avatars").upload(path, file, { upsert: true, contentType: file.type, cacheControl: "3600" });
+      if (uploadError) throw uploadError;
+      const { data: publicData } = supabase.storage.from("professional-avatars").getPublicUrl(path);
+      const avatarUrl = `${publicData.publicUrl}?v=${Date.now()}`;
+      const { error: saveError } = await db.rpc("set_my_professional_avatar", { _avatar_url: avatarUrl });
+      if (saveError) throw saveError;
+      toast.success("Foto da agenda atualizada.");
+      await refetch();
+    } catch (err: any) {
+      toast.error(err?.message || "Não foi possível atualizar sua foto.");
+    } finally {
+      setUploadingPhoto(false);
+      if (photoInputRef.current) photoInputRef.current.value = "";
+    }
+  };
+
   const signOut = async () => { await supabase.auth.signOut(); navigate({ to: "/auth", search: { next: "/profissional" } }); };
 
   if (isLoading) return <CenteredMessage title="Carregando sua agenda..." />;
@@ -214,7 +246,17 @@ function ProfessionalAgenda() {
       <SimpleHeader onSignOut={signOut} />
       <main className="mx-auto max-w-5xl px-4 pb-16 pt-6 sm:px-8 sm:pt-10">
         <section className="rounded-3xl border border-border bg-card p-5 shadow-soft sm:p-7">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Minha agenda</p><h1 className="mt-2 text-2xl font-semibold sm:text-3xl">{data.professional.name}</h1><p className="mt-1 text-sm text-muted-foreground">{data.professional.specialty}</p></div><div className="flex flex-wrap gap-2"><Button variant={notificationsEnabled ? "secondary" : "default"} size="sm" className="rounded-full" onClick={enableNotifications}><BellRing className="size-4" /> {notificationsEnabled ? "Notificações ativas" : "Ativar notificações"}</Button><Button variant="outline" size="sm" className="rounded-full" onClick={() => refetch()} disabled={isFetching}><RefreshCw className={`size-4 ${isFetching ? "animate-spin" : ""}`} /> Atualizar</Button></div></div>
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                {data.professional.avatar_url ? <img src={data.professional.avatar_url} alt={`Foto de ${data.professional.name}`} className="size-20 rounded-2xl object-cover ring-1 ring-border" /> : <div className="grid size-20 place-items-center rounded-2xl bg-primary text-xl font-semibold text-primary-foreground">{initials(data.professional.name)}</div>}
+                <button type="button" onClick={() => photoInputRef.current?.click()} disabled={uploadingPhoto} className="absolute -bottom-2 -right-2 grid size-9 place-items-center rounded-full border border-border bg-card shadow-md transition hover:bg-secondary disabled:opacity-50" aria-label="Alterar foto"><Camera className="size-4" /></button>
+                <input ref={photoInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => void uploadPhoto(event.target.files?.[0])} />
+              </div>
+              <div><p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Minha agenda</p><h1 className="mt-2 text-2xl font-semibold sm:text-3xl">{data.professional.name}</h1><p className="mt-1 text-sm text-muted-foreground">{data.professional.specialty}</p><p className="mt-2 text-[11px] text-muted-foreground">{uploadingPhoto ? "Enviando foto..." : "Toque na câmera para trocar sua foto."}</p></div>
+            </div>
+            <div className="flex flex-wrap gap-2"><Button variant={notificationsEnabled ? "secondary" : "default"} size="sm" className="rounded-full" onClick={enableNotifications}><BellRing className="size-4" /> {notificationsEnabled ? "Notificações ativas" : "Ativar notificações"}</Button><Button variant="outline" size="sm" className="rounded-full" onClick={() => refetch()} disabled={isFetching}><RefreshCw className={`size-4 ${isFetching ? "animate-spin" : ""}`} /> Atualizar</Button></div>
+          </div>
         </section>
 
         <div className="mt-4 grid grid-cols-3 gap-2.5 sm:mt-6 sm:gap-4"><Metric icon={CalendarDays} label="Hoje" value={String(todayAppointments.length)} /><Metric icon={Clock3} label="Turnos ativos" value={String(activePeriods)} /><Metric icon={Stethoscope} label="Próximos" value={String(upcomingAppointments.length)} /></div>
@@ -243,20 +285,23 @@ function ProfessionalAgenda() {
 }
 
 function ProfessionalAppointmentCard({ appointment, onSaved }: any) {
-  const [busy, setBusy] = useState(false);
-  const confirmed = responseFor(appointment)?.response === "confirmado" || appointment.status === "confirmado";
+  const [busy, setBusy] = useState<"confirm" | "decline" | null>(null);
+  const response = responseFor(appointment)?.response;
+  const confirmed = response === "confirmado" || appointment.status === "confirmado";
   const waiting = appointment.status === "pendente" && !confirmed;
-  const confirmCommitment = async () => {
+
+  const respond = async (nextResponse: "confirmado" | "recusado") => {
     if (!appointment.professional_id || appointment.status === "cancelado") return;
-    setBusy(true);
-    const now = new Date().toISOString();
-    const { error } = await db.from("appointment_professional_responses").upsert({ appointment_id: appointment.id, professional_id: appointment.professional_id, response: "confirmado", responded_at: now, updated_at: now }, { onConflict: "appointment_id" });
-    setBusy(false);
-    if (error) { toast.error("Não foi possível confirmar o compromisso."); return; }
-    toast.success("Compromisso confirmado."); onSaved?.();
+    setBusy(nextResponse === "confirmado" ? "confirm" : "decline");
+    const { error } = await db.rpc("respond_to_professional_appointment", { _appointment_id: appointment.id, _response: nextResponse });
+    setBusy(null);
+    if (error) { toast.error(nextResponse === "confirmado" ? "Não foi possível confirmar o compromisso." : "Não foi possível recusar o compromisso."); return; }
+    toast.success(nextResponse === "confirmado" ? "Compromisso confirmado." : "Agendamento recusado.");
+    onSaved?.();
   };
-  const label = appointment.status === "cancelado" ? "cancelado" : confirmed ? "confirmado" : waiting ? "aguardando confirmação" : appointment.status;
-  return <article className={`rounded-2xl border border-border bg-card p-4 shadow-soft ${appointment.status === "cancelado" ? "opacity-60" : ""}`}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="font-semibold">{appointment.patient_name}</p><Badge variant={confirmed ? "default" : "outline"} className="rounded-full text-[10px]">{label}</Badge>{confirmed ? <Badge className="rounded-full bg-primary-soft text-primary"><CheckCircle2 className="mr-1 size-3" /> Você confirmou</Badge> : null}</div><p className="mt-1 text-xs text-muted-foreground">{appointment.service?.name || "Procedimento"}</p></div><div className="text-right"><p className="font-semibold">{appointment.scheduled_time}</p><p className="text-[10px] text-muted-foreground">{formatDate(appointment.scheduled_date)}</p></div></div><div className="mt-3 grid gap-2 border-t border-border pt-3 sm:grid-cols-2"><a href={appointment.patient_phone ? `tel:${appointment.patient_phone}` : undefined} className="flex items-center gap-2 text-xs text-muted-foreground"><Phone className="size-3.5" /> {appointment.patient_phone || "Telefone não informado"}</a><a href={appointment.patient_email ? `mailto:${appointment.patient_email}` : undefined} className="flex items-center gap-2 text-xs text-muted-foreground sm:justify-end"><Mail className="size-3.5" /> {appointment.patient_email || "E-mail não informado"}</a></div>{appointment.notes ? <p className="mt-3 rounded-xl bg-secondary/60 px-3 py-2 text-xs text-muted-foreground">{appointment.notes}</p> : null}{appointment.status !== "cancelado" && !confirmed ? <Button className="mt-3 w-full rounded-xl" disabled={busy} onClick={confirmCommitment}><CheckCircle2 className="size-4" /> {busy ? "Confirmando..." : "Confirmar compromisso"}</Button> : null}</article>;
+
+  const label = appointment.status === "cancelado" ? (response === "recusado" ? "recusado por você" : "cancelado") : confirmed ? "confirmado" : waiting ? "aguardando confirmação" : appointment.status;
+  return <article className={`rounded-2xl border border-border bg-card p-4 shadow-soft ${appointment.status === "cancelado" ? "opacity-60" : ""}`}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="font-semibold">{appointment.patient_name}</p><Badge variant={confirmed ? "default" : "outline"} className="rounded-full text-[10px]">{label}</Badge>{confirmed ? <Badge className="rounded-full bg-primary-soft text-primary"><CheckCircle2 className="mr-1 size-3" /> Você confirmou</Badge> : null}</div><p className="mt-1 text-xs text-muted-foreground">{appointment.service?.name || "Procedimento"}</p></div><div className="text-right"><p className="font-semibold">{appointment.scheduled_time}</p><p className="text-[10px] text-muted-foreground">{formatDate(appointment.scheduled_date)}</p></div></div><div className="mt-3 grid gap-2 border-t border-border pt-3 sm:grid-cols-2"><a href={appointment.patient_phone ? `tel:${appointment.patient_phone}` : undefined} className="flex items-center gap-2 text-xs text-muted-foreground"><Phone className="size-3.5" /> {appointment.patient_phone || "Telefone não informado"}</a><a href={appointment.patient_email ? `mailto:${appointment.patient_email}` : undefined} className="flex items-center gap-2 text-xs text-muted-foreground sm:justify-end"><Mail className="size-3.5" /> {appointment.patient_email || "E-mail não informado"}</a></div>{appointment.notes ? <p className="mt-3 rounded-xl bg-secondary/60 px-3 py-2 text-xs text-muted-foreground">{appointment.notes}</p> : null}{waiting ? <div className="mt-3 grid gap-2 sm:grid-cols-2"><Button className="rounded-xl" disabled={busy !== null} onClick={() => void respond("confirmado")}><CheckCircle2 className="size-4" /> {busy === "confirm" ? "Confirmando..." : "Confirmar compromisso"}</Button><Button variant="outline" className="rounded-xl text-destructive" disabled={busy !== null} onClick={() => void respond("recusado")}><XCircle className="size-4" /> {busy === "decline" ? "Recusando..." : "Recusar"}</Button></div> : null}</article>;
 }
 
 function SimpleHeader({ onSignOut }: { onSignOut: () => void }) { return <header className="sticky top-0 z-40 border-b border-border/80 bg-card/95 backdrop-blur-xl"><div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4 sm:px-8"><Link to="/"><img src={logo} alt="JR Clinic" className="h-9 w-auto" /></Link><Button variant="outline" size="sm" className="rounded-full" onClick={onSignOut}><LogOut className="size-4" /> Sair</Button></div></header>; }
