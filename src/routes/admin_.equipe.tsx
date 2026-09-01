@@ -15,7 +15,6 @@ import {
   RefreshCw,
   ShieldCheck,
   Trash2,
-  UserRound,
   Users,
   X,
 } from "lucide-react";
@@ -42,6 +41,34 @@ import { supabase } from "@/integrations/supabase/client";
 import { formatDate } from "@/lib/clinic";
 
 const db = supabase as any;
+const weekdays = [
+  { value: 1, label: "Segunda" },
+  { value: 2, label: "Terça" },
+  { value: 3, label: "Quarta" },
+  { value: 4, label: "Quinta" },
+  { value: 5, label: "Sexta" },
+  { value: 6, label: "Sábado" },
+] as const;
+const periods = [
+  { value: "morning", label: "Manhã", detail: "Até 11:59" },
+  { value: "afternoon", label: "Tarde", detail: "12:00 às 17:59" },
+  { value: "evening", label: "Noite", detail: "A partir de 18:00" },
+] as const;
+
+function periodForTime(time: string) {
+  const hour = Number(time.slice(0, 2));
+  if (hour < 12) return "morning";
+  if (hour < 18) return "afternoon";
+  return "evening";
+}
+
+function appointmentStatusLabel(status: string) {
+  if (status === "pendente") return "Aguardando confirmação";
+  if (status === "confirmado") return "Confirmado";
+  if (status === "cancelado") return "Cancelado";
+  if (status === "aguardando_pagamento") return "Aguardando pagamento";
+  return status;
+}
 
 export const Route = createFileRoute("/admin_/equipe")({
   ssr: false,
@@ -85,16 +112,17 @@ async function loadTeamAgenda() {
   if (adminError) throw adminError;
   if (!isAdmin) return { isAdmin: false as const };
 
-  const [professionals, access, appointments, services, links, slots] = await Promise.all([
+  const [professionals, access, appointments, services, links, slots, availability] = await Promise.all([
     db.from("professionals").select("id, name, specialty, avatar_url, is_active, sort_order, deleted_at").is("deleted_at", null).order("sort_order").order("name"),
     db.from("professional_access").select("id, professional_id, email, enabled, created_by, created_at, updated_at").order("created_at"),
     db.from("appointments").select("id, professional_id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status, service:services(id, name, duration_min)").order("scheduled_date").order("scheduled_time"),
     db.from("services").select("id, name, duration_min, price, is_active").eq("is_active", true).order("name"),
     db.from("service_professionals").select("service_id, professional_id"),
     db.from("professional_time_slots").select("id, professional_id, slot, is_available, sort_order").order("sort_order").order("slot"),
+    db.from("professional_availability_periods").select("id, professional_id, weekday, period, is_available").order("weekday").order("period"),
   ]);
 
-  for (const result of [professionals, access, appointments, services, links, slots]) {
+  for (const result of [professionals, access, appointments, services, links, slots, availability]) {
     if (result.error) throw result.error;
   }
 
@@ -106,6 +134,7 @@ async function loadTeamAgenda() {
     services: services.data ?? [],
     links: links.data ?? [],
     slots: slots.data ?? [],
+    availability: availability.data ?? [],
   };
 }
 
@@ -142,6 +171,7 @@ function TeamAgendaPage() {
   const selectedAppointments = selected ? data.appointments.filter((item: any) => item.professional_id === selected.id) : [];
   const selectedServiceIds = selected ? data.links.filter((item: any) => item.professional_id === selected.id).map((item: any) => item.service_id) : [];
   const selectedSlots = selected ? data.slots.filter((item: any) => item.professional_id === selected.id) : [];
+  const selectedAvailability = selected ? data.availability.filter((item: any) => item.professional_id === selected.id) : [];
 
   return (
     <div className="min-h-screen bg-background lg:pl-[252px]">
@@ -168,7 +198,7 @@ function TeamAgendaPage() {
             <div>
               <span className="eyebrow text-muted-foreground">Equipe</span>
               <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Agendas da equipe</h1>
-              <p className="mt-2 max-w-2xl text-sm text-muted-foreground">Crie agendas, cadastre atendimentos, defina horários e controle os acessos dos colaboradores.</p>
+              <p className="mt-2 max-w-2xl text-sm text-muted-foreground">Crie agendas, cadastre atendimentos, defina dias, turnos e horários e controle os acessos dos colaboradores.</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <Button type="button" className="rounded-full" onClick={() => setCreateOpen(true)}><Plus className="size-4" /> Criar agenda</Button>
@@ -189,6 +219,7 @@ function TeamAgendaPage() {
               const access = data.access.find((item: any) => item.professional_id === professional.id);
               const appointments = data.appointments.filter((item: any) => item.professional_id === professional.id && item.status !== "cancelado");
               const activeSlots = data.slots.filter((item: any) => item.professional_id === professional.id && item.is_available).length;
+              const activePeriods = data.availability.filter((item: any) => item.professional_id === professional.id && item.is_available).length;
               return (
                 <article key={professional.id} className="rounded-3xl border border-border bg-card p-5 shadow-soft">
                   <div className="flex items-start gap-4">
@@ -201,7 +232,7 @@ function TeamAgendaPage() {
                       <p className="mt-2 flex items-center gap-1.5 truncate text-[11px] text-muted-foreground"><Mail className="size-3" /> {access?.email || "Sem colaborador vinculado"}</p>
                     </div>
                   </div>
-                  <div className="mt-5 grid grid-cols-3 gap-2"><MiniStat label="Atendimentos" value={appointments.length} /><MiniStat label="Horários" value={activeSlots} /><MiniStat label="Serviços" value={data.links.filter((item: any) => item.professional_id === professional.id).length} /></div>
+                  <div className="mt-5 grid grid-cols-3 gap-2"><MiniStat label="Atendimentos" value={appointments.length} /><MiniStat label="Turnos" value={activePeriods} /><MiniStat label="Horários" value={activeSlots} /></div>
                   <Button type="button" className="mt-4 w-full rounded-full" onClick={() => setSelectedId(professional.id)}>Abrir agenda</Button>
                 </article>
               );
@@ -218,7 +249,7 @@ function TeamAgendaPage() {
                 <div className="flex min-w-0 items-center gap-4"><ProfessionalAvatar professional={selected} className="size-16 sm:size-20" /><div className="min-w-0"><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/65">Agenda individual</p><h1 className="mt-1 truncate text-3xl font-semibold sm:text-4xl">{selected.name}</h1><p className="mt-1 text-sm text-white/70">{selected.specialty}</p></div></div>
                 <div className="flex flex-wrap gap-2">
                   <Button type="button" variant="secondary" className="rounded-full bg-white/15 text-white hover:bg-white/25" onClick={() => setEditOpen(true)}><Pencil className="size-4" /> Editar agenda</Button>
-                  <Button type="button" variant="secondary" className="rounded-full bg-white/15 text-white hover:bg-white/25" onClick={() => setHoursOpen(true)}><Clock3 className="size-4" /> Horários</Button>
+                  <Button type="button" variant="secondary" className="rounded-full bg-white/15 text-white hover:bg-white/25" onClick={() => setHoursOpen(true)}><Clock3 className="size-4" /> Disponibilidade</Button>
                   <Button type="button" className="rounded-full bg-white text-primary hover:bg-white/90" onClick={() => setAppointmentOpen(true)}><CalendarPlus className="size-4" /> Novo agendamento</Button>
                   <Button type="button" variant="secondary" className="rounded-full bg-white/15 text-white hover:bg-destructive hover:text-destructive-foreground" onClick={async () => {
                     if (!window.confirm(`Excluir a agenda de ${selected.name}? O histórico de atendimentos será preservado.`)) return;
@@ -232,12 +263,12 @@ function TeamAgendaPage() {
               </div>
             </div>
             <div className="flex flex-col gap-2 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-7">
-              <div><p className="text-xs font-medium">{selectedAccess?.email || "Nenhum colaborador vinculado"}</p><p className="mt-1 text-[11px] text-muted-foreground">O colaborador vinculado enxerga somente esta agenda.</p></div>
+              <div><p className="text-xs font-medium">{selectedAccess?.email || "Nenhum colaborador vinculado"}</p><p className="mt-1 text-[11px] text-muted-foreground">O colaborador vinculado enxerga somente esta agenda e pode alterar a própria disponibilidade e foto.</p></div>
               <Badge variant={selectedAccess?.enabled ? "default" : "secondary"} className="w-fit rounded-full">{selectedAccess?.enabled ? "Acesso ativo" : "Sem acesso ativo"}</Badge>
             </div>
           </section>
 
-          <div className="mt-5 grid grid-cols-3 gap-2.5 sm:gap-4"><Metric icon={CalendarDays} label="Atendimentos" value={String(selectedAppointments.length)} /><Metric icon={Clock3} label="Horários ativos" value={String(selectedSlots.filter((slot: any) => slot.is_available).length)} /><Metric icon={Users} label="Serviços" value={String(selectedServiceIds.length)} /></div>
+          <div className="mt-5 grid grid-cols-3 gap-2.5 sm:gap-4"><Metric icon={CalendarDays} label="Atendimentos" value={String(selectedAppointments.length)} /><Metric icon={Clock3} label="Turnos ativos" value={String(selectedAvailability.filter((item: any) => item.is_available).length)} /><Metric icon={Users} label="Serviços" value={String(selectedServiceIds.length)} /></div>
 
           <section className="mt-8">
             <div className="flex items-end justify-between"><div><h2 className="text-xl font-semibold">Atendimentos de {selected.name.split(" ")[0]}</h2><p className="mt-1 text-xs text-muted-foreground">Agendamentos desta agenda.</p></div></div>
@@ -245,7 +276,7 @@ function TeamAgendaPage() {
               {selectedAppointments.length === 0 ? <div className="rounded-3xl border border-dashed border-border bg-card p-10 text-center text-sm text-muted-foreground">Nenhum atendimento cadastrado.</div> : selectedAppointments.map((appointment: any) => (
                 <article key={appointment.id} className="rounded-2xl border border-border bg-card p-4 shadow-soft">
                   <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="font-semibold">{appointment.patient_name}</p><p className="mt-1 text-xs text-muted-foreground">{appointment.service?.name || "Atendimento"}</p></div><div className="text-right"><p className="font-semibold">{appointment.scheduled_time}</p><p className="text-[10px] text-muted-foreground">{formatDate(appointment.scheduled_date)}</p></div></div>
-                  <div className="mt-3 flex items-center justify-between border-t border-border pt-3"><Badge variant={appointment.status === "confirmado" ? "default" : "outline"} className="rounded-full">{appointment.status}</Badge><Button type="button" variant="ghost" size="icon" className="text-destructive" onClick={async () => { if (!window.confirm(`Apagar o agendamento de ${appointment.patient_name}?`)) return; const { error: removeError } = await db.from("appointments").delete().eq("id", appointment.id); if (removeError) { toast.error(removeError.message); return; } toast.success("Agendamento apagado."); await refresh(); }}><Trash2 className="size-4" /></Button></div>
+                  <div className="mt-3 flex items-center justify-between border-t border-border pt-3"><Badge variant={appointment.status === "confirmado" ? "default" : "outline"} className="rounded-full">{appointmentStatusLabel(appointment.status)}</Badge><Button type="button" variant="ghost" size="icon" className="text-destructive" onClick={async () => { if (!window.confirm(`Apagar o agendamento de ${appointment.patient_name}?`)) return; const { error: removeError } = await db.from("appointments").delete().eq("id", appointment.id); if (removeError) { toast.error(removeError.message); return; } toast.success("Agendamento apagado."); await refresh(); }}><Trash2 className="size-4" /></Button></div>
                 </article>
               ))}
             </div>
@@ -255,8 +286,8 @@ function TeamAgendaPage() {
 
       <CreateAgendaModal open={createOpen} onClose={() => setCreateOpen(false)} services={data.services} onSaved={refresh} />
       {selected ? <EditAgendaModal open={editOpen} onClose={() => setEditOpen(false)} professional={selected} access={selectedAccess} services={data.services} linkedServiceIds={selectedServiceIds} onSaved={refresh} /> : null}
-      {selected ? <NewAppointmentModal open={appointmentOpen} onClose={() => setAppointmentOpen(false)} professional={selected} services={data.services.filter((service: any) => selectedServiceIds.includes(service.id))} slots={selectedSlots.filter((slot: any) => slot.is_available)} onSaved={refresh} /> : null}
-      {selected ? <HoursModal open={hoursOpen} onClose={() => setHoursOpen(false)} professional={selected} slots={selectedSlots} onSaved={refresh} /> : null}
+      {selected ? <NewAppointmentModal open={appointmentOpen} onClose={() => setAppointmentOpen(false)} professional={selected} services={data.services.filter((service: any) => selectedServiceIds.includes(service.id))} slots={selectedSlots.filter((slot: any) => slot.is_available)} availability={selectedAvailability} onSaved={refresh} /> : null}
+      {selected ? <HoursModal open={hoursOpen} onClose={() => setHoursOpen(false)} professional={selected} slots={selectedSlots} availability={selectedAvailability} onSaved={refresh} /> : null}
     </div>
   );
 }
@@ -321,7 +352,7 @@ function CreateAgendaModal({ open, onClose, services, onSaved }: any) {
   return <ModalShell open={open} onClose={close} title="Criar agenda" description="Cadastre a profissional, o acesso e os serviços atendidos." footer={<><Button variant="outline" onClick={close} disabled={busy}>Cancelar</Button><Button onClick={save} disabled={busy}>{busy ? "Criando..." : "Criar agenda"}</Button></>}>
     <div className="grid gap-4 sm:grid-cols-2">
       <Field label="Nome"><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome completo" /></Field>
-      <Field label="Especialidade"><Input value={specialty} onChange={(e) => setSpecialty(e.target.value)} placeholder="Ex.: Cabeleireira" /></Field>
+      <Field label="Especialidade"><Input value={specialty} onChange={(e) => setSpecialty(e.target.value)} placeholder="Ex.: Esteticista" /></Field>
       <div className="sm:col-span-2"><Field label="E-mail do colaborador (opcional)"><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="colaborador@email.com" /></Field></div>
       <div className="sm:col-span-2"><Label>Serviços atendidos</Label><div className="mt-2 grid max-h-56 gap-2 overflow-y-auto rounded-2xl border border-border p-2 sm:grid-cols-2">{services.map((service: any) => { const selected = serviceIds.includes(service.id); return <button key={service.id} type="button" onClick={() => setServiceIds((current) => selected ? current.filter((id) => id !== service.id) : [...current, service.id])} className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-xs ${selected ? "border-primary bg-primary-soft text-primary" : "border-border"}`}><span className={`grid size-4 place-items-center rounded border ${selected ? "border-primary bg-primary text-primary-foreground" : "border-border"}`}>{selected ? <Check className="size-3" /> : null}</span>{service.name}</button>; })}</div></div>
     </div>
@@ -377,7 +408,7 @@ function EditAgendaModal({ open, onClose, professional, access, services, linked
   </ModalShell>;
 }
 
-function NewAppointmentModal({ open, onClose, professional, services, slots, onSaved }: any) {
+function NewAppointmentModal({ open, onClose, professional, services, slots, availability, onSaved }: any) {
   const [serviceId, setServiceId] = useState("");
   const [patientName, setPatientName] = useState("");
   const [patientEmail, setPatientEmail] = useState("");
@@ -387,31 +418,37 @@ function NewAppointmentModal({ open, onClose, professional, services, slots, onS
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
 
+  const weekday = new Date(`${date}T12:00:00`).getDay();
+  const allowedSlots = useMemo(() => slots.filter((slot: any) => availability.some((item: any) => item.weekday === weekday && item.period === periodForTime(slot.slot) && item.is_available)), [slots, availability, weekday]);
+
+  useEffect(() => { if (time && !allowedSlots.some((slot: any) => slot.slot === time)) setTime(""); }, [allowedSlots, time]);
+
   const reset = () => { setServiceId(""); setPatientName(""); setPatientEmail(""); setPatientPhone(""); setDate(todayIso()); setTime(""); setNotes(""); };
   const save = async () => {
     if (!serviceId || !patientName.trim() || !date || !time) { toast.error("Preencha serviço, cliente, data e horário."); return; }
     const selectedService = services.find((service: any) => service.id === serviceId);
     setBusy(true);
-    const { error } = await db.from("appointments").insert({ user_id: null, professional_id: professional.id, service_id: serviceId, patient_name: patientName.trim(), patient_email: patientEmail.trim().toLowerCase(), patient_phone: patientPhone.trim(), scheduled_date: date, scheduled_time: time, notes: notes.trim(), status: "confirmado", payment_choice: "onsite", service_price_snapshot: Number(selectedService?.price ?? 0), deposit_percent: 0, deposit_amount: 0, balance_amount: Number(selectedService?.price ?? 0) });
+    const { error } = await db.from("appointments").insert({ user_id: null, professional_id: professional.id, service_id: serviceId, patient_name: patientName.trim(), patient_email: patientEmail.trim().toLowerCase(), patient_phone: patientPhone.trim(), scheduled_date: date, scheduled_time: time, notes: notes.trim(), status: "pendente", payment_choice: "onsite", service_price_snapshot: Number(selectedService?.price ?? 0), deposit_percent: 0, deposit_amount: 0, balance_amount: Number(selectedService?.price ?? 0) });
     setBusy(false);
     if (error) { toast.error(error.message); return; }
-    toast.success("Agendamento criado."); reset(); onClose(); await onSaved();
+    toast.success("Agendamento enviado para confirmação.", { description: `${professional.name} precisa confirmar o compromisso na própria agenda.` }); reset(); onClose(); await onSaved();
   };
 
-  return <ModalShell open={open} onClose={() => { if (!busy) { reset(); onClose(); } }} title="Novo agendamento" description={`Adicionar atendimento diretamente à agenda de ${professional.name}.`} width="max-w-xl" footer={<><Button variant="outline" onClick={onClose} disabled={busy}>Cancelar</Button><Button onClick={save} disabled={busy || !services.length || !slots.length}>{busy ? "Salvando..." : "Criar agendamento"}</Button></>}>
+  return <ModalShell open={open} onClose={() => { if (!busy) { reset(); onClose(); } }} title="Novo agendamento" description={`Adicionar atendimento à agenda de ${professional.name}. Ele ficará aguardando a confirmação da profissional.`} width="max-w-xl" footer={<><Button variant="outline" onClick={onClose} disabled={busy}>Cancelar</Button><Button onClick={save} disabled={busy || !services.length || !allowedSlots.length}>{busy ? "Salvando..." : "Enviar para confirmação"}</Button></>}>
     <div className="grid gap-4 sm:grid-cols-2">
       <div className="sm:col-span-2"><Field label="Serviço"><Select value={serviceId} onValueChange={setServiceId}><SelectTrigger><SelectValue placeholder="Selecione o serviço" /></SelectTrigger><SelectContent>{services.map((service: any) => <SelectItem key={service.id} value={service.id}>{service.name}</SelectItem>)}</SelectContent></Select></Field></div>
       <div className="sm:col-span-2"><Field label="Cliente / paciente"><Input value={patientName} onChange={(e) => setPatientName(e.target.value)} /></Field></div>
       <Field label="Telefone"><Input value={patientPhone} onChange={(e) => setPatientPhone(e.target.value)} /></Field>
       <Field label="E-mail"><Input type="email" value={patientEmail} onChange={(e) => setPatientEmail(e.target.value)} /></Field>
       <Field label="Data"><Input type="date" min={todayIso()} value={date} onChange={(e) => setDate(e.target.value)} /></Field>
-      <Field label="Horário"><Select value={time} onValueChange={setTime}><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger><SelectContent>{slots.map((slot: any) => <SelectItem key={slot.id} value={slot.slot}>{slot.slot}</SelectItem>)}</SelectContent></Select></Field>
+      <Field label="Horário"><Select value={time} onValueChange={setTime}><SelectTrigger><SelectValue placeholder={allowedSlots.length ? "Selecione" : "Sem horário neste turno"} /></SelectTrigger><SelectContent>{allowedSlots.map((slot: any) => <SelectItem key={slot.id} value={slot.slot}>{slot.slot}</SelectItem>)}</SelectContent></Select></Field>
       <div className="sm:col-span-2"><Field label="Observações"><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} /></Field></div>
+      {!allowedSlots.length ? <p className="sm:col-span-2 rounded-xl bg-secondary/60 px-3 py-2 text-xs text-muted-foreground">A profissional não possui um turno ativo com horários disponíveis nessa data.</p> : null}
     </div>
   </ModalShell>;
 }
 
-function HoursModal({ open, onClose, professional, slots, onSaved }: any) {
+function HoursModal({ open, onClose, professional, slots, availability, onSaved }: any) {
   const [newTime, setNewTime] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -424,12 +461,28 @@ function HoursModal({ open, onClose, professional, slots, onSaved }: any) {
     setNewTime(""); toast.success("Horário adicionado."); await onSaved();
   };
 
-  return <ModalShell open={open} onClose={onClose} title={`Horários de ${professional.name}`} description="Ative, pause, adicione ou remova horários específicos desta profissional." width="max-w-xl">
-    <div className="flex gap-2"><Input type="time" value={newTime} onChange={(e) => setNewTime(e.target.value)} /><Button type="button" onClick={add} disabled={busy}><Plus className="size-4" /> Adicionar horário</Button></div>
-    <div className="mt-5 space-y-2">
-      {slots.length === 0 ? <p className="rounded-2xl border border-dashed border-border p-5 text-center text-sm text-muted-foreground">Nenhum horário cadastrado.</p> : slots.map((slot: any) => (
-        <div key={slot.id} className="flex items-center justify-between rounded-2xl border border-border px-4 py-3"><div><p className="font-semibold tabular-nums">{slot.slot}</p><p className="text-[10px] text-muted-foreground">{slot.is_available ? "Disponível para agendamento" : "Pausado"}</p></div><div className="flex items-center gap-2"><Switch checked={slot.is_available} onCheckedChange={async (checked) => { const { error } = await db.from("professional_time_slots").update({ is_available: checked, updated_at: new Date().toISOString() }).eq("id", slot.id); if (error) { toast.error(error.message); return; } await onSaved(); }} /><Button type="button" variant="ghost" size="icon" className="text-destructive" onClick={async () => { if (!window.confirm(`Remover o horário ${slot.slot}?`)) return; const { error } = await db.from("professional_time_slots").delete().eq("id", slot.id); if (error) { toast.error(error.message); return; } toast.success("Horário removido."); await onSaved(); }}><Trash2 className="size-4" /></Button></div></div>
-      ))}
+  const setAvailability = async (weekday: number, period: string, checked: boolean) => {
+    const { error } = await db.from("professional_availability_periods").upsert({ professional_id: professional.id, weekday, period, is_available: checked, updated_at: new Date().toISOString() }, { onConflict: "professional_id,weekday,period" });
+    if (error) { toast.error(error.message); return; }
+    await onSaved();
+  };
+
+  return <ModalShell open={open} onClose={onClose} title={`Disponibilidade de ${professional.name}`} description="Defina os dias, turnos e horários específicos desta profissional." width="max-w-3xl">
+    <div>
+      <h3 className="text-sm font-semibold">Dias e turnos</h3>
+      <p className="mt-1 text-xs text-muted-foreground">Ative somente os períodos em que a profissional realmente atende.</p>
+      <div className="mt-4 space-y-3">{weekdays.map((day) => <div key={day.value} className="rounded-2xl border border-border p-4"><p className="mb-3 text-sm font-semibold">{day.label}</p><div className="grid gap-2 sm:grid-cols-3">{periods.map((period) => { const row = availability.find((item: any) => item.weekday === day.value && item.period === period.value); return <div key={period.value} className="flex items-center justify-between rounded-xl bg-secondary/50 px-3 py-2.5"><div><p className="text-xs font-medium">{period.label}</p><p className="text-[9px] text-muted-foreground">{period.detail}</p></div><Switch checked={row?.is_available ?? false} onCheckedChange={(checked) => setAvailability(day.value, period.value, checked)} /></div>; })}</div></div>)}</div>
+    </div>
+
+    <div className="mt-7 border-t border-border pt-6">
+      <h3 className="text-sm font-semibold">Horários exatos</h3>
+      <p className="mt-1 text-xs text-muted-foreground">Os horários só aparecem para agendamento quando o dia e o turno correspondentes também estão ativos.</p>
+      <div className="mt-4 flex gap-2"><Input type="time" value={newTime} onChange={(e) => setNewTime(e.target.value)} /><Button type="button" onClick={add} disabled={busy}><Plus className="size-4" /> Adicionar horário</Button></div>
+      <div className="mt-5 grid gap-2 sm:grid-cols-2">
+        {slots.length === 0 ? <p className="col-span-full rounded-2xl border border-dashed border-border p-5 text-center text-sm text-muted-foreground">Nenhum horário cadastrado.</p> : slots.map((slot: any) => (
+          <div key={slot.id} className="flex items-center justify-between rounded-2xl border border-border px-4 py-3"><div><p className="font-semibold tabular-nums">{slot.slot}</p><p className="text-[10px] text-muted-foreground">{slot.is_available ? "Disponível para agendamento" : "Pausado"}</p></div><div className="flex items-center gap-2"><Switch checked={slot.is_available} onCheckedChange={async (checked) => { const { error } = await db.from("professional_time_slots").update({ is_available: checked, updated_at: new Date().toISOString() }).eq("id", slot.id); if (error) { toast.error(error.message); return; } await onSaved(); }} /><Button type="button" variant="ghost" size="icon" className="text-destructive" onClick={async () => { if (!window.confirm(`Remover o horário ${slot.slot}?`)) return; const { error } = await db.from("professional_time_slots").delete().eq("id", slot.id); if (error) { toast.error(error.message); return; } toast.success("Horário removido."); await onSaved(); }}><Trash2 className="size-4" /></Button></div></div>
+        ))}
+      </div>
     </div>
   </ModalShell>;
 }
