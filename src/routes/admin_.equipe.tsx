@@ -1,15 +1,16 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import {
+  AlertTriangle,
   ArrowLeft,
   CalendarDays,
   CalendarPlus,
   Check,
   ChevronLeft,
   Clock3,
-  ExternalLink,
   LogOut,
   Mail,
+  MessageCircle,
   Pencil,
   Plus,
   RefreshCw,
@@ -24,6 +25,7 @@ import { toast } from "sonner";
 
 import logo from "@/assets/jr-clinic-logo.png";
 import { AdminSubpageSidebar } from "@/components/admin-subpage-sidebar";
+import { AppointmentCalendar } from "@/components/appointment-calendar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,7 +40,13 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
-import { formatDate } from "@/lib/clinic";
+import {
+  appointmentProximity,
+  appointmentWhatsAppUrl,
+  daysUntilAppointment,
+  normalizeWhatsAppPhone,
+} from "@/lib/appointment-contact";
+import { formatDate, formatPrice } from "@/lib/clinic";
 
 const db = supabase as any;
 const weekdays = [
@@ -68,6 +76,15 @@ function appointmentStatusLabel(status: string) {
   if (status === "cancelado") return "Cancelado";
   if (status === "aguardando_pagamento") return "Aguardando pagamento";
   return status;
+}
+
+function openAppointmentWhatsApp(appointment: any, professional: any, kind: "confirmation" | "reminder") {
+  const url = appointmentWhatsAppUrl({ ...appointment, professional }, kind);
+  if (!url) {
+    toast.error("Este cliente não possui WhatsApp cadastrado.");
+    return;
+  }
+  window.open(url, "_blank", "noopener,noreferrer");
 }
 
 export const Route = createFileRoute("/admin_/equipe")({
@@ -115,7 +132,7 @@ async function loadTeamAgenda() {
   const [professionals, access, appointments, services, links, slots, availability] = await Promise.all([
     db.from("professionals").select("id, name, specialty, avatar_url, is_active, sort_order, deleted_at").is("deleted_at", null).order("sort_order").order("name"),
     db.from("professional_access").select("id, professional_id, email, enabled, created_by, created_at, updated_at").order("created_at"),
-    db.from("appointments").select("id, professional_id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status, service:services(id, name, duration_min)").order("scheduled_date").order("scheduled_time"),
+    db.from("appointments").select("id, professional_id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status, service_price_snapshot, service:services(id, name, price, duration_min)").order("scheduled_date").order("scheduled_time"),
     db.from("services").select("id, name, duration_min, price, is_active").eq("is_active", true).order("name"),
     db.from("service_professionals").select("service_id, professional_id"),
     db.from("professional_time_slots").select("id, professional_id, slot, is_available, sort_order").order("sort_order").order("slot"),
@@ -146,6 +163,7 @@ function TeamAgendaPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [appointmentOpen, setAppointmentOpen] = useState(false);
   const [hoursOpen, setHoursOpen] = useState(false);
+  const [calendarDate, setCalendarDate] = useState("");
 
   const { data, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ["team-agenda-v2"],
@@ -168,7 +186,8 @@ function TeamAgendaPage() {
 
   const selected = selectedId ? data.professionals.find((item: any) => item.id === selectedId) ?? null : null;
   const selectedAccess = selected ? data.access.find((item: any) => item.professional_id === selected.id) ?? null : null;
-  const selectedAppointments = selected ? data.appointments.filter((item: any) => item.professional_id === selected.id) : [];
+  const selectedAppointmentsAll = selected ? data.appointments.filter((item: any) => item.professional_id === selected.id) : [];
+  const selectedAppointments = calendarDate ? selectedAppointmentsAll.filter((item: any) => item.scheduled_date === calendarDate) : selectedAppointmentsAll;
   const selectedServiceIds = selected ? data.links.filter((item: any) => item.professional_id === selected.id).map((item: any) => item.service_id) : [];
   const selectedSlots = selected ? data.slots.filter((item: any) => item.professional_id === selected.id) : [];
   const selectedAvailability = selected ? data.availability.filter((item: any) => item.professional_id === selected.id) : [];
@@ -198,13 +217,11 @@ function TeamAgendaPage() {
             <div>
               <span className="eyebrow text-muted-foreground">Equipe</span>
               <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Agendas da equipe</h1>
-              <p className="mt-2 max-w-2xl text-sm text-muted-foreground">Crie agendas, cadastre atendimentos, defina dias, turnos e horários e controle os acessos dos colaboradores.</p>
+              <p className="mt-2 max-w-2xl text-sm text-muted-foreground">Crie agendas, cadastre atendimentos e defina dias, turnos e horários de cada profissional.</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <Button type="button" className="rounded-full" onClick={() => setCreateOpen(true)}><Plus className="size-4" /> Criar agenda</Button>
               <Button type="button" variant="outline" className="rounded-full" onClick={() => refetch()} disabled={isFetching}><RefreshCw className={`size-4 ${isFetching ? "animate-spin" : ""}`} /> Atualizar</Button>
-              <Button variant="outline" className="rounded-full" asChild><Link to="/admin/acessos"><ShieldCheck className="size-4" /> Acessos</Link></Button>
-              <Button variant="outline" className="rounded-full" asChild><Link to="/profissional" target="_blank">Portal da equipe <ExternalLink className="size-4" /></Link></Button>
             </div>
           </div>
 
@@ -233,7 +250,7 @@ function TeamAgendaPage() {
                     </div>
                   </div>
                   <div className="mt-5 grid grid-cols-3 gap-2"><MiniStat label="Atendimentos" value={appointments.length} /><MiniStat label="Turnos" value={activePeriods} /><MiniStat label="Horários" value={activeSlots} /></div>
-                  <Button type="button" className="mt-4 w-full rounded-full" onClick={() => setSelectedId(professional.id)}>Abrir agenda</Button>
+                  <Button type="button" className="mt-4 w-full rounded-full" onClick={() => { setCalendarDate(""); setSelectedId(professional.id); }}>Abrir agenda</Button>
                 </article>
               );
             })}
@@ -241,7 +258,7 @@ function TeamAgendaPage() {
         </main>
       ) : (
         <main className="mx-auto max-w-[1240px] px-4 pb-16 pt-6 sm:px-8 sm:py-10">
-          <Button type="button" variant="ghost" className="-ml-2 rounded-full" onClick={() => setSelectedId(null)}><ArrowLeft className="size-4" /> Voltar para equipe</Button>
+          <Button type="button" variant="ghost" className="-ml-2 rounded-full" onClick={() => { setCalendarDate(""); setSelectedId(null); }}><ArrowLeft className="size-4" /> Voltar para equipe</Button>
 
           <section className="mt-4 overflow-hidden rounded-3xl border border-border bg-card shadow-soft">
             <div className="bg-primary p-5 text-primary-foreground sm:p-7">
@@ -268,17 +285,27 @@ function TeamAgendaPage() {
             </div>
           </section>
 
-          <div className="mt-5 grid grid-cols-3 gap-2.5 sm:gap-4"><Metric icon={CalendarDays} label="Atendimentos" value={String(selectedAppointments.length)} /><Metric icon={Clock3} label="Turnos ativos" value={String(selectedAvailability.filter((item: any) => item.is_available).length)} /><Metric icon={Users} label="Serviços" value={String(selectedServiceIds.length)} /></div>
+          <div className="mt-5 grid grid-cols-3 gap-2.5 sm:gap-4"><Metric icon={CalendarDays} label="Atendimentos" value={String(selectedAppointmentsAll.length)} /><Metric icon={Clock3} label="Turnos ativos" value={String(selectedAvailability.filter((item: any) => item.is_available).length)} /><Metric icon={Users} label="Serviços" value={String(selectedServiceIds.length)} /></div>
+
+          <div className="mt-5"><AppointmentCalendar appointments={selectedAppointmentsAll} selectedDate={calendarDate} onSelectDate={setCalendarDate} title={`Calendário de ${selected.name.split(" ")[0]}`} description="Toque em um dia para mostrar somente os atendimentos daquela data." /></div>
 
           <section className="mt-8">
-            <div className="flex items-end justify-between"><div><h2 className="text-xl font-semibold">Atendimentos de {selected.name.split(" ")[0]}</h2><p className="mt-1 text-xs text-muted-foreground">Agendamentos desta agenda.</p></div></div>
+            <div className="flex items-end justify-between"><div><h2 className="text-xl font-semibold">Atendimentos de {selected.name.split(" ")[0]}</h2><p className="mt-1 text-xs text-muted-foreground">Agendamentos desta agenda com alertas automáticos de proximidade.</p></div></div>
             <div className="mt-4 space-y-3">
-              {selectedAppointments.length === 0 ? <div className="rounded-3xl border border-dashed border-border bg-card p-10 text-center text-sm text-muted-foreground">Nenhum atendimento cadastrado.</div> : selectedAppointments.map((appointment: any) => (
-                <article key={appointment.id} className="rounded-2xl border border-border bg-card p-4 shadow-soft">
-                  <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="font-semibold">{appointment.patient_name}</p><p className="mt-1 text-xs text-muted-foreground">{appointment.service?.name || "Atendimento"}</p></div><div className="text-right"><p className="font-semibold">{appointment.scheduled_time}</p><p className="text-[10px] text-muted-foreground">{formatDate(appointment.scheduled_date)}</p></div></div>
-                  <div className="mt-3 flex items-center justify-between border-t border-border pt-3"><Badge variant={appointment.status === "confirmado" ? "default" : "outline"} className="rounded-full">{appointmentStatusLabel(appointment.status)}</Badge><Button type="button" variant="ghost" size="icon" className="text-destructive" onClick={async () => { if (!window.confirm(`Apagar o agendamento de ${appointment.patient_name}?`)) return; const { error: removeError } = await db.from("appointments").delete().eq("id", appointment.id); if (removeError) { toast.error(removeError.message); return; } toast.success("Agendamento apagado."); await refresh(); }}><Trash2 className="size-4" /></Button></div>
-                </article>
-              ))}
+              {selectedAppointments.length === 0 ? <div className="rounded-3xl border border-dashed border-border bg-card p-10 text-center text-sm text-muted-foreground">Nenhum atendimento cadastrado nesta data.</div> : selectedAppointments.map((appointment: any) => {
+                const proximity = appointment.status === "cancelado" ? "past" : appointmentProximity(appointment.scheduled_date);
+                const days = daysUntilAppointment(appointment.scheduled_date);
+                const hasWhatsApp = normalizeWhatsAppPhone(appointment.patient_phone).length > 0;
+                const cardClass = proximity === "urgent" ? "border-amber-500/60 bg-amber-50/70" : proximity === "soon" ? "border-amber-300/60 bg-amber-50/35" : "border-border bg-card";
+                return (
+                  <article key={appointment.id} className={`rounded-2xl border p-4 shadow-soft ${cardClass}`}>
+                    {proximity === "urgent" && appointment.status !== "cancelado" ? <div className="mb-3 flex items-center gap-2 rounded-xl bg-amber-100 px-3 py-2 text-xs font-semibold text-amber-900"><AlertTriangle className="size-4" /> {days === 0 ? "Atendimento hoje" : "Atendimento amanhã — recontato recomendado"}</div> : proximity === "soon" ? <div className="mb-3 rounded-xl bg-amber-100/60 px-3 py-2 text-[11px] font-medium text-amber-900">Faltam {days} dias para este atendimento.</div> : null}
+                    <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="font-semibold">{appointment.patient_name}</p><p className="mt-1 text-xs text-muted-foreground">{appointment.service?.name || "Atendimento"} · {formatPrice(Number(appointment.service_price_snapshot ?? appointment.service?.price ?? 0))}</p></div><div className="text-right"><p className="font-semibold">{appointment.scheduled_time}</p><p className="text-[10px] text-muted-foreground">{formatDate(appointment.scheduled_date)}</p></div></div>
+                    {hasWhatsApp && appointment.status !== "cancelado" ? <div className="mt-3">{proximity === "urgent" ? <Button type="button" size="sm" className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => openAppointmentWhatsApp(appointment, selected, "reminder")}><MessageCircle className="size-4" /> {days === 0 ? "Falar com cliente" : "Recontatar cliente"}</Button> : appointment.status === "pendente" ? <Button type="button" size="sm" variant="outline" className="rounded-xl border-emerald-600/40 text-emerald-700" onClick={() => openAppointmentWhatsApp(appointment, selected, "confirmation")}><MessageCircle className="size-4" /> Confirmar pelo WhatsApp</Button> : null}</div> : null}
+                    <div className="mt-3 flex items-center justify-between border-t border-border/70 pt-3"><Badge variant={appointment.status === "confirmado" ? "default" : "outline"} className="rounded-full">{appointmentStatusLabel(appointment.status)}</Badge><Button type="button" variant="ghost" size="icon" className="text-destructive" onClick={async () => { if (!window.confirm(`Apagar o agendamento de ${appointment.patient_name}?`)) return; const { error: removeError } = await db.from("appointments").delete().eq("id", appointment.id); if (removeError) { toast.error(removeError.message); return; } toast.success("Agendamento apagado."); await refresh(); }}><Trash2 className="size-4" /></Button></div>
+                  </article>
+                );
+              })}
             </div>
           </section>
         </main>
@@ -438,7 +465,7 @@ function NewAppointmentModal({ open, onClose, professional, services, slots, ava
     <div className="grid gap-4 sm:grid-cols-2">
       <div className="sm:col-span-2"><Field label="Serviço"><Select value={serviceId} onValueChange={setServiceId}><SelectTrigger><SelectValue placeholder="Selecione o serviço" /></SelectTrigger><SelectContent>{services.map((service: any) => <SelectItem key={service.id} value={service.id}>{service.name}</SelectItem>)}</SelectContent></Select></Field></div>
       <div className="sm:col-span-2"><Field label="Cliente / paciente"><Input value={patientName} onChange={(e) => setPatientName(e.target.value)} /></Field></div>
-      <Field label="Telefone"><Input value={patientPhone} onChange={(e) => setPatientPhone(e.target.value)} /></Field>
+      <Field label="WhatsApp"><Input inputMode="tel" value={patientPhone} onChange={(e) => setPatientPhone(e.target.value)} /></Field>
       <Field label="E-mail"><Input type="email" value={patientEmail} onChange={(e) => setPatientEmail(e.target.value)} /></Field>
       <Field label="Data"><Input type="date" min={todayIso()} value={date} onChange={(e) => setDate(e.target.value)} /></Field>
       <Field label="Horário"><Select value={time} onValueChange={setTime}><SelectTrigger><SelectValue placeholder={allowedSlots.length ? "Selecione" : "Sem horário neste turno"} /></SelectTrigger><SelectContent>{allowedSlots.map((slot: any) => <SelectItem key={slot.id} value={slot.slot}>{slot.slot}</SelectItem>)}</SelectContent></Select></Field>
