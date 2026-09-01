@@ -114,18 +114,32 @@ function AuthPage() {
       }
 
       setCheckingAccess(true);
-      const { data: isAdmin, error: accessError } = await (supabase as any).rpc(
+
+      const { data: isAdmin, error: adminError } = await (supabase as any).rpc(
         "is_current_user_admin",
       );
 
-      if (accessError || !isAdmin) {
-        await supabase.auth.signOut();
-        toast.error("Este e-mail não está autorizado a acessar o painel da JR Clinic.");
-        setCheckingAccess(false);
+      if (!adminError && isAdmin) {
+        window.location.replace("/admin");
         return;
       }
 
-      window.location.replace("/admin");
+      const normalizedEmail = (user.email ?? "").trim().toLowerCase();
+      const { data: staffAccess, error: staffError } = await (supabase as any)
+        .from("professional_access")
+        .select("professional_id, enabled")
+        .eq("email", normalizedEmail)
+        .eq("enabled", true)
+        .maybeSingle();
+
+      if (!staffError && staffAccess?.professional_id) {
+        window.location.replace("/profissional");
+        return;
+      }
+
+      await supabase.auth.signOut();
+      toast.error("Este e-mail não está autorizado a acessar o painel da JR Clinic.");
+      setCheckingAccess(false);
     };
 
     void finishLogin();
@@ -218,21 +232,21 @@ function AuthPage() {
 
       <main className="mx-auto max-w-md px-4 pb-24 pt-8 sm:px-8 sm:py-16">
         <span className="eyebrow text-muted-foreground">
-          {isAdminAccess ? "Acesso administrativo" : "Bem-vindo"}
+          {isAdminAccess ? "Acesso ao painel" : "Bem-vindo"}
         </span>
         <h1 className="mt-2 text-3xl font-semibold">
           {isAdminAccess ? "Painel JR Clinic" : "Sua conta JR Clinic"}
         </h1>
         <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
           {isAdminAccess
-            ? "Entre com um dos e-mails previamente autorizados para administrar a clínica."
+            ? "Entre com um e-mail administrativo ou de colaborador previamente autorizado."
             : "Entre para agendar, acompanhar atendimentos e manter seus dados em um só lugar."}
         </p>
 
         <div className="mt-7 rounded-2xl border border-border bg-card p-5 shadow-soft sm:mt-8 sm:p-6">
           {isAdminAccess && (
             <p className="mb-5 text-center text-[11px] leading-relaxed text-muted-foreground">
-              Somente contas com e-mail administrativo autorizado conseguem entrar no painel.
+              Administradores acessam a gestão completa. Colaboradores autorizados são direcionados à própria agenda.
             </p>
           )}
 
