@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import {
+  AlertTriangle,
   BellRing,
   CalendarDays,
   Camera,
@@ -9,6 +10,7 @@ import {
   Clock3,
   LogOut,
   Mail,
+  MessageCircle,
   Phone,
   Plus,
   RefreshCw,
@@ -21,12 +23,19 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import logo from "@/assets/jr-clinic-logo.png";
+import { AppointmentCalendar } from "@/components/appointment-calendar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
-import { formatDate } from "@/lib/clinic";
+import {
+  appointmentProximity,
+  appointmentWhatsAppUrl,
+  daysUntilAppointment,
+  normalizeWhatsAppPhone,
+} from "@/lib/appointment-contact";
+import { formatDate, formatPrice } from "@/lib/clinic";
 
 const db = supabase as any;
 const weekdays = [
@@ -100,7 +109,7 @@ async function loadProfessionalAgenda() {
   if (!access.data?.professional_id || !access.data.professional?.is_active || access.data.professional?.deleted_at) return { authorized: false as const, email };
 
   const [appointments, slots, availability] = await Promise.all([
-    db.from("appointments").select("id, professional_id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status, service:services(name, duration_min), professional_response:appointment_professional_responses(response, responded_at)").eq("professional_id", access.data.professional_id).order("scheduled_date").order("scheduled_time"),
+    db.from("appointments").select("id, professional_id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status, service_price_snapshot, balance_amount, service:services(name, price, duration_min), professional_response:appointment_professional_responses(response, responded_at)").eq("professional_id", access.data.professional_id).order("scheduled_date").order("scheduled_time"),
     db.from("professional_time_slots").select("id, professional_id, slot, is_available, sort_order").eq("professional_id", access.data.professional_id).order("sort_order").order("slot"),
     db.from("professional_availability_periods").select("id, professional_id, weekday, period, is_available").eq("professional_id", access.data.professional_id).order("weekday").order("period"),
   ]);
@@ -137,33 +146,25 @@ function ProfessionalAgenda() {
   useEffect(() => {
     if (!data?.authorized || !data.professional?.id) return;
     const professionalId = data.professional.id;
-
     const notify = async (payload: any) => {
       const next = payload.new as any;
       if (!next?.id || next.professional_id !== professionalId || next.status !== "pendente" || notifiedIds.current.has(next.id)) return;
       notifiedIds.current.add(next.id);
       await refetch();
       playNotificationSound(audioRef);
-
       const detailResult = await db.from("appointments").select("id,patient_name,scheduled_date,scheduled_time,service:services(name)").eq("id", next.id).maybeSingle();
       const detail = detailResult.data;
-      const title = "Novo agendamento para confirmar";
-      const description = detail
-        ? `${detail.patient_name} · ${detail.service?.name ?? "Atendimento"} · ${formatDate(detail.scheduled_date)} às ${detail.scheduled_time}`
-        : "Você recebeu um novo agendamento na sua agenda.";
-
-      toast.success(title, { description });
+      const description = detail ? `${detail.patient_name} · ${detail.service?.name ?? "Atendimento"} · ${formatDate(detail.scheduled_date)} às ${detail.scheduled_time}` : "Você recebeu um novo agendamento na sua agenda.";
+      toast.success("Novo agendamento para confirmar", { description });
       if (typeof Notification !== "undefined" && Notification.permission === "granted") {
         try { new Notification("JR Clinic · Novo agendamento", { body: description }); } catch {}
       }
     };
-
     const channel = supabase
       .channel(`jrclinic-professional-${professionalId}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "appointments", filter: `professional_id=eq.${professionalId}` }, notify)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "appointments", filter: `professional_id=eq.${professionalId}` }, notify)
       .subscribe();
-
     return () => { void supabase.removeChannel(channel); };
   }, [data?.authorized, data?.professional?.id, refetch]);
 
@@ -173,16 +174,14 @@ function ProfessionalAgenda() {
       if (AudioCtx && !audioRef.current) audioRef.current = new AudioCtx();
       if (audioRef.current?.state === "suspended") await audioRef.current.resume();
       playNotificationSound(audioRef);
-
       if (typeof Notification === "undefined") {
         setNotificationsEnabled(true);
         toast.success("Som de notificações ativado.");
         return;
       }
-
       const permission = Notification.permission === "granted" ? "granted" : await Notification.requestPermission();
       setNotificationsEnabled(permission === "granted");
-      if (permission === "granted") toast.success("Notificações do navegador ativadas.", { description: "Novos agendamentos terão alerta visual e sonoro enquanto o portal estiver conectado." });
+      if (permission === "granted") toast.success("Notificações do navegador ativadas.");
       else toast.info("O som foi ativado, mas as notificações do navegador não foram permitidas.");
     } catch {
       toast.error("O navegador não permitiu ativar o áudio de notificações.");
@@ -193,12 +192,10 @@ function ProfessionalAgenda() {
     if (!file || !data?.authorized) return;
     if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) { toast.error("Use uma imagem JPG, PNG ou WebP."); return; }
     if (file.size > 5 * 1024 * 1024) { toast.error("A foto deve ter no máximo 5 MB."); return; }
-
     setUploadingPhoto(true);
     try {
       const { data: userData, error: userError } = await supabase.auth.getUser();
       if (userError || !userData.user) throw new Error("Sua sessão expirou. Entre novamente para trocar a foto.");
-
       const extension = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
       const path = `${userData.user.id}/professional-${data.professional.id}-${Date.now()}.${extension}`;
       const { error: uploadError } = await supabase.storage.from("avatars").upload(path, file, { upsert: false, contentType: file.type, cacheControl: "3600" });
@@ -227,13 +224,7 @@ function ProfessionalAgenda() {
   const activePeriods = data.availability.filter((item: any) => item.is_available).length;
 
   const setAvailability = async (weekday: number, period: string, checked: boolean) => {
-    const { error: availabilityError } = await db.from("professional_availability_periods").upsert({
-      professional_id: data.professional.id,
-      weekday,
-      period,
-      is_available: checked,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: "professional_id,weekday,period" });
+    const { error: availabilityError } = await db.from("professional_availability_periods").upsert({ professional_id: data.professional.id, weekday, period, is_available: checked, updated_at: new Date().toISOString() }, { onConflict: "professional_id,weekday,period" });
     if (availabilityError) { toast.error(availabilityError.message); return; }
     await refetch();
   };
@@ -267,33 +258,35 @@ function ProfessionalAgenda() {
 
         <div className="mt-4 grid grid-cols-3 gap-2.5 sm:mt-6 sm:gap-4"><Metric icon={CalendarDays} label="Hoje" value={String(todayAppointments.length)} /><Metric icon={Clock3} label="Turnos ativos" value={String(activePeriods)} /><Metric icon={Stethoscope} label="Próximos" value={String(upcomingAppointments.length)} /></div>
 
-        <section className="mt-7 rounded-3xl border border-border bg-card p-3 shadow-soft sm:p-6">
-          <button type="button" className="flex w-full items-center justify-between gap-4 rounded-2xl border border-border/80 bg-secondary/70 px-4 py-3.5 text-left sm:cursor-default sm:border-0 sm:bg-transparent sm:p-0" onClick={() => setDaysOpen((open) => !open)}>
-            <div><h2 className="text-base font-bold text-foreground sm:text-lg">Meus dias e turnos</h2><p className="mt-1 text-sm font-medium leading-snug text-foreground/75 sm:text-xs sm:font-normal sm:text-muted-foreground">{activePeriods} turno(s) ativo(s). Toque para visualizar e alterar.</p></div>
-            <ChevronDown className={`size-6 shrink-0 text-foreground transition-transform sm:hidden ${daysOpen ? "rotate-180" : ""}`} />
+        <div className="mt-7"><AppointmentCalendar appointments={data.appointments} selectedDate={dateFilter} onSelectDate={setDateFilter} title="Meu calendário" description="Toque em um dia para filtrar os atendimentos daquela data." /></div>
+
+        <section className="mt-4 rounded-3xl border border-primary/15 bg-primary-soft/20 p-4 shadow-soft sm:mt-7 sm:p-6">
+          <button type="button" className="flex w-full items-center justify-between gap-4 text-left sm:cursor-default" onClick={() => setDaysOpen((open) => !open)}>
+            <div><h2 className="text-lg font-bold text-foreground">Meus dias e turnos</h2><p className="mt-1 text-xs font-medium text-foreground/70">{activePeriods} turno(s) ativo(s). Toque para visualizar e alterar.</p></div>
+            <ChevronDown className={`size-5 shrink-0 text-primary transition-transform sm:hidden ${daysOpen ? "rotate-180" : ""}`} />
           </button>
           <div className={`${daysOpen ? "block" : "hidden"} mt-5 space-y-3 sm:block`}>
             <p className="text-xs text-muted-foreground">Escolha em quais dias você atende de manhã, à tarde ou à noite. Turnos desligados não aceitarão novos agendamentos.</p>
-            {weekdays.map((day) => <div key={day.value} className="rounded-2xl border border-border p-4"><p className="mb-3 text-sm font-semibold">{day.label}</p><div className="grid gap-2 sm:grid-cols-3">{periods.map((period) => { const row = data.availability.find((item: any) => item.weekday === day.value && item.period === period.value); const checked = row?.is_available ?? false; return <div key={period.value} className="flex items-center justify-between rounded-xl bg-secondary/50 px-3 py-2.5"><div><p className="text-xs font-medium">{period.label}</p><p className="text-[9px] text-muted-foreground">{period.detail}</p></div><Switch checked={checked} onCheckedChange={(value) => setAvailability(day.value, period.value, value)} /></div>; })}</div></div>)}
+            {weekdays.map((day) => <div key={day.value} className="rounded-2xl border border-border bg-card p-4"><p className="mb-3 text-sm font-semibold">{day.label}</p><div className="grid gap-2 sm:grid-cols-3">{periods.map((period) => { const row = data.availability.find((item: any) => item.weekday === day.value && item.period === period.value); const checked = row?.is_available ?? false; return <div key={period.value} className="flex items-center justify-between rounded-xl bg-secondary/50 px-3 py-2.5"><div><p className="text-xs font-medium">{period.label}</p><p className="text-[9px] text-muted-foreground">{period.detail}</p></div><Switch checked={checked} onCheckedChange={(value) => setAvailability(day.value, period.value, value)} /></div>; })}</div></div>)}
           </div>
         </section>
 
-        <section className="mt-4 rounded-3xl border border-border bg-card p-3 shadow-soft sm:mt-7 sm:p-6">
-          <button type="button" className="flex w-full items-center justify-between gap-4 rounded-2xl border border-border/80 bg-secondary/70 px-4 py-3.5 text-left sm:cursor-default sm:border-0 sm:bg-transparent sm:p-0" onClick={() => setHoursOpen((open) => !open)}>
-            <div><h2 className="text-base font-bold text-foreground sm:text-lg">Meus horários disponíveis</h2><p className="mt-1 text-sm font-medium leading-snug text-foreground/75 sm:text-xs sm:font-normal sm:text-muted-foreground">{data.slots.filter((slot: any) => slot.is_available).length} horário(s) ativo(s). Toque para visualizar e alterar.</p></div>
-            <ChevronDown className={`size-6 shrink-0 text-foreground transition-transform sm:hidden ${hoursOpen ? "rotate-180" : ""}`} />
+        <section className="mt-4 rounded-3xl border border-primary/15 bg-primary-soft/20 p-4 shadow-soft sm:mt-7 sm:p-6">
+          <button type="button" className="flex w-full items-center justify-between gap-4 text-left sm:cursor-default" onClick={() => setHoursOpen((open) => !open)}>
+            <div><h2 className="text-lg font-bold text-foreground">Meus horários disponíveis</h2><p className="mt-1 text-xs font-medium text-foreground/70">{data.slots.filter((slot: any) => slot.is_available).length} horário(s) ativo(s). Toque para visualizar e alterar.</p></div>
+            <ChevronDown className={`size-5 shrink-0 text-primary transition-transform sm:hidden ${hoursOpen ? "rotate-180" : ""}`} />
           </button>
           <div className={`${hoursOpen ? "block" : "hidden"} mt-5 sm:block`}>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><p className="text-xs text-muted-foreground">Além do dia e turno, defina os horários exatos que podem receber agendamentos.</p><div className="flex gap-2"><Input type="time" value={newTime} onChange={(e) => setNewTime(e.target.value)} className="min-w-0 flex-1 sm:w-[150px] sm:flex-none" /><Button type="button" onClick={addTime} disabled={savingTime}><Plus className="size-4" /> Adicionar</Button></div></div>
             <div className="mt-5 grid gap-2 sm:grid-cols-2">
-              {data.slots.length === 0 ? <p className="col-span-full rounded-2xl border border-dashed border-border p-5 text-center text-sm text-muted-foreground">Nenhum horário cadastrado.</p> : data.slots.map((slot: any) => <div key={slot.id} className="flex items-center justify-between rounded-2xl border border-border px-4 py-3"><div><p className="font-semibold tabular-nums">{slot.slot}</p><p className="text-[10px] text-muted-foreground">{slot.is_available ? "Disponível" : "Pausado"}</p></div><div className="flex items-center gap-2"><Switch checked={slot.is_available} onCheckedChange={async (checked) => { const { error: updateError } = await db.from("professional_time_slots").update({ is_available: checked, updated_at: new Date().toISOString() }).eq("id", slot.id); if (updateError) { toast.error(updateError.message); return; } await refetch(); }} /><Button type="button" variant="ghost" size="icon" className="text-destructive" onClick={async () => { if (!window.confirm(`Remover o horário ${slot.slot}?`)) return; const { error: removeError } = await db.from("professional_time_slots").delete().eq("id", slot.id); if (removeError) { toast.error(removeError.message); return; } toast.success("Horário removido."); await refetch(); }}><Trash2 className="size-4" /></Button></div></div>)}
+              {data.slots.length === 0 ? <p className="col-span-full rounded-2xl border border-dashed border-border bg-card p-5 text-center text-sm text-muted-foreground">Nenhum horário cadastrado.</p> : data.slots.map((slot: any) => <div key={slot.id} className="flex items-center justify-between rounded-2xl border border-border bg-card px-4 py-3"><div><p className="font-semibold tabular-nums">{slot.slot}</p><p className="text-[10px] text-muted-foreground">{slot.is_available ? "Disponível" : "Pausado"}</p></div><div className="flex items-center gap-2"><Switch checked={slot.is_available} onCheckedChange={async (checked) => { const { error: updateError } = await db.from("professional_time_slots").update({ is_available: checked, updated_at: new Date().toISOString() }).eq("id", slot.id); if (updateError) { toast.error(updateError.message); return; } await refetch(); }} /><Button type="button" variant="ghost" size="icon" className="text-destructive" onClick={async () => { if (!window.confirm(`Remover o horário ${slot.slot}?`)) return; const { error: removeError } = await db.from("professional_time_slots").delete().eq("id", slot.id); if (removeError) { toast.error(removeError.message); return; } toast.success("Horário removido."); await refetch(); }}><Trash2 className="size-4" /></Button></div></div>)}
             </div>
           </div>
         </section>
 
         <section className="mt-7">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><h2 className="text-lg font-semibold">Meus atendimentos</h2><p className="mt-1 text-xs text-muted-foreground">Somente os atendimentos vinculados à sua agenda aparecem aqui.</p></div><div className="flex gap-2"><div className="grid grid-cols-2 rounded-xl bg-secondary/70 p-1"><button type="button" onClick={() => setScope("upcoming")} className={`rounded-lg px-3 py-2 text-xs ${scope === "upcoming" ? "bg-card shadow-sm" : "text-muted-foreground"}`}>Próximos</button><button type="button" onClick={() => setScope("all")} className={`rounded-lg px-3 py-2 text-xs ${scope === "all" ? "bg-card shadow-sm" : "text-muted-foreground"}`}>Todos</button></div><Input type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} className="w-[160px]" /></div></div>
-          <div className="mt-4 space-y-3">{filteredAppointments.length === 0 ? <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center text-sm text-muted-foreground">Nenhum atendimento encontrado.</div> : filteredAppointments.map((appointment: any) => <ProfessionalAppointmentCard key={appointment.id} appointment={appointment} onSaved={() => refetch()} />)}</div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><h2 className="text-lg font-semibold">Meus atendimentos</h2><p className="mt-1 text-xs text-muted-foreground">Os atendimentos próximos ganham destaque automaticamente. Com 1 dia de antecedência, o recontato pelo WhatsApp aparece.</p></div><div className="flex gap-2"><div className="grid grid-cols-2 rounded-xl bg-secondary/70 p-1"><button type="button" onClick={() => setScope("upcoming")} className={`rounded-lg px-3 py-2 text-xs ${scope === "upcoming" ? "bg-card shadow-sm" : "text-muted-foreground"}`}>Próximos</button><button type="button" onClick={() => setScope("all")} className={`rounded-lg px-3 py-2 text-xs ${scope === "all" ? "bg-card shadow-sm" : "text-muted-foreground"}`}>Todos</button></div><Input type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} className="w-[160px]" /></div></div>
+          <div className="mt-4 space-y-3">{filteredAppointments.length === 0 ? <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center text-sm text-muted-foreground">Nenhum atendimento encontrado.</div> : filteredAppointments.map((appointment: any) => <ProfessionalAppointmentCard key={appointment.id} appointment={{ ...appointment, professional: data.professional }} onSaved={() => refetch()} />)}</div>
         </section>
       </main>
     </div>
@@ -305,22 +298,38 @@ function ProfessionalAppointmentCard({ appointment, onSaved }: any) {
   const response = responseFor(appointment)?.response;
   const confirmed = response === "confirmado" || appointment.status === "confirmado";
   const waiting = appointment.status === "pendente" && !confirmed;
+  const proximity = appointment.status === "cancelado" ? "past" : appointmentProximity(appointment.scheduled_date);
+  const days = daysUntilAppointment(appointment.scheduled_date);
+  const hasWhatsApp = normalizeWhatsAppPhone(appointment.patient_phone).length > 0;
+  const total = Number(appointment.service_price_snapshot ?? appointment.service?.price ?? 0);
 
   const respond = async (nextResponse: "confirmado" | "recusado") => {
     if (!appointment.professional_id || appointment.status === "cancelado") return;
     setBusy(nextResponse === "confirmado" ? "confirm" : "decline");
     const { error } = await db.rpc("respond_to_professional_appointment", { _appointment_id: appointment.id, _response: nextResponse });
     setBusy(null);
-    if (error) {
-      toast.error(nextResponse === "confirmado" ? "Não foi possível confirmar o compromisso." : "Não foi possível recusar o compromisso.", { description: error.message });
-      return;
-    }
+    if (error) { toast.error(nextResponse === "confirmado" ? "Não foi possível confirmar o compromisso." : "Não foi possível recusar o compromisso.", { description: error.message }); return; }
     toast.success(nextResponse === "confirmado" ? "Compromisso confirmado." : "Agendamento recusado.");
     onSaved?.();
   };
 
+  const openWhatsApp = (kind: "confirmation" | "reminder") => {
+    const url = appointmentWhatsAppUrl(appointment, kind);
+    if (!url) { toast.error("Este cliente não possui WhatsApp cadastrado."); return; }
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
   const label = appointment.status === "cancelado" ? (response === "recusado" ? "recusado por você" : "cancelado") : confirmed ? "confirmado" : waiting ? "aguardando confirmação" : appointment.status;
-  return <article className={`rounded-2xl border border-border bg-card p-4 shadow-soft ${appointment.status === "cancelado" ? "opacity-60" : ""}`}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="font-semibold">{appointment.patient_name}</p><Badge variant={confirmed ? "default" : "outline"} className="rounded-full text-[10px]">{label}</Badge>{confirmed ? <Badge className="rounded-full bg-primary-soft text-primary"><CheckCircle2 className="mr-1 size-3" /> Você confirmou</Badge> : null}</div><p className="mt-1 text-xs text-muted-foreground">{appointment.service?.name || "Procedimento"}</p></div><div className="text-right"><p className="font-semibold">{appointment.scheduled_time}</p><p className="text-[10px] text-muted-foreground">{formatDate(appointment.scheduled_date)}</p></div></div><div className="mt-3 grid gap-2 border-t border-border pt-3 sm:grid-cols-2"><a href={appointment.patient_phone ? `tel:${appointment.patient_phone}` : undefined} className="flex items-center gap-2 text-xs text-muted-foreground"><Phone className="size-3.5" /> {appointment.patient_phone || "Telefone não informado"}</a><a href={appointment.patient_email ? `mailto:${appointment.patient_email}` : undefined} className="flex items-center gap-2 text-xs text-muted-foreground sm:justify-end"><Mail className="size-3.5" /> {appointment.patient_email || "E-mail não informado"}</a></div>{appointment.notes ? <p className="mt-3 rounded-xl bg-secondary/60 px-3 py-2 text-xs text-muted-foreground">{appointment.notes}</p> : null}{waiting ? <div className="mt-3 grid gap-2 sm:grid-cols-2"><Button className="rounded-xl" disabled={busy !== null} onClick={() => void respond("confirmado")}><CheckCircle2 className="size-4" /> {busy === "confirm" ? "Confirmando..." : "Confirmar compromisso"}</Button><Button variant="outline" className="rounded-xl text-destructive" disabled={busy !== null} onClick={() => void respond("recusado")}><XCircle className="size-4" /> {busy === "decline" ? "Recusando..." : "Recusar"}</Button></div> : null}</article>;
+  const cardClass = proximity === "urgent" ? "border-amber-500/60 bg-amber-50/70 shadow-md" : proximity === "soon" ? "border-amber-300/60 bg-amber-50/35" : "border-border bg-card";
+
+  return <article className={`rounded-2xl border p-4 shadow-soft transition ${cardClass} ${appointment.status === "cancelado" ? "opacity-60" : ""}`}>
+    {proximity === "urgent" && appointment.status !== "cancelado" ? <div className="mb-3 flex items-center gap-2 rounded-xl bg-amber-100 px-3 py-2 text-xs font-semibold text-amber-900"><AlertTriangle className="size-4" /> {days === 0 ? "Atendimento hoje — confira com a cliente." : "Atendimento amanhã — recontato recomendado."}</div> : proximity === "soon" ? <div className="mb-3 rounded-xl bg-amber-100/60 px-3 py-2 text-[11px] font-medium text-amber-900">Atendimento se aproximando: faltam {days} dias.</div> : null}
+    <div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="font-semibold">{appointment.patient_name}</p><Badge variant={confirmed ? "default" : "outline"} className="rounded-full text-[10px]">{label}</Badge>{confirmed ? <Badge className="rounded-full bg-primary-soft text-primary"><CheckCircle2 className="mr-1 size-3" /> Você confirmou</Badge> : null}</div><p className="mt-1 text-xs text-muted-foreground">{appointment.service?.name || "Procedimento"} · {formatPrice(total)}</p></div><div className="text-right"><p className="font-semibold">{appointment.scheduled_time}</p><p className="text-[10px] text-muted-foreground">{formatDate(appointment.scheduled_date)}</p></div></div>
+    <div className="mt-3 grid gap-2 border-t border-border/70 pt-3 sm:grid-cols-2"><a href={appointment.patient_phone ? `tel:${appointment.patient_phone}` : undefined} className="flex items-center gap-2 text-xs text-muted-foreground"><Phone className="size-3.5" /> {appointment.patient_phone || "Telefone não informado"}</a><a href={appointment.patient_email ? `mailto:${appointment.patient_email}` : undefined} className="flex items-center gap-2 text-xs text-muted-foreground sm:justify-end"><Mail className="size-3.5" /> {appointment.patient_email || "E-mail não informado"}</a></div>
+    {appointment.notes ? <p className="mt-3 rounded-xl bg-secondary/60 px-3 py-2 text-xs text-muted-foreground">{appointment.notes}</p> : null}
+    {appointment.status !== "cancelado" && hasWhatsApp ? <div className="mt-3 flex flex-wrap gap-2">{proximity === "urgent" ? <Button type="button" className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => openWhatsApp("reminder")}><MessageCircle className="size-4" /> {days === 0 ? "Falar com cliente" : "Recontatar cliente"}</Button> : waiting ? <Button type="button" variant="outline" className="rounded-xl border-emerald-600/40 text-emerald-700 hover:bg-emerald-50" onClick={() => openWhatsApp("confirmation")}><MessageCircle className="size-4" /> Confirmar pelo WhatsApp</Button> : null}</div> : null}
+    {waiting ? <div className="mt-3 grid gap-2 sm:grid-cols-2"><Button className="rounded-xl" disabled={busy !== null} onClick={() => void respond("confirmado")}><CheckCircle2 className="size-4" /> {busy === "confirm" ? "Confirmando..." : "Confirmar compromisso"}</Button><Button variant="outline" className="rounded-xl text-destructive" disabled={busy !== null} onClick={() => void respond("recusado")}><XCircle className="size-4" /> {busy === "decline" ? "Recusando..." : "Recusar"}</Button></div> : null}
+  </article>;
 }
 
 function SimpleHeader({ onSignOut }: { onSignOut: () => void }) { return <header className="sticky top-0 z-40 border-b border-border/80 bg-card/95 backdrop-blur-xl"><div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4 sm:px-8"><Link to="/"><img src={logo} alt="JR Clinic" className="h-9 w-auto" /></Link><Button variant="outline" size="sm" className="rounded-full" onClick={onSignOut}><LogOut className="size-4" /> Sair</Button></div></header>; }
