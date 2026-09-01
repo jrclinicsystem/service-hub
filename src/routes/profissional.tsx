@@ -196,17 +196,20 @@ function ProfessionalAgenda() {
 
     setUploadingPhoto(true);
     try {
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError || !userData.user) throw new Error("Sua sessão expirou. Entre novamente para trocar a foto.");
+
       const extension = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
-      const path = `${data.professional.id}/profile-${Date.now()}.${extension}`;
-      const { error: uploadError } = await supabase.storage.from("professional-avatars").upload(path, file, { upsert: false, contentType: file.type, cacheControl: "3600" });
+      const path = `${userData.user.id}/professional-${data.professional.id}-${Date.now()}.${extension}`;
+      const { error: uploadError } = await supabase.storage.from("avatars").upload(path, file, { upsert: false, contentType: file.type, cacheControl: "3600" });
       if (uploadError) throw uploadError;
-      const { data: publicData } = supabase.storage.from("professional-avatars").getPublicUrl(path);
+      const { data: publicData } = supabase.storage.from("avatars").getPublicUrl(path);
       const { error: saveError } = await db.rpc("set_my_professional_avatar", { _avatar_url: publicData.publicUrl });
       if (saveError) throw saveError;
       toast.success("Foto da agenda atualizada.");
       await refetch();
     } catch (err: any) {
-      toast.error(err?.message || "Não foi possível atualizar sua foto.");
+      toast.error("Não foi possível atualizar sua foto.", { description: err?.message || "Erro inesperado no envio da imagem." });
     } finally {
       setUploadingPhoto(false);
       if (photoInputRef.current) photoInputRef.current.value = "";
@@ -264,10 +267,10 @@ function ProfessionalAgenda() {
 
         <div className="mt-4 grid grid-cols-3 gap-2.5 sm:mt-6 sm:gap-4"><Metric icon={CalendarDays} label="Hoje" value={String(todayAppointments.length)} /><Metric icon={Clock3} label="Turnos ativos" value={String(activePeriods)} /><Metric icon={Stethoscope} label="Próximos" value={String(upcomingAppointments.length)} /></div>
 
-        <section className="mt-7 rounded-3xl border border-border bg-card p-4 shadow-soft sm:p-6">
-          <button type="button" className="flex w-full items-center justify-between gap-4 text-left sm:cursor-default" onClick={() => setDaysOpen((open) => !open)}>
-            <div><h2 className="text-lg font-semibold">Meus dias e turnos</h2><p className="mt-1 text-xs text-muted-foreground">{activePeriods} turno(s) ativo(s). Toque para visualizar e alterar.</p></div>
-            <ChevronDown className={`size-5 shrink-0 text-muted-foreground transition-transform sm:hidden ${daysOpen ? "rotate-180" : ""}`} />
+        <section className="mt-7 rounded-3xl border border-border bg-card p-3 shadow-soft sm:p-6">
+          <button type="button" className="flex w-full items-center justify-between gap-4 rounded-2xl border border-border/80 bg-secondary/70 px-4 py-3.5 text-left sm:cursor-default sm:border-0 sm:bg-transparent sm:p-0" onClick={() => setDaysOpen((open) => !open)}>
+            <div><h2 className="text-base font-bold text-foreground sm:text-lg">Meus dias e turnos</h2><p className="mt-1 text-sm font-medium leading-snug text-foreground/75 sm:text-xs sm:font-normal sm:text-muted-foreground">{activePeriods} turno(s) ativo(s). Toque para visualizar e alterar.</p></div>
+            <ChevronDown className={`size-6 shrink-0 text-foreground transition-transform sm:hidden ${daysOpen ? "rotate-180" : ""}`} />
           </button>
           <div className={`${daysOpen ? "block" : "hidden"} mt-5 space-y-3 sm:block`}>
             <p className="text-xs text-muted-foreground">Escolha em quais dias você atende de manhã, à tarde ou à noite. Turnos desligados não aceitarão novos agendamentos.</p>
@@ -275,10 +278,10 @@ function ProfessionalAgenda() {
           </div>
         </section>
 
-        <section className="mt-4 rounded-3xl border border-border bg-card p-4 shadow-soft sm:mt-7 sm:p-6">
-          <button type="button" className="flex w-full items-center justify-between gap-4 text-left sm:cursor-default" onClick={() => setHoursOpen((open) => !open)}>
-            <div><h2 className="text-lg font-semibold">Meus horários disponíveis</h2><p className="mt-1 text-xs text-muted-foreground">{data.slots.filter((slot: any) => slot.is_available).length} horário(s) ativo(s). Toque para visualizar e alterar.</p></div>
-            <ChevronDown className={`size-5 shrink-0 text-muted-foreground transition-transform sm:hidden ${hoursOpen ? "rotate-180" : ""}`} />
+        <section className="mt-4 rounded-3xl border border-border bg-card p-3 shadow-soft sm:mt-7 sm:p-6">
+          <button type="button" className="flex w-full items-center justify-between gap-4 rounded-2xl border border-border/80 bg-secondary/70 px-4 py-3.5 text-left sm:cursor-default sm:border-0 sm:bg-transparent sm:p-0" onClick={() => setHoursOpen((open) => !open)}>
+            <div><h2 className="text-base font-bold text-foreground sm:text-lg">Meus horários disponíveis</h2><p className="mt-1 text-sm font-medium leading-snug text-foreground/75 sm:text-xs sm:font-normal sm:text-muted-foreground">{data.slots.filter((slot: any) => slot.is_available).length} horário(s) ativo(s). Toque para visualizar e alterar.</p></div>
+            <ChevronDown className={`size-6 shrink-0 text-foreground transition-transform sm:hidden ${hoursOpen ? "rotate-180" : ""}`} />
           </button>
           <div className={`${hoursOpen ? "block" : "hidden"} mt-5 sm:block`}>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><p className="text-xs text-muted-foreground">Além do dia e turno, defina os horários exatos que podem receber agendamentos.</p><div className="flex gap-2"><Input type="time" value={newTime} onChange={(e) => setNewTime(e.target.value)} className="min-w-0 flex-1 sm:w-[150px] sm:flex-none" /><Button type="button" onClick={addTime} disabled={savingTime}><Plus className="size-4" /> Adicionar</Button></div></div>
@@ -308,7 +311,10 @@ function ProfessionalAppointmentCard({ appointment, onSaved }: any) {
     setBusy(nextResponse === "confirmado" ? "confirm" : "decline");
     const { error } = await db.rpc("respond_to_professional_appointment", { _appointment_id: appointment.id, _response: nextResponse });
     setBusy(null);
-    if (error) { toast.error(nextResponse === "confirmado" ? "Não foi possível confirmar o compromisso." : "Não foi possível recusar o compromisso."); return; }
+    if (error) {
+      toast.error(nextResponse === "confirmado" ? "Não foi possível confirmar o compromisso." : "Não foi possível recusar o compromisso.", { description: error.message });
+      return;
+    }
     toast.success(nextResponse === "confirmado" ? "Compromisso confirmado." : "Agendamento recusado.");
     onSaved?.();
   };
