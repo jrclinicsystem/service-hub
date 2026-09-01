@@ -7,6 +7,16 @@ function money(value: number) {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
+const whatsappSchema = z
+  .string()
+  .trim()
+  .min(10, "Informe seu WhatsApp.")
+  .max(40)
+  .refine((value) => {
+    const digits = value.replace(/\D/g, "");
+    return digits.length >= 10 && digits.length <= 15;
+  }, "Informe um número de WhatsApp válido com DDD.");
+
 export const createBookingAppointment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data) =>
@@ -16,7 +26,7 @@ export const createBookingAppointment = createServerFn({ method: "POST" })
         professionalId: z.string().uuid(),
         patientName: z.string().trim().min(2).max(120),
         patientEmail: z.string().trim().email(),
-        patientPhone: z.string().trim().max(40).optional().default(""),
+        patientPhone: whatsappSchema,
         notes: z.string().trim().max(1000).optional().default(""),
         scheduledDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
         scheduledTime: z.string().regex(/^\d{2}:\d{2}$/),
