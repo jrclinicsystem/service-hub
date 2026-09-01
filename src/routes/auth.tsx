@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { Eye, EyeOff } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -53,6 +54,45 @@ export const Route = createFileRoute("/auth")({
   }),
   component: AuthPage,
 });
+
+function PasswordField({
+  id,
+  value,
+  onChange,
+  autoComplete,
+  placeholder,
+}: {
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+  autoComplete: string;
+  placeholder?: string;
+}) {
+  const [visible, setVisible] = useState(false);
+
+  return (
+    <div className="relative mt-2">
+      <Input
+        id={id}
+        type={visible ? "text" : "password"}
+        autoComplete={autoComplete}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-11 rounded-xl pr-11"
+        placeholder={placeholder}
+      />
+      <button
+        type="button"
+        onClick={() => setVisible((current) => !current)}
+        className="absolute right-1.5 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        aria-label={visible ? "Ocultar senha" : "Mostrar senha"}
+        title={visible ? "Ocultar senha" : "Mostrar senha"}
+      >
+        {visible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+      </button>
+    </div>
+  );
+}
 
 function AuthPage() {
   const { user, loading } = useAuth();
@@ -127,8 +167,6 @@ function AuthPage() {
     const recoveryTarget = next === "/admin" ? "/admin" : "/minha-conta";
     window.localStorage.setItem(RECOVERY_TARGET_KEY, recoveryTarget);
 
-    // Recovery emails must always return to the public JR Clinic app. In local or
-    // Lovable preview environments, window.location.origin is not a valid customer URL.
     const redirectTo = `${publicAuthOrigin()}/redefinir-senha`;
     const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
       redirectTo,
@@ -229,13 +267,11 @@ function AuthPage() {
                     {resetBusy ? "Enviando..." : "Esqueci minha senha"}
                   </button>
                 </div>
-                <Input
+                <PasswordField
                   id="senha"
-                  type="password"
                   autoComplete="current-password"
                   value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  className="mt-2 h-11 rounded-xl"
+                  onChange={setPassword}
                 />
               </div>
               <Button
@@ -273,13 +309,11 @@ function AuthPage() {
               </div>
               <div>
                 <Label htmlFor="senha-nova">Senha</Label>
-                <Input
+                <PasswordField
                   id="senha-nova"
-                  type="password"
                   autoComplete="new-password"
                   value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  className="mt-2 h-11 rounded-xl"
+                  onChange={setPassword}
                   placeholder="Mínimo de 8 caracteres"
                 />
               </div>
