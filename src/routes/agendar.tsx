@@ -144,6 +144,9 @@ function Agendar() {
         ? 0
         : total;
 
+  const phoneDigits = phone.replace(/\D/g, "");
+  const validWhatsApp = phoneDigits.length >= 10 && phoneDigits.length <= 15;
+
   const isDayAvailable = (weekdayNumber: number) => {
     if (weekdayNumber === 0) return false;
     if (!professionalAvailability.length) return true;
@@ -218,7 +221,7 @@ function Agendar() {
     setPaymentOpen(false);
   };
 
-  const canConfirm = Boolean(service && professionalId && day && time && name.trim() && email.trim());
+  const canConfirm = Boolean(service && professionalId && day && time && name.trim() && email.trim() && validWhatsApp);
   const buttonLabel = busy
     ? "Preparando..."
     : paymentSession
@@ -239,6 +242,10 @@ function Agendar() {
       return;
     }
     if (!service || !time || !professionalId) return;
+    if (!validWhatsApp) {
+      toast.error("Informe um WhatsApp válido com DDD para concluir o agendamento.");
+      return;
+    }
 
     setBusy(true);
     try {
@@ -370,7 +377,7 @@ function Agendar() {
               <div className="mt-4 grid gap-3 sm:grid-cols-2 sm:gap-4">
                 <div><Label htmlFor="nome">Nome completo</Label><Input id="nome" value={name} onChange={(e) => { setName(e.target.value); resetPreparedPayment(); }} className="mt-2 h-11 rounded-xl" /></div>
                 <div><Label htmlFor="email">E-mail</Label><Input id="email" type="email" value={email} onChange={(e) => { setEmail(e.target.value); resetPreparedPayment(); }} className="mt-2 h-11 rounded-xl" /></div>
-                <div className="sm:col-span-2"><Label htmlFor="telefone">Telefone/WhatsApp <span className="font-normal text-muted-foreground">(opcional)</span></Label><Input id="telefone" value={phone} onChange={(e) => { setPhone(e.target.value); resetPreparedPayment(); }} className="mt-2 h-11 rounded-xl" /></div>
+                <div className="sm:col-span-2"><Label htmlFor="telefone">WhatsApp <span className="font-semibold text-destructive">*</span></Label><Input id="telefone" inputMode="tel" autoComplete="tel" required value={phone} onChange={(e) => { setPhone(e.target.value); resetPreparedPayment(); }} placeholder="(85) 99999-9999" className={`mt-2 h-11 rounded-xl ${phone && !validWhatsApp ? "border-destructive" : ""}`} />{phone && !validWhatsApp ? <p className="mt-1.5 text-[11px] text-destructive">Informe um número válido com DDD.</p> : <p className="mt-1.5 text-[11px] text-muted-foreground">Obrigatório para confirmações e lembretes do seu agendamento.</p>}</div>
                 <div className="sm:col-span-2"><Label htmlFor="obs">Observações <span className="font-normal text-muted-foreground">(opcional)</span></Label><Textarea id="obs" value={notes} onChange={(e) => { setNotes(e.target.value); resetPreparedPayment(); }} className="mt-2 min-h-[82px] resize-none rounded-xl" /></div>
               </div>
             </section>
