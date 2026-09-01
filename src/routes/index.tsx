@@ -144,17 +144,21 @@ function Home() {
                 </div>
               </div>
 
-              <div className="home-availability absolute -bottom-3 right-3 rounded-2xl border border-border bg-card/95 px-4 py-3 shadow-soft backdrop-blur sm:-bottom-5 sm:right-5 sm:px-5 sm:py-4">
+              <Link
+                to="/agendar"
+                className="home-availability group absolute -bottom-3 right-3 rounded-2xl border border-border bg-card/95 px-4 py-3 shadow-soft backdrop-blur transition hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-elegant sm:-bottom-5 sm:right-5 sm:px-5 sm:py-4"
+                aria-label="Agende seu horário"
+              >
                 <div className="flex items-center gap-2">
-                  <span className="grid size-7 place-items-center rounded-lg bg-accent/15 text-accent-foreground">
+                  <span className="grid size-7 place-items-center rounded-lg bg-accent/15 text-accent-foreground transition group-hover:bg-primary group-hover:text-primary-foreground">
                     <CalendarCheck2 className="size-3.5" />
                   </span>
                   <div>
-                    <p className="text-[9px] text-muted-foreground sm:text-xs">Próxima disponibilidade</p>
-                    <p className="font-display text-sm font-semibold text-primary sm:text-lg">Hoje, 14:30</p>
+                    <p className="text-[9px] text-muted-foreground sm:text-xs">Agende seu horário</p>
+                    <p className="font-display text-sm font-semibold text-primary sm:text-lg">Escolha o melhor momento</p>
                   </div>
                 </div>
-              </div>
+              </Link>
             </div>
           </div>
         </section>
