@@ -38,6 +38,19 @@ function safeNext(value: unknown) {
   return value;
 }
 
+function isPanelDestination(value?: string) {
+  return value === "/profissional" || Boolean(value?.startsWith("/admin"));
+}
+
+function adminDestination(value?: string) {
+  if (!value || value === "/admin") return "/admin";
+  if (value.startsWith("/admin/equipe")) return "/admin#equipe";
+  if (value.startsWith("/admin/acessos")) return "/admin#acessos";
+  if (value.startsWith("/admin/financeiro")) return "/admin#financeiro";
+  if (value.startsWith("/admin/catalogo")) return "/admin#catalogo";
+  return "/admin";
+}
+
 export const Route = createFileRoute("/auth")({
   validateSearch: (search: Record<string, unknown>) => ({
     next: safeNext(search['next']),
@@ -108,8 +121,9 @@ function AuthPage() {
     if (loading || !user || checkingAccess) return;
 
     const finishLogin = async () => {
-      if (next !== "/admin") {
-        window.location.replace(next ?? "/");
+      const hasExplicitPublicDestination = Boolean(next) && !isPanelDestination(next);
+      if (hasExplicitPublicDestination) {
+        window.location.replace(next!);
         return;
       }
 
@@ -120,7 +134,7 @@ function AuthPage() {
       );
 
       if (!adminError && isAdmin) {
-        window.location.replace("/admin");
+        window.location.replace(adminDestination(next));
         return;
       }
 
@@ -137,9 +151,14 @@ function AuthPage() {
         return;
       }
 
-      await supabase.auth.signOut();
-      toast.error("Este e-mail não está autorizado a acessar o painel da JR Clinic.");
-      setCheckingAccess(false);
+      if (isPanelDestination(next)) {
+        await supabase.auth.signOut();
+        toast.error("Este e-mail não está autorizado a acessar o painel da JR Clinic.");
+        setCheckingAccess(false);
+        return;
+      }
+
+      window.location.replace(next ?? "/");
     };
 
     void finishLogin();
@@ -178,7 +197,7 @@ function AuthPage() {
     }
 
     setResetBusy(true);
-    const recoveryTarget = next === "/admin" ? "/admin" : "/minha-conta";
+    const recoveryTarget = next === "/profissional" ? "/profissional" : next?.startsWith("/admin") ? "/admin" : "/minha-conta";
     window.localStorage.setItem(RECOVERY_TARGET_KEY, recoveryTarget);
 
     const redirectTo = `${publicAuthOrigin()}/redefinir-senha`;
@@ -224,7 +243,7 @@ function AuthPage() {
     toast.success("Conta criada! Verifique seu e-mail se a confirmação for solicitada.");
   };
 
-  const isAdminAccess = next === "/admin";
+  const isAdminAccess = isPanelDestination(next);
 
   return (
     <div className="min-h-screen overflow-x-hidden">
