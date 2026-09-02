@@ -18,7 +18,9 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { AdminOperationSummary } from "@/components/admin-operation-summary";
 import { AppointmentCalendar } from "@/components/appointment-calendar";
+import { CalendarDayDialog } from "@/components/calendar-day-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -131,6 +133,7 @@ export function AdminAppointmentsWorkspace({ appointments, onStatusChange, onRef
   const [scope, setScope] = useState<Scope>("pending");
   const [search, setSearch] = useState("");
   const [calendarDate, setCalendarDate] = useState("");
+  const [calendarDayOpen, setCalendarDayOpen] = useState<string | null>(null);
   const [selected, setSelected] = useState<any | null>(null);
   const [incoming, setIncoming] = useState<any | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
@@ -224,7 +227,17 @@ export function AdminAppointmentsWorkspace({ appointments, onStatusChange, onRef
 
   return (
     <section>
-      <AppointmentCalendar appointments={appointments} selectedDate={calendarDate} onSelectDate={setCalendarDate} title="Calendário geral" description="Todos os atendimentos da clínica. Toque em um dia para filtrar a agenda." />
+      <div className="grid items-stretch gap-4 xl:grid-cols-[minmax(420px,560px)_minmax(0,1fr)]">
+        <AppointmentCalendar
+          appointments={appointments}
+          selectedDate={calendarDate}
+          onSelectDate={setCalendarDate}
+          onOpenDate={(date) => { setCalendarDate(date); setCalendarDayOpen(date); }}
+          title="Calendário geral"
+          description="Todos os atendimentos da clínica. Toque em um dia para filtrar a agenda."
+        />
+        <AdminOperationSummary appointments={appointments} />
+      </div>
 
       <div className="mt-4 rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-5">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
@@ -242,6 +255,7 @@ export function AdminAppointmentsWorkspace({ appointments, onStatusChange, onRef
       </div>
 
       <CreateAppointmentDialog open={createOpen} onOpenChange={setCreateOpen} onCreated={() => { setCreateOpen(false); setScope("pending"); onRefresh(); }} />
+      <CalendarDayDialog date={calendarDayOpen} appointments={appointments} open={Boolean(calendarDayOpen)} onOpenChange={(open) => { if (!open) setCalendarDayOpen(null); }} />
       <AppointmentAdminDialog appointment={selected} open={Boolean(selected)} onOpenChange={(open: boolean) => !open && setSelected(null)} onConfirm={() => selected && act(selected, "confirmado")} onCancel={() => selected && act(selected, "cancelado")} busy={busyAction} />
       <NewAppointmentAlert appointment={incoming} open={Boolean(incoming)} onLater={() => setIncoming(null)} onConfirm={() => incoming && act(incoming, "confirmado")} onCancel={() => incoming && act(incoming, "cancelado")} busy={busyAction} />
     </section>
