@@ -310,8 +310,9 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated }: { open: bool
   const [services, setServices] = useState<any[]>([]);
   const [professionals, setProfessionals] = useState<any[]>([]);
   const [links, setLinks] = useState<any[]>([]);
-  const [timeSlots, setTimeSlots] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
+  const [bookingSlots, setBookingSlots] = useState<any[]>([]);
+  const [bookingSlotsLoading, setBookingSlotsLoading] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState("");
   const [patientName, setPatientName] = useState("");
   const [patientEmail, setPatientEmail] = useState("");
@@ -330,17 +331,44 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated }: { open: bool
       db.from("services").select("id, name, price, duration_min, is_active").eq("is_active", true).order("name"),
       db.from("professionals").select("id, name, specialty, is_active, sort_order").eq("is_active", true).order("sort_order").order("name"),
       db.from("service_professionals").select("service_id, professional_id"),
-      db.from("time_slots").select("id, slot, is_available, sort_order").eq("is_available", true).order("sort_order"),
       db.from("clients").select("id, name, whatsapp, email, is_active").eq("is_active", true).order("name"),
-    ]).then(([serviceResult, professionalResult, linkResult, slotResult, clientResult]) => {
+    ]).then(([serviceResult, professionalResult, linkResult, clientResult]) => {
       if (!active) return;
-      const firstError = [serviceResult, professionalResult, linkResult, slotResult, clientResult].find((result) => result.error)?.error;
+      const firstError = [serviceResult, professionalResult, linkResult, clientResult].find((result) => result.error)?.error;
       if (firstError) toast.error(firstError.message);
-      else { setServices(serviceResult.data ?? []); setProfessionals(professionalResult.data ?? []); setLinks(linkResult.data ?? []); setTimeSlots(slotResult.data ?? []); setClients(clientResult.data ?? []); }
+      else { setServices(serviceResult.data ?? []); setProfessionals(professionalResult.data ?? []); setLinks(linkResult.data ?? []); setClients(clientResult.data ?? []); }
       setLoadingCatalog(false);
     });
     return () => { active = false; };
   }, [open]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setScheduledTime("");
+
+    if (!open || !professionalId || !scheduledDate) {
+      setBookingSlots([]);
+      setBookingSlotsLoading(false);
+      return;
+    }
+
+    setBookingSlotsLoading(true);
+    void db
+      .rpc("get_professional_booking_slots", { _professional_id: professionalId, _date: scheduledDate })
+      .then(({ data, error }: any) => {
+        if (cancelled) return;
+        if (error) {
+          console.error("Falha ao carregar horários da profissional/data", error);
+          setBookingSlots([]);
+          toast.error("Não foi possível carregar os horários disponíveis desta data.");
+        } else {
+          setBookingSlots((data ?? []).filter((slot: any) => slot.is_available));
+        }
+        setBookingSlotsLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [open, professionalId, scheduledDate]);
 
   const availableProfessionals = useMemo(() => {
     if (!serviceId) return [];
@@ -408,7 +436,7 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated }: { open: bool
     <div className="space-y-1.5 sm:col-span-2"><Label>Serviço *</Label><Select value={serviceId} onValueChange={(value) => { setServiceId(value); setProfessionalId(""); }} disabled={saving || loadingCatalog}><SelectTrigger><SelectValue placeholder="Selecione o serviço" /></SelectTrigger><SelectContent>{services.map((service) => <SelectItem key={service.id} value={service.id}>{service.name} · {formatPrice(Number(service.price ?? 0))}</SelectItem>)}</SelectContent></Select></div>
     <div className="space-y-1.5 sm:col-span-2"><Label>Profissional *</Label><Select value={professionalId} onValueChange={setProfessionalId} disabled={saving || !serviceId || availableProfessionals.length === 0}><SelectTrigger><SelectValue placeholder={!serviceId ? "Escolha primeiro o serviço" : "Selecione o profissional"} /></SelectTrigger><SelectContent>{availableProfessionals.map((professional) => <SelectItem key={professional.id} value={professional.id}>{professional.name}{professional.specialty ? ` · ${professional.specialty}` : ""}</SelectItem>)}</SelectContent></Select></div>
     <div className="space-y-1.5"><Label htmlFor="admin-scheduled-date">Data *</Label><Input id="admin-scheduled-date" type="date" min={todayIso()} value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} disabled={saving} /></div>
-    <div className="space-y-1.5"><Label>Horário *</Label><Select value={scheduledTime} onValueChange={setScheduledTime} disabled={saving || loadingCatalog}><SelectTrigger><SelectValue placeholder="Selecione o horário" /></SelectTrigger><SelectContent>{timeSlots.map((slot) => <SelectItem key={slot.id} value={slot.slot}>{slot.slot}</SelectItem>)}</SelectContent></Select></div>
+    <div className="space-y-1.5"><Label>Horário *</Label><Select value={scheduledTime} onValueChange={setScheduledTime} disabled={saving || loadingCatalog || bookingSlotsLoading || !professionalId || !scheduledDate}><SelectTrigger><SelectValue placeholder={bookingSlotsLoading ? "Carregando horários..." : bookingSlots.length ? "Selecione o horário" : "Sem horários disponíveis"} /></SelectTrigger><SelectContent>{bookingSlots.map((slot) => <SelectItem key={`${slot.slot}-${slot.source ?? "slot"}`} value={slot.slot}>{slot.slot}</SelectItem>)}</SelectContent></Select></div>
     <div className="space-y-1.5 sm:col-span-2"><Label htmlFor="admin-notes">Observações</Label><Textarea id="admin-notes" value={notes} onChange={(e) => setNotes(e.target.value)} className="min-h-24" disabled={saving} /></div>
   </div><div className="mt-4 rounded-2xl bg-primary-soft/60 p-3 text-xs text-muted-foreground">Depois de criado, o card ficará em <strong className="text-foreground">Aguardando profissional</strong> até a colaboradora confirmar ou recusar.</div><DialogFooter className="mt-4 gap-2 sm:gap-0"><Button variant="outline" onClick={() => handleOpenChange(false)} disabled={saving}>Cancelar</Button><Button onClick={createAppointment} disabled={saving || loadingCatalog}>{saving ? "Salvando..." : "Criar agendamento"}</Button></DialogFooter></DialogContent></Dialog>;
 }

@@ -313,7 +313,7 @@ function TeamAgendaPage() {
 
       <CreateAgendaModal open={createOpen} onClose={() => setCreateOpen(false)} services={data.services} onSaved={refresh} />
       {selected ? <EditAgendaModal open={editOpen} onClose={() => setEditOpen(false)} professional={selected} access={selectedAccess} services={data.services} linkedServiceIds={selectedServiceIds} onSaved={refresh} /> : null}
-      {selected ? <NewAppointmentModal open={appointmentOpen} onClose={() => setAppointmentOpen(false)} professional={selected} services={data.services.filter((service: any) => selectedServiceIds.includes(service.id))} slots={selectedSlots.filter((slot: any) => slot.is_available)} availability={selectedAvailability} onSaved={refresh} /> : null}
+      {selected ? <NewAppointmentModal open={appointmentOpen} onClose={() => setAppointmentOpen(false)} professional={selected} services={data.services.filter((service: any) => selectedServiceIds.includes(service.id))} onSaved={refresh} /> : null}
       {selected ? <HoursModal open={hoursOpen} onClose={() => setHoursOpen(false)} professional={selected} slots={selectedSlots} availability={selectedAvailability} onSaved={refresh} /> : null}
     </div>
   );
@@ -435,7 +435,7 @@ function EditAgendaModal({ open, onClose, professional, access, services, linked
   </ModalShell>;
 }
 
-function NewAppointmentModal({ open, onClose, professional, services, slots, availability, onSaved }: any) {
+function NewAppointmentModal({ open, onClose, professional, services, onSaved }: any) {
   const [serviceId, setServiceId] = useState("");
   const [patientName, setPatientName] = useState("");
   const [patientEmail, setPatientEmail] = useState("");
@@ -444,9 +444,36 @@ function NewAppointmentModal({ open, onClose, professional, services, slots, ava
   const [time, setTime] = useState("");
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
+  const [allowedSlots, setAllowedSlots] = useState<any[]>([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
 
-  const weekday = new Date(`${date}T12:00:00`).getDay();
-  const allowedSlots = useMemo(() => slots.filter((slot: any) => availability.some((item: any) => item.weekday === weekday && item.period === periodForTime(slot.slot) && item.is_available)), [slots, availability, weekday]);
+  useEffect(() => {
+    let cancelled = false;
+    setTime("");
+
+    if (!open || !professional?.id || !date) {
+      setAllowedSlots([]);
+      setSlotsLoading(false);
+      return;
+    }
+
+    setSlotsLoading(true);
+    void db
+      .rpc("get_professional_booking_slots", { _professional_id: professional.id, _date: date })
+      .then(({ data, error }: any) => {
+        if (cancelled) return;
+        if (error) {
+          console.error("Falha ao carregar horários da agenda", error);
+          setAllowedSlots([]);
+          toast.error("Não foi possível carregar os horários disponíveis desta data.");
+        } else {
+          setAllowedSlots((data ?? []).filter((slot: any) => slot.is_available));
+        }
+        setSlotsLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [open, professional?.id, date]);
 
   useEffect(() => { if (time && !allowedSlots.some((slot: any) => slot.slot === time)) setTime(""); }, [allowedSlots, time]);
 
@@ -461,16 +488,16 @@ function NewAppointmentModal({ open, onClose, professional, services, slots, ava
     toast.success("Agendamento enviado para confirmação.", { description: `${professional.name} precisa confirmar o compromisso na própria agenda.` }); reset(); onClose(); await onSaved();
   };
 
-  return <ModalShell open={open} onClose={() => { if (!busy) { reset(); onClose(); } }} title="Novo agendamento" description={`Adicionar atendimento à agenda de ${professional.name}. Ele ficará aguardando a confirmação da profissional.`} width="max-w-xl" footer={<><Button variant="outline" onClick={onClose} disabled={busy}>Cancelar</Button><Button onClick={save} disabled={busy || !services.length || !allowedSlots.length}>{busy ? "Salvando..." : "Enviar para confirmação"}</Button></>}>
+  return <ModalShell open={open} onClose={() => { if (!busy) { reset(); onClose(); } }} title="Novo agendamento" description={`Adicionar atendimento à agenda de ${professional.name}. Ele ficará aguardando a confirmação da profissional.`} width="max-w-xl" footer={<><Button variant="outline" onClick={onClose} disabled={busy}>Cancelar</Button><Button onClick={save} disabled={busy || slotsLoading || !services.length || !allowedSlots.length}>{busy ? "Salvando..." : "Enviar para confirmação"}</Button></>}>
     <div className="grid gap-4 sm:grid-cols-2">
       <div className="sm:col-span-2"><Field label="Serviço"><Select value={serviceId} onValueChange={setServiceId}><SelectTrigger><SelectValue placeholder="Selecione o serviço" /></SelectTrigger><SelectContent>{services.map((service: any) => <SelectItem key={service.id} value={service.id}>{service.name}</SelectItem>)}</SelectContent></Select></Field></div>
       <div className="sm:col-span-2"><Field label="Cliente / paciente"><Input value={patientName} onChange={(e) => setPatientName(e.target.value)} /></Field></div>
       <Field label="WhatsApp"><Input inputMode="tel" value={patientPhone} onChange={(e) => setPatientPhone(e.target.value)} /></Field>
       <Field label="E-mail"><Input type="email" value={patientEmail} onChange={(e) => setPatientEmail(e.target.value)} /></Field>
       <Field label="Data"><Input type="date" min={todayIso()} value={date} onChange={(e) => setDate(e.target.value)} /></Field>
-      <Field label="Horário"><Select value={time} onValueChange={setTime}><SelectTrigger><SelectValue placeholder={allowedSlots.length ? "Selecione" : "Sem horário neste turno"} /></SelectTrigger><SelectContent>{allowedSlots.map((slot: any) => <SelectItem key={slot.id} value={slot.slot}>{slot.slot}</SelectItem>)}</SelectContent></Select></Field>
+      <Field label="Horário"><Select value={time} onValueChange={setTime} disabled={slotsLoading}><SelectTrigger><SelectValue placeholder={slotsLoading ? "Carregando..." : allowedSlots.length ? "Selecione" : "Sem horário disponível"} /></SelectTrigger><SelectContent>{allowedSlots.map((slot: any) => <SelectItem key={`${slot.slot}-${slot.source ?? "slot"}`} value={slot.slot}>{slot.slot}</SelectItem>)}</SelectContent></Select></Field>
       <div className="sm:col-span-2"><Field label="Observações"><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} /></Field></div>
-      {!allowedSlots.length ? <p className="sm:col-span-2 rounded-xl bg-secondary/60 px-3 py-2 text-xs text-muted-foreground">A profissional não possui um turno ativo com horários disponíveis nessa data.</p> : null}
+      {!allowedSlots.length ? <p className="sm:col-span-2 rounded-xl bg-secondary/60 px-3 py-2 text-xs text-muted-foreground">A profissional não possui horários liberados para esta data.</p> : null}
     </div>
   </ModalShell>;
 }
@@ -494,16 +521,16 @@ function HoursModal({ open, onClose, professional, slots, availability, onSaved 
     await onSaved();
   };
 
-  return <ModalShell open={open} onClose={onClose} title={`Disponibilidade de ${professional.name}`} description="Defina os dias, turnos e horários específicos desta profissional." width="max-w-3xl">
+  return <ModalShell open={open} onClose={onClose} title={`Padrão semanal de ${professional.name}`} description="Defina os dias, turnos e horários recorrentes desta profissional. Esse padrão vale normalmente e pode ser substituído por uma exceção em uma data específica." width="max-w-3xl">
     <div>
-      <h3 className="text-sm font-semibold">Dias e turnos</h3>
-      <p className="mt-1 text-xs text-muted-foreground">Ative somente os períodos em que a profissional realmente atende.</p>
+      <h3 className="text-sm font-semibold">Dias e turnos do padrão semanal</h3>
+      <p className="mt-1 text-xs text-muted-foreground">Ative os períodos que normalmente se repetem toda semana. Datas personalizadas têm prioridade sobre este padrão.</p>
       <div className="mt-4 space-y-3">{weekdays.map((day) => <div key={day.value} className="rounded-2xl border border-border p-4"><p className="mb-3 text-sm font-semibold">{day.label}</p><div className="grid gap-2 sm:grid-cols-3">{periods.map((period) => { const row = availability.find((item: any) => item.weekday === day.value && item.period === period.value); return <div key={period.value} className="flex items-center justify-between rounded-xl bg-secondary/50 px-3 py-2.5"><div><p className="text-xs font-medium">{period.label}</p><p className="text-[9px] text-muted-foreground">{period.detail}</p></div><Switch checked={row?.is_available ?? false} onCheckedChange={(checked) => setAvailability(day.value, period.value, checked)} /></div>; })}</div></div>)}</div>
     </div>
 
     <div className="mt-7 border-t border-border pt-6">
-      <h3 className="text-sm font-semibold">Horários exatos</h3>
-      <p className="mt-1 text-xs text-muted-foreground">Os horários só aparecem para agendamento quando o dia e o turno correspondentes também estão ativos.</p>
+      <h3 className="text-sm font-semibold">Horários recorrentes</h3>
+      <p className="mt-1 text-xs text-muted-foreground">Esses horários fazem parte do padrão semanal e só aparecem quando o dia e o turno correspondentes estão ativos.</p>
       <div className="mt-4 flex gap-2"><Input type="time" value={newTime} onChange={(e) => setNewTime(e.target.value)} /><Button type="button" onClick={add} disabled={busy}><Plus className="size-4" /> Adicionar horário</Button></div>
       <div className="mt-5 grid gap-2 sm:grid-cols-2">
         {slots.length === 0 ? <p className="col-span-full rounded-2xl border border-dashed border-border p-5 text-center text-sm text-muted-foreground">Nenhum horário cadastrado.</p> : slots.map((slot: any) => (

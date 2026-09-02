@@ -192,8 +192,8 @@ function AvailabilityPage() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Agenda da equipe</p>
-            <h1 className="mt-2 text-3xl font-semibold">Disponibilidade por data</h1>
-            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">Configure cada dia individualmente. Quando uma data tiver horários próprios, somente eles aparecem para o cliente.</p>
+            <h1 className="mt-2 text-3xl font-semibold">Exceção de disponibilidade por data</h1>
+            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">Use esta área somente quando um dia for diferente do padrão semanal. Quando uma data tiver horários próprios, eles substituem o padrão apenas naquele dia.</p>
           </div>
           <Button variant="outline" onClick={() => refresh()} disabled={slotsQuery.isFetching}><RefreshCw className={`size-4 ${slotsQuery.isFetching ? "animate-spin" : ""}`} /> Atualizar</Button>
         </div>
@@ -219,7 +219,7 @@ function AvailabilityPage() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <div className="flex items-center gap-2"><CalendarDays className="size-5 text-primary" /><h2 className="text-lg font-bold capitalize">{formattedDate}</h2></div>
-              <p className="mt-1 text-xs text-muted-foreground">Adicione manualmente os horários que estarão disponíveis somente neste dia.</p>
+              <p className="mt-1 text-xs text-muted-foreground">Adicione os horários que valerão somente neste dia. Enquanto esta exceção existir, o padrão semanal não será usado nesta data.</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <Button type="button" variant="outline" size="sm" onClick={copyFallback} disabled={saving}><Copy className="size-4" /> Copiar padrão geral</Button>
