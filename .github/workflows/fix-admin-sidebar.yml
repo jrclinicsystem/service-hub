@@ -1,0 +1,91 @@
+name: Fix admin sidebar duplication
+
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-admin-sidebar.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Repair admin navigation
+        shell: python
+        run: |
+          from pathlib import Path
+
+          admin = Path('src/routes/admin.tsx')
+          text = admin.read_text(encoding='utf-8')
+          text = text.replace('import { AdminSubpageSidebar } from "@/components/admin-subpage-sidebar";\n', '')
+          text = text.replace('    <div className="min-h-screen bg-background lg:pl-[252px]">\n      <AdminSubpageSidebar active="home" />\n', '    <div className="min-h-screen bg-background">\n', 1)
+          admin.write_text(text, encoding='utf-8')
+
+          root = Path('src/routes/__root.tsx')
+          text = root.read_text(encoding='utf-8')
+
+          if '  UserRound,\n' not in text:
+              text = text.replace('  Tag,\n} from "lucide-react";', '  Tag,\n  UserRound,\n} from "lucide-react";', 1)
+
+          marker = '''        <button
+          type="button"
+          className={`persistent-admin-sidebar-item${inlineSection === "team" ? " is-active" : ""}`}
+          onClick={() => onInlineSection("team")}
+        >
+          <CalendarDays className="size-4 shrink-0" />
+          <span>Agenda da equipe</span>
+        </button>
+'''
+          links = '''        <Link to="/admin/disponibilidade" className="persistent-admin-sidebar-item">
+          <Clock3 className="size-4 shrink-0" />
+          <span>Disponibilidade</span>
+        </Link>
+
+        <Link to="/admin/clientes" className="persistent-admin-sidebar-item">
+          <UserRound className="size-4 shrink-0" />
+          <span>Clientes</span>
+        </Link>
+
+'''
+          if 'to="/admin/clientes" className="persistent-admin-sidebar-item"' not in text:
+              if marker not in text:
+                  raise SystemExit('Persistent sidebar insertion point not found')
+              text = text.replace(marker, marker + '\n' + links, 1)
+
+          mobile_marker = '''            <button type="button" className="admin-mobile-more-option" role="menuitem" onClick={() => selectInline("access")}>
+              <span className="admin-mobile-more-option-icon"><ShieldCheck /></span>
+              <span><strong>Acessos</strong><small>Administradores e colaboradores</small></span>
+            </button>
+'''
+          mobile_links = '''            <Link to="/admin/disponibilidade" className="admin-mobile-more-option" role="menuitem" onClick={() => setMoreOpen(false)}>
+              <span className="admin-mobile-more-option-icon"><Clock3 /></span>
+              <span><strong>Disponibilidade</strong><small>Horários específicos por data</small></span>
+            </Link>
+            <Link to="/admin/clientes" className="admin-mobile-more-option" role="menuitem" onClick={() => setMoreOpen(false)}>
+              <span className="admin-mobile-more-option-icon"><UserRound /></span>
+              <span><strong>Clientes</strong><small>Cadastro e aniversariantes</small></span>
+            </Link>
+'''
+          if 'Horários específicos por data' not in text:
+              if mobile_marker not in text:
+                  raise SystemExit('Mobile menu insertion point not found')
+              text = text.replace(mobile_marker, mobile_links + mobile_marker, 1)
+
+          root.write_text(text, encoding='utf-8')
+
+      - name: Commit repair
+        run: |
+          if git diff --quiet; then
+            echo "No changes needed"
+            exit 0
+          fi
+          git config user.name "jrclinicsystem"
+          git config user.email "jrclinic.system@gmail.com"
+          git add src/routes/admin.tsx src/routes/__root.tsx
+          git commit -m "Fix duplicated admin navigation and add client links"
+          git push
