@@ -99,8 +99,8 @@ export function AppointmentCalendar({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <CalendarDays className="size-4 shrink-0 text-primary" />
-            <h2 className="truncate text-sm font-semibold sm:text-base">{title}</h2>
+            <CalendarDays className="size-4.5 shrink-0 text-primary" />
+            <h2 className="truncate text-base font-bold tracking-[-0.01em] text-foreground sm:text-lg">{title}</h2>
           </div>
           <p className="mt-1 line-clamp-1 text-[10px] text-muted-foreground sm:text-[11px]">{description}</p>
           {onOpenDate ? <p className="mt-1 text-[9px] font-medium text-primary/75">1 clique filtra · 2 cliques abrem o dia</p> : null}
