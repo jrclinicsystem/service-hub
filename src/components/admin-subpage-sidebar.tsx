@@ -14,7 +14,7 @@ import { Link } from "@tanstack/react-router";
 
 import logo from "@/assets/jr-clinic-logo.png";
 
-type ActiveSection = "team" | "catalog" | "finance" | "access" | "availability" | "clients";
+type ActiveSection = "home" | "team" | "catalog" | "finance" | "access" | "availability" | "clients";
 
 const mainItems = [
   { href: "/admin#agendamentos", label: "Agendamentos", icon: CalendarDays },
