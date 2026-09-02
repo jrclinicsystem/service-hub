@@ -308,15 +308,43 @@ body:has(a.admin-sidebar-presence-anchor) a.admin-sidebar-presence-anchor {
     box-shadow: inset 0 0 0 1px rgb(255 250 246 / 0.12) !important;
   }
 
-  /* With the legacy Acessos row removed, pull every injected shortcut up by one row
-   * so the sidebar stays compact instead of leaving a blank slot. */
+  /* Agenda da equipe stays visually flat even when selected. */
+  .admin-team-shortcut.is-active {
+    border-color: transparent !important;
+    background: transparent !important;
+    color: #fffaf6 !important;
+    box-shadow: none !important;
+  }
+
+  /* The subpage sidebar must not inherit the legacy gold team-link treatment. */
+  aside a[href="/admin/equipe"] {
+    border-color: transparent !important;
+    background: transparent !important;
+    color: rgb(255 250 246 / 0.70) !important;
+    box-shadow: none !important;
+    font-weight: 500 !important;
+  }
+
+  aside a[href="/admin/equipe"]:hover {
+    border-color: transparent !important;
+    background: rgb(255 250 246 / 0.07) !important;
+    color: #fffaf6 !important;
+    box-shadow: none !important;
+  }
+
+  /* Top group: catalog and clients. Bottom group starts after the divider. */
   .admin-catalog-shortcut {
     top: 325px !important;
     bottom: auto !important;
   }
 
+  .admin-client-shortcut {
+    top: 374px !important;
+    bottom: auto !important;
+  }
+
   .admin-team-shortcut {
-    top: 394px !important;
+    top: 443px !important;
     bottom: auto !important;
     left: 18px !important;
     width: 214px !important;
@@ -336,11 +364,6 @@ body:has(a.admin-sidebar-presence-anchor) a.admin-sidebar-presence-anchor {
   }
 
   .admin-availability-shortcut {
-    top: 443px !important;
-    bottom: auto !important;
-  }
-
-  .admin-client-shortcut {
     top: 492px !important;
     bottom: auto !important;
   }
