@@ -1,0 +1,56 @@
+name: Patch admin sidebar
+
+on:
+  push:
+    paths:
+      - '.github/workflows/patch-admin-sidebar.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Add admin sidebar to main panel
+        shell: python
+        run: |
+          from pathlib import Path
+
+          sidebar = Path('src/components/admin-subpage-sidebar.tsx')
+          text = sidebar.read_text(encoding='utf-8')
+          old = 'type ActiveSection = "team" | "catalog" | "finance" | "access" | "availability" | "clients";'
+          new = 'type ActiveSection = "home" | "team" | "catalog" | "finance" | "access" | "availability" | "clients";'
+          if old in text:
+              text = text.replace(old, new, 1)
+              sidebar.write_text(text, encoding='utf-8')
+
+          admin = Path('src/routes/admin.tsx')
+          text = admin.read_text(encoding='utf-8')
+
+          import_old = 'import { AdminAppointmentsWorkspace } from "@/components/admin-appointments-workspace";'
+          import_new = 'import { AdminAppointmentsWorkspace } from "@/components/admin-appointments-workspace";\nimport { AdminSubpageSidebar } from "@/components/admin-subpage-sidebar";'
+          if import_new not in text and import_old in text:
+              text = text.replace(import_old, import_new, 1)
+
+          root_old = '  return (\n    <div className="min-h-screen bg-background">\n      <header className="sticky top-0 z-40 border-b border-border/80 bg-card/95 backdrop-blur-xl">'
+          root_new = '  return (\n    <div className="min-h-screen bg-background lg:pl-[252px]">\n      <AdminSubpageSidebar active="home" />\n      <header className="sticky top-0 z-40 border-b border-border/80 bg-card/95 backdrop-blur-xl">'
+          if root_old not in text:
+              raise SystemExit('Main admin root pattern not found; refusing unsafe patch.')
+          text = text.replace(root_old, root_new, 1)
+          admin.write_text(text, encoding='utf-8')
+
+      - name: Commit patch
+        run: |
+          if git diff --quiet; then
+            echo "No changes needed"
+            exit 0
+          fi
+          git config user.name "jrclinicsystem"
+          git config user.email "jrclinic.system@gmail.com"
+          git add src/routes/admin.tsx src/components/admin-subpage-sidebar.tsx
+          git commit -m "Show navigation sidebar on main admin panel"
+          git push
