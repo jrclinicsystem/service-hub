@@ -378,27 +378,3 @@ body:has(a.admin-sidebar-presence-anchor) a.admin-sidebar-presence-anchor {
     bottom: auto !important;
   }
 }
-
-
-/* route-transition-sidebar-guard: never expose two desktop admin sidebars during a route swap. */
-@media (min-width: 1024px) {
-  body:has(.admin-subpage-sidebar) .admin-sidebar-shortcut {
-    display: none !important;
-    visibility: hidden !important;
-    opacity: 0 !important;
-    pointer-events: none !important;
-  }
-
-  body:has(.admin-subpage-sidebar) a.admin-sidebar-presence-anchor {
-    display: none !important;
-  }
-
-  body:has(.admin-subpage-sidebar) main.max-w-\[1480px\] div:has(> [role="tablist"]) {
-    display: none !important;
-  }
-
-  body:has(.admin-subpage-sidebar) header.sticky {
-    visibility: hidden !important;
-    pointer-events: none !important;
-  }
-}
