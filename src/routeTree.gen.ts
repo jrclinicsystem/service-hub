@@ -22,6 +22,8 @@ import { Route as TermosRouteImport } from './routes/termos'
 import { Route as AuthenticatedMinhaContaRouteImport } from './routes/_authenticated/minha-conta'
 import { Route as AdminAcessosRouteImport } from './routes/admin_.acessos'
 import { Route as AdminCatalogoRouteImport } from './routes/admin_.catalogo'
+import { Route as AdminClientesRouteImport } from './routes/admin_.clientes'
+import { Route as AdminDisponibilidadeRouteImport } from './routes/admin_.disponibilidade'
 import { Route as AdminEquipeRouteImport } from './routes/admin_.equipe'
 import { Route as AdminFinanceiroRouteImport } from './routes/admin_.financeiro'
 import { Route as ServicoSlugRouteImport } from './routes/servico.$slug'
@@ -90,6 +92,16 @@ const AdminCatalogoRoute = AdminCatalogoRouteImport.update({
   path: '/admin/catalogo',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminClientesRoute = AdminClientesRouteImport.update({
+  id: '/admin_/clientes',
+  path: '/admin/clientes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminDisponibilidadeRoute = AdminDisponibilidadeRouteImport.update({
+  id: '/admin_/disponibilidade',
+  path: '/admin/disponibilidade',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminEquipeRoute = AdminEquipeRouteImport.update({
   id: '/admin_/equipe',
   path: '/admin/equipe',
@@ -119,6 +131,8 @@ export interface FileRoutesByFullPath {
   '/minha-conta': typeof AuthenticatedMinhaContaRoute
   '/admin/acessos': typeof AdminAcessosRoute
   '/admin/catalogo': typeof AdminCatalogoRoute
+  '/admin/clientes': typeof AdminClientesRoute
+  '/admin/disponibilidade': typeof AdminDisponibilidadeRoute
   '/admin/equipe': typeof AdminEquipeRoute
   '/admin/financeiro': typeof AdminFinanceiroRoute
   '/servico/$slug': typeof ServicoSlugRoute
@@ -136,6 +150,8 @@ export interface FileRoutesByTo {
   '/minha-conta': typeof AuthenticatedMinhaContaRoute
   '/admin/acessos': typeof AdminAcessosRoute
   '/admin/catalogo': typeof AdminCatalogoRoute
+  '/admin/clientes': typeof AdminClientesRoute
+  '/admin/disponibilidade': typeof AdminDisponibilidadeRoute
   '/admin/equipe': typeof AdminEquipeRoute
   '/admin/financeiro': typeof AdminFinanceiroRoute
   '/servico/$slug': typeof ServicoSlugRoute
@@ -155,6 +171,8 @@ export interface FileRoutesById {
   '/_authenticated/minha-conta': typeof AuthenticatedMinhaContaRoute
   '/admin_/acessos': typeof AdminAcessosRoute
   '/admin_/catalogo': typeof AdminCatalogoRoute
+  '/admin_/clientes': typeof AdminClientesRoute
+  '/admin_/disponibilidade': typeof AdminDisponibilidadeRoute
   '/admin_/equipe': typeof AdminEquipeRoute
   '/admin_/financeiro': typeof AdminFinanceiroRoute
   '/servico/$slug': typeof ServicoSlugRoute
@@ -174,6 +192,8 @@ export interface FileRouteTypes {
     | '/minha-conta'
     | '/admin/acessos'
     | '/admin/catalogo'
+    | '/admin/clientes'
+    | '/admin/disponibilidade'
     | '/admin/equipe'
     | '/admin/financeiro'
     | '/servico/$slug'
@@ -191,6 +211,8 @@ export interface FileRouteTypes {
     | '/minha-conta'
     | '/admin/acessos'
     | '/admin/catalogo'
+    | '/admin/clientes'
+    | '/admin/disponibilidade'
     | '/admin/equipe'
     | '/admin/financeiro'
     | '/servico/$slug'
@@ -209,6 +231,8 @@ export interface FileRouteTypes {
     | '/_authenticated/minha-conta'
     | '/admin_/acessos'
     | '/admin_/catalogo'
+    | '/admin_/clientes'
+    | '/admin_/disponibilidade'
     | '/admin_/equipe'
     | '/admin_/financeiro'
     | '/servico/$slug'
@@ -227,6 +251,8 @@ export interface RootRouteChildren {
   TermosRoute: typeof TermosRoute
   AdminAcessosRoute: typeof AdminAcessosRoute
   AdminCatalogoRoute: typeof AdminCatalogoRoute
+  AdminClientesRoute: typeof AdminClientesRoute
+  AdminDisponibilidadeRoute: typeof AdminDisponibilidadeRoute
   AdminEquipeRoute: typeof AdminEquipeRoute
   AdminFinanceiroRoute: typeof AdminFinanceiroRoute
   ServicoSlugRoute: typeof ServicoSlugRoute
@@ -325,6 +351,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminCatalogoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin_/clientes': {
+      id: '/admin_/clientes'
+      path: '/admin/clientes'
+      fullPath: '/admin/clientes'
+      preLoaderRoute: typeof AdminClientesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin_/disponibilidade': {
+      id: '/admin_/disponibilidade'
+      path: '/admin/disponibilidade'
+      fullPath: '/admin/disponibilidade'
+      preLoaderRoute: typeof AdminDisponibilidadeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin_/equipe': {
       id: '/admin_/equipe'
       path: '/admin/equipe'
@@ -373,6 +413,8 @@ const rootRouteChildren: RootRouteChildren = {
   TermosRoute: TermosRoute,
   AdminAcessosRoute: AdminAcessosRoute,
   AdminCatalogoRoute: AdminCatalogoRoute,
+  AdminClientesRoute: AdminClientesRoute,
+  AdminDisponibilidadeRoute: AdminDisponibilidadeRoute,
   AdminEquipeRoute: AdminEquipeRoute,
   AdminFinanceiroRoute: AdminFinanceiroRoute,
   ServicoSlugRoute: ServicoSlugRoute,
