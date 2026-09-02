@@ -18,6 +18,7 @@ import {
   Sparkles,
   Stethoscope,
   Tag,
+  UserRound,
 } from "lucide-react";
 import { lazy, Suspense, useEffect, useState, type ComponentType, type ReactNode } from "react";
 
@@ -235,6 +236,16 @@ function PersistentAdminSidebar({
           <span>Agenda da equipe</span>
         </button>
 
+        <Link to="/admin/disponibilidade" className="persistent-admin-sidebar-item">
+          <Clock3 className="size-4 shrink-0" />
+          <span>Disponibilidade</span>
+        </Link>
+
+        <Link to="/admin/clientes" className="persistent-admin-sidebar-item">
+          <UserRound className="size-4 shrink-0" />
+          <span>Clientes</span>
+        </Link>
+
         <button
           type="button"
           className={`persistent-admin-sidebar-item${inlineSection === "access" ? " is-active" : ""}`}
@@ -327,6 +338,14 @@ function MobileAdminNav({
               <span className="admin-mobile-more-option-icon"><CalendarDays /></span>
               <span><strong>Agenda da equipe</strong><small>Agendas e profissionais</small></span>
             </button>
+            <Link to="/admin/disponibilidade" className="admin-mobile-more-option" role="menuitem" onClick={() => setMoreOpen(false)}>
+              <span className="admin-mobile-more-option-icon"><Clock3 /></span>
+              <span><strong>Disponibilidade</strong><small>Horários específicos por data</small></span>
+            </Link>
+            <Link to="/admin/clientes" className="admin-mobile-more-option" role="menuitem" onClick={() => setMoreOpen(false)}>
+              <span className="admin-mobile-more-option-icon"><UserRound /></span>
+              <span><strong>Clientes</strong><small>Cadastro e aniversariantes</small></span>
+            </Link>
             <button type="button" className="admin-mobile-more-option" role="menuitem" onClick={() => selectInline("access")}>
               <span className="admin-mobile-more-option-icon"><ShieldCheck /></span>
               <span><strong>Acessos</strong><small>Administradores e colaboradores</small></span>
@@ -511,6 +530,14 @@ function SystemAccess() {
             <CalendarDays className="size-4 shrink-0 opacity-80" />
             <span>Agenda da equipe</span>
           </button>
+          <Link to="/admin/disponibilidade" className="admin-sidebar-shortcut admin-availability-shortcut">
+            <Clock3 className="size-4 shrink-0 opacity-80" />
+            <span>Disponibilidade</span>
+          </Link>
+          <Link to="/admin/clientes" className="admin-sidebar-shortcut admin-client-shortcut">
+            <UserRound className="size-4 shrink-0 opacity-80" />
+            <span>Clientes</span>
+          </Link>
           <button
             type="button"
             onClick={() => openInlineSection("access")}
