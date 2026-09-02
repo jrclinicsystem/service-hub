@@ -7,27 +7,45 @@ on:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
+  patch-admin-ui:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Apply admin UI patch
+        run: python .github/scripts/patch_admin_ui.py
+      - name: Commit patch
+        run: |
+          if git diff --quiet; then
+            echo "No patch changes needed"
+            exit 0
+          fi
+          git config user.name "jrclinicsystem"
+          git config user.email "jrclinic.system@gmail.com"
+          git add src/components/admin-subpage-sidebar.tsx src/admin-navigation.css src/routes/admin.tsx
+          git commit -m "Fix admin sidebar transition and custom hours"
+          git push
+
   validate:
+    needs: patch-admin-ui
+    if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-
       - name: Install dependencies
         run: bun install --frozen-lockfile
-
       - name: Lint
         run: bun run lint
-
       - name: Production build
         if: always()
         run: bun run build
