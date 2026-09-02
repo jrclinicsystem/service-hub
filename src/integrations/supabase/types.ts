@@ -34,6 +34,7 @@ export type Database = {
       }
       appointments: {
         Row: {
+          client_id: string | null
           created_at: string
           id: string
           notes: string
@@ -48,6 +49,8 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          client_id?: string | null
+          client_id?: string | null
           created_at?: string
           id?: string
           notes?: string
@@ -76,6 +79,13 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "appointments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "appointments_professional_id_fkey"
             columns: ["professional_id"]
@@ -110,6 +120,54 @@ export type Database = {
           id?: string
           name?: string
           sort_order?: number
+        }
+        Relationships: []
+      }
+      clients: {
+        Row: {
+          auth_user_id: string | null
+          birth_date: string
+          birthday_benefit_type: string
+          birthday_custom_benefit: string | null
+          birthday_discount_percent: number | null
+          created_at: string
+          created_by: string | null
+          email: string | null
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+          whatsapp: string
+        }
+        Insert: {
+          auth_user_id?: string | null
+          birth_date: string
+          birthday_benefit_type?: string
+          birthday_custom_benefit?: string | null
+          birthday_discount_percent?: number | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+          whatsapp: string
+        }
+        Update: {
+          auth_user_id?: string | null
+          birth_date?: string
+          birthday_benefit_type?: string
+          birthday_custom_benefit?: string | null
+          birthday_discount_percent?: number | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+          whatsapp?: string
         }
         Relationships: []
       }

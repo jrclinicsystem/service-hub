@@ -311,6 +311,8 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated }: { open: bool
   const [professionals, setProfessionals] = useState<any[]>([]);
   const [links, setLinks] = useState<any[]>([]);
   const [timeSlots, setTimeSlots] = useState<any[]>([]);
+  const [clients, setClients] = useState<any[]>([]);
+  const [selectedClientId, setSelectedClientId] = useState("");
   const [patientName, setPatientName] = useState("");
   const [patientEmail, setPatientEmail] = useState("");
   const [patientPhone, setPatientPhone] = useState("");
@@ -329,11 +331,12 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated }: { open: bool
       db.from("professionals").select("id, name, specialty, is_active, sort_order").eq("is_active", true).order("sort_order").order("name"),
       db.from("service_professionals").select("service_id, professional_id"),
       db.from("time_slots").select("id, slot, is_available, sort_order").eq("is_available", true).order("sort_order"),
-    ]).then(([serviceResult, professionalResult, linkResult, slotResult]) => {
+      db.from("clients").select("id, name, whatsapp, email, is_active").eq("is_active", true).order("name"),
+    ]).then(([serviceResult, professionalResult, linkResult, slotResult, clientResult]) => {
       if (!active) return;
-      const firstError = [serviceResult, professionalResult, linkResult, slotResult].find((result) => result.error)?.error;
+      const firstError = [serviceResult, professionalResult, linkResult, slotResult, clientResult].find((result) => result.error)?.error;
       if (firstError) toast.error(firstError.message);
-      else { setServices(serviceResult.data ?? []); setProfessionals(professionalResult.data ?? []); setLinks(linkResult.data ?? []); setTimeSlots(slotResult.data ?? []); }
+      else { setServices(serviceResult.data ?? []); setProfessionals(professionalResult.data ?? []); setLinks(linkResult.data ?? []); setTimeSlots(slotResult.data ?? []); setClients(clientResult.data ?? []); }
       setLoadingCatalog(false);
     });
     return () => { active = false; };
@@ -345,7 +348,24 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated }: { open: bool
     return professionals.filter((professional) => allowed.has(professional.id));
   }, [serviceId, links, professionals]);
 
-  const reset = () => { setPatientName(""); setPatientEmail(""); setPatientPhone(""); setServiceId(""); setProfessionalId(""); setScheduledDate(todayIso()); setScheduledTime(""); setNotes(""); };
+
+  const selectSavedClient = (clientId: string) => {
+    setSelectedClientId(clientId);
+    const client = clients.find((item) => item.id === clientId);
+    if (!client) return;
+    setPatientName(client.name ?? "");
+    setPatientPhone(client.whatsapp ?? "");
+    setPatientEmail(client.email ?? "");
+  };
+
+  const clearSavedClient = () => {
+    setSelectedClientId("");
+    setPatientName("");
+    setPatientPhone("");
+    setPatientEmail("");
+  };
+
+  const reset = () => { setSelectedClientId(""); setPatientName(""); setPatientEmail(""); setPatientPhone(""); setServiceId(""); setProfessionalId(""); setScheduledDate(todayIso()); setScheduledTime(""); setNotes(""); };
   const handleOpenChange = (next: boolean) => { if (!next && !saving) reset(); onOpenChange(next); };
 
   const createAppointment = async () => {
@@ -363,7 +383,7 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated }: { open: bool
     const conflict = await db.from("appointments").select("id").eq("professional_id", professionalId).eq("scheduled_date", scheduledDate).eq("scheduled_time", scheduledTime).neq("status", "cancelado").limit(1).maybeSingle();
     if (conflict.error) { setSaving(false); toast.error(conflict.error.message); return; }
     if (conflict.data) { setSaving(false); toast.error("Este profissional já possui um agendamento nesse horário."); return; }
-    const { error } = await db.from("appointments").insert({ user_id: null, service_id: serviceId, professional_id: professionalId, patient_name: patientName.trim(), patient_email: patientEmail.trim(), patient_phone: patientPhone.trim(), notes: notes.trim(), scheduled_date: scheduledDate, scheduled_time: scheduledTime, status: "pendente", payment_choice: "onsite", service_price_snapshot: total, deposit_percent: 0, deposit_amount: 0, balance_amount: total });
+    const { error } = await db.from("appointments").insert({ user_id: null, client_id: selectedClientId || null, service_id: serviceId, professional_id: professionalId, patient_name: patientName.trim(), patient_email: patientEmail.trim(), patient_phone: patientPhone.trim(), notes: notes.trim(), scheduled_date: scheduledDate, scheduled_time: scheduledTime, status: "pendente", payment_choice: "onsite", service_price_snapshot: total, deposit_percent: 0, deposit_amount: 0, balance_amount: total });
     setSaving(false);
     if (error) { toast.error(error.message); return; }
     toast.success("Agendamento enviado para confirmação da profissional.", { description: `${patientName.trim()} · ${service.name} · ${formatDate(scheduledDate)} às ${scheduledTime}` });
@@ -371,6 +391,17 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated }: { open: bool
   };
 
   return <Dialog open={open} onOpenChange={handleOpenChange}><DialogContent className="max-h-[92dvh] w-[calc(100%-1rem)] overflow-y-auto rounded-3xl p-5 sm:max-w-2xl sm:p-6"><DialogHeader><DialogTitle>Novo agendamento</DialogTitle><DialogDescription>O agendamento será criado como aguardando confirmação da profissional e com pagamento presencial.</DialogDescription></DialogHeader><div className="mt-2 grid gap-4 sm:grid-cols-2">
+    <div className="space-y-1.5 sm:col-span-2">
+      <div className="flex items-center justify-between gap-3">
+        <Label>Selecionar cliente cadastrado</Label>
+        {selectedClientId ? <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={clearSavedClient} disabled={saving}>Preencher manualmente</Button> : null}
+      </div>
+      <Select value={selectedClientId} onValueChange={selectSavedClient} disabled={saving || loadingCatalog || clients.length === 0}>
+        <SelectTrigger><SelectValue placeholder={clients.length === 0 ? "Nenhum cliente cadastrado" : "Escolha um cliente"} /></SelectTrigger>
+        <SelectContent>{clients.map((client) => <SelectItem key={client.id} value={client.id}>{client.name} · {client.whatsapp}</SelectItem>)}</SelectContent>
+      </Select>
+      <p className="text-[11px] text-muted-foreground">Ao selecionar, nome, WhatsApp e e-mail são preenchidos automaticamente.</p>
+    </div>
     <div className="space-y-1.5 sm:col-span-2"><Label htmlFor="admin-patient-name">Nome do cliente *</Label><Input id="admin-patient-name" value={patientName} onChange={(e) => setPatientName(e.target.value)} disabled={saving} /></div>
     <div className="space-y-1.5"><Label htmlFor="admin-patient-phone">WhatsApp</Label><Input id="admin-patient-phone" inputMode="tel" value={patientPhone} onChange={(e) => setPatientPhone(e.target.value)} placeholder="(85) 99999-9999" disabled={saving} /></div>
     <div className="space-y-1.5"><Label htmlFor="admin-patient-email">E-mail</Label><Input id="admin-patient-email" type="email" value={patientEmail} onChange={(e) => setPatientEmail(e.target.value)} disabled={saving} /></div>

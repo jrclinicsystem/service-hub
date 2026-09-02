@@ -124,6 +124,8 @@ function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [whatsapp, setWhatsapp] = useState("");
+  const [birthDate, setBirthDate] = useState("");
   const [busy, setBusy] = useState(false);
   const [resetBusy, setResetBusy] = useState(false);
   const [checkingAccess, setCheckingAccess] = useState(false);
@@ -226,9 +228,25 @@ function AuthPage() {
   };
 
   const signUp = async () => {
+    const panelSignup = isPanelDestination(next);
+    const normalizedWhatsApp = whatsapp.replace(/\D/g, "");
+    const today = new Date();
+    const todayLocal = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+
     if (!name.trim() || !email.trim() || password.length < 8) {
       toast.error("Preencha nome, e-mail e uma senha de pelo menos 8 caracteres.");
       return;
+    }
+
+    if (!panelSignup) {
+      if (normalizedWhatsApp.length < 10) {
+        toast.error("Informe um WhatsApp válido com DDD.");
+        return;
+      }
+      if (!birthDate || birthDate > todayLocal) {
+        toast.error("Informe uma data de nascimento válida.");
+        return;
+      }
     }
 
     setBusy(true);
@@ -238,7 +256,15 @@ function AuthPage() {
       password,
       options: {
         emailRedirectTo: redirectTo,
-        data: { full_name: name.trim() },
+        data: panelSignup
+          ? { full_name: name.trim(), account_type: "panel" }
+          : {
+              full_name: name.trim(),
+              whatsapp: normalizedWhatsApp,
+              phone: normalizedWhatsApp,
+              birth_date: birthDate,
+              account_type: "client",
+            },
       },
     });
     setBusy(false);
@@ -336,6 +362,32 @@ function AuthPage() {
                   placeholder="Seu nome"
                 />
               </div>
+              {!isAdminAccess && (
+                <>
+                  <div>
+                    <Label htmlFor="whatsapp-novo">WhatsApp</Label>
+                    <Input
+                      id="whatsapp-novo"
+                      inputMode="tel"
+                      autoComplete="tel"
+                      value={whatsapp}
+                      onChange={(event) => setWhatsapp(event.target.value)}
+                      className="mt-2 h-11 rounded-xl"
+                      placeholder="(85) 99999-9999"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="nascimento-novo">Data de nascimento</Label>
+                    <Input
+                      id="nascimento-novo"
+                      type="date"
+                      value={birthDate}
+                      onChange={(event) => setBirthDate(event.target.value)}
+                      className="mt-2 h-11 rounded-xl"
+                    />
+                  </div>
+                </>
+              )}
               <div>
                 <Label htmlFor="email-novo">E-mail</Label>
                 <Input
