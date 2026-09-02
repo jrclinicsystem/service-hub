@@ -99,18 +99,43 @@ function playNotificationSound(audioRef: { current: AudioContext | null }) {
     const ctx = audioRef.current ?? new AudioCtx();
     audioRef.current = ctx;
     if (ctx.state === "suspended") void ctx.resume();
-    const oscillator = ctx.createOscillator();
-    const gain = ctx.createGain();
-    oscillator.type = "sine";
-    oscillator.frequency.setValueAtTime(740, ctx.currentTime);
-    oscillator.frequency.setValueAtTime(900, ctx.currentTime + 0.1);
-    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.14, ctx.currentTime + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.26);
-    oscillator.connect(gain);
-    gain.connect(ctx.destination);
-    oscillator.start();
-    oscillator.stop(ctx.currentTime + 0.27);
+
+    const master = ctx.createGain();
+    master.gain.setValueAtTime(0.9, ctx.currentTime);
+    master.connect(ctx.destination);
+
+    const start = ctx.currentTime + 0.04;
+    const interval = 1.25;
+    const repeats = 8;
+    const notes = [659.25, 880];
+
+    for (let repeat = 0; repeat < repeats; repeat += 1) {
+      const base = start + repeat * interval;
+      notes.forEach((frequency, index) => {
+        const oscillator = ctx.createOscillator();
+        const gain = ctx.createGain();
+        const noteStart = base + index * 0.14;
+        const noteEnd = noteStart + 0.62;
+
+        oscillator.type = index === 0 ? "sine" : "triangle";
+        oscillator.frequency.setValueAtTime(frequency, noteStart);
+        gain.gain.setValueAtTime(0.0001, noteStart);
+        gain.gain.exponentialRampToValueAtTime(index === 0 ? 0.34 : 0.22, noteStart + 0.035);
+        gain.gain.exponentialRampToValueAtTime(0.0001, noteEnd);
+
+        oscillator.connect(gain);
+        gain.connect(master);
+        oscillator.start(noteStart);
+        oscillator.stop(noteEnd + 0.02);
+      });
+    }
+
+    const end = start + 10;
+    master.gain.setValueAtTime(0.9, end - 0.8);
+    master.gain.linearRampToValueAtTime(0.0001, end);
+    window.setTimeout(() => {
+      try { master.disconnect(); } catch {}
+    }, 10_400);
   } catch {}
 }
 
@@ -227,7 +252,7 @@ export function AdminAppointmentsWorkspace({ appointments, onStatusChange, onRef
 
   return (
     <section>
-      <div className="grid items-stretch gap-4 xl:grid-cols-[minmax(420px,560px)_minmax(0,1fr)]">
+      <div className="grid items-stretch gap-4 lg:grid-cols-[minmax(360px,560px)_minmax(0,1fr)]">
         <AppointmentCalendar
           appointments={appointments}
           selectedDate={calendarDate}
@@ -384,5 +409,5 @@ function AppointmentAdminDialog({ appointment, open, onOpenChange, onConfirm, on
 function NewAppointmentAlert({ appointment, open, onLater, onConfirm, onCancel, busy }: any) {
   if (!appointment) return null;
   const hasWhatsApp = normalizeWhatsAppPhone(appointment.patient_phone).length > 0;
-  return <Dialog open={open} onOpenChange={(next) => !next && onLater()}><DialogContent className="w-[calc(100%-1rem)] rounded-3xl p-5 sm:max-w-md sm:p-6"><DialogHeader><span className="mb-2 grid size-12 place-items-center rounded-2xl bg-primary-soft text-primary"><BellRing className="size-5" /></span><DialogTitle>Novo agendamento realizado</DialogTitle><DialogDescription>A profissional ainda precisa confirmar este atendimento.</DialogDescription></DialogHeader><div className="mt-2 rounded-2xl border border-border bg-secondary/40 p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate font-semibold">{appointment.patient_name}</p><p className="mt-1 truncate text-xs text-muted-foreground">{appointment.service?.name ?? "Atendimento"}</p></div><AdminStatusBadge status={appointment.status} /></div><div className="mt-3 grid grid-cols-2 gap-2"><SmallInfo label="Data" value={formatDate(appointment.scheduled_date)} /><SmallInfo label="Horário" value={appointment.scheduled_time} /><SmallInfo label="Profissional" value={appointment.professional?.name ?? "—"} /><SmallInfo label="Pagamento" value={paymentLabel(appointment)} accent /></div></div>{hasWhatsApp ? <Button variant="outline" className="mt-3 w-full rounded-xl border-emerald-600/40 text-emerald-700" onClick={() => openAppointmentWhatsApp(appointment, "confirmation")}><MessageCircle className="size-4" /> Confirmar pelo WhatsApp</Button> : null}<DialogFooter className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3 sm:space-x-0"><Button variant="outline" disabled={busy} onClick={onLater}>Depois</Button><Button variant="destructive" disabled={busy} onClick={onCancel}>Cancelar</Button><Button disabled={busy} onClick={onConfirm}>Confirmar manualmente</Button></DialogFooter></DialogContent></Dialog>;
+  return <Dialog open={open} onOpenChange={(next) => !next && onLater()}><DialogContent className="w-[calc(100%-1rem)] rounded-3xl p-5 sm:max-w-md sm:p-6"><DialogHeader><span className="mb-2 grid size-12 place-items-center rounded-2xl bg-primary-soft text-primary"><BellRing className="size-5" /></span><DialogTitle>Novo agendamento realizado</DialogTitle><DialogDescription>A profissional ainda precisa confirmar este atendimento.</DialogDescription></DialogHeader><div className="mt-2 rounded-2xl border border-border bg-secondary/40 p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate font-semibold">{appointment.patient_name}</p><p className="mt-1 truncate text-xs text-muted-foreground">{appointment.service?.name ?? "Atendimento"}</p></div><AdminStatusBadge status={appointment.status} /></div><div className="mt-3 grid grid-cols-2 gap-2"><SmallInfo label="Data" value={formatDate(appointment.scheduled_date)} /><SmallInfo label="Horário" value={appointment.scheduled_time} /><SmallInfo label="Profissional" value={appointment.professional?.name ?? "—"} /><SmallInfo label="Pagamento" value={paymentLabel(appointment)} accent /></div></div>{hasWhatsApp ? <Button variant="outline" className="mt-3 w-full rounded-xl border-emerald-600/40 text-emerald-700" onClick={() => openAppointmentWhatsApp(appointment, "confirmation")}><MessageCircle className="size-4" /> Confirmar pelo WhatsApp</Button> : null}<DialogFooter className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3 sm:space-x-0"><Button variant="outline" disabled={busy} onClick={onLater}>Depois</Button><Button variant="destructive" disabled={busy} onClick={onCancel}>Cancelar</Button><Button disabled={busy} onClick={onConfirm}>Confirmar</Button></DialogFooter></DialogContent></Dialog>;
 }
