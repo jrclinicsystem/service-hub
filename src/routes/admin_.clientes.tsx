@@ -17,21 +17,17 @@ import { supabase } from "@/integrations/supabase/client";
 const db = supabase as any;
 type BenefitType = "soft_lips" | "percent" | "custom";
 
-const DEFAULT_BIRTHDAY_MESSAGE = `🎉✨ Feliz aniversário! ✨🎉
-
+const DEFAULT_BIRTHDAY_MESSAGE = `Feliz aniversário!
 Hoje a J.R Clinic deseja a você um dia muito especial, repleto de alegria, amor e momentos felizes!
-
 Que esse novo ciclo seja cheio de saúde, realizações, prosperidade e muitos motivos para sorrir.
 
-E para deixar seu dia ainda mais especial, temos um presentinho para você: 🎁✨
-
-Você ganhou um Soft Lips da J.R Clinic! 💋💚
+Para deixar seu dia ainda mais especial, preparamos um presentinho para você:
+Você ganhou um Soft Lips da J.R Clinic!
 
 Esperamos que aproveite esse carinho preparado especialmente para você.
 
 Com carinho,
-
-J.R Clinic 💚`;
+J.R Clinic`;
 
 export const Route = createFileRoute("/admin_/clientes")({
   ssr: false,
@@ -73,21 +69,17 @@ function birthdayMessage(client: any) {
     benefit = `${Number.isInteger(percent) ? percent : percent.toFixed(1).replace(".", ",")}% de desconto em seu atendimento na J.R Clinic!`;
   }
 
-  return `🎉✨ Feliz aniversário! ✨🎉
-
+  return `Feliz aniversário!
 Hoje a J.R Clinic deseja a você um dia muito especial, repleto de alegria, amor e momentos felizes!
-
 Que esse novo ciclo seja cheio de saúde, realizações, prosperidade e muitos motivos para sorrir.
 
-E para deixar seu dia ainda mais especial, temos um presentinho para você: 🎁✨
-
+Para deixar seu dia ainda mais especial, preparamos um presentinho para você:
 Você ganhou ${benefit}
 
 Esperamos que aproveite esse carinho preparado especialmente para você.
 
 Com carinho,
-
-J.R Clinic 💚`;
+J.R Clinic`;
 }
 
 function openBirthdayWhatsApp(client: any) {
