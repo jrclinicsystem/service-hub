@@ -17,7 +17,6 @@ import { toast } from "sonner";
 
 import logo from "@/assets/jr-clinic-logo.png";
 import { AdminAppointmentsWorkspace } from "@/components/admin-appointments-workspace";
-import { AdminSubpageSidebar } from "@/components/admin-subpage-sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -298,8 +297,7 @@ function Admin() {
     data.categories.find((category: any) => category.id === service.category_id)?.name ?? "Sem categoria";
 
   return (
-    <div className="min-h-screen bg-background lg:pl-[252px]">
-      <AdminSubpageSidebar active="home" />
+    <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-40 border-b border-border/80 bg-card/95 backdrop-blur-xl">
         <div className="mx-auto flex h-14 max-w-[1480px] items-center justify-between px-4 sm:h-17 sm:px-8">
           <div className="flex min-w-0 items-center gap-3 sm:gap-4">
