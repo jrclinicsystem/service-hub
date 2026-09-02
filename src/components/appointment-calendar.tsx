@@ -35,12 +35,14 @@ export function AppointmentCalendar({
   appointments,
   selectedDate,
   onSelectDate,
+  onOpenDate,
   title = "Calendário",
   description = "Visualize rapidamente os dias com atendimentos.",
 }: {
   appointments: any[];
   selectedDate?: string;
   onSelectDate?: (date: string) => void;
+  onOpenDate?: (date: string) => void;
   title?: string;
   description?: string;
 }) {
@@ -101,6 +103,7 @@ export function AppointmentCalendar({
             <h2 className="truncate text-sm font-semibold sm:text-base">{title}</h2>
           </div>
           <p className="mt-1 line-clamp-1 text-[10px] text-muted-foreground sm:text-[11px]">{description}</p>
+          {onOpenDate ? <p className="mt-1 text-[9px] font-medium text-primary/75">1 clique filtra · 2 cliques abrem o dia</p> : null}
         </div>
         {selectedDate ? (
           <button type="button" className="shrink-0 text-[10px] font-semibold text-primary hover:underline" onClick={() => onSelectDate?.("")}>Limpar</button>
@@ -151,6 +154,7 @@ export function AppointmentCalendar({
               key={key}
               type="button"
               onClick={() => onSelectDate?.(key)}
+              onDoubleClick={() => onOpenDate?.(key)}
               className={`relative h-9 rounded-lg border px-1 text-center transition sm:h-10 ${active ? "border-primary bg-primary text-primary-foreground" : count ? "border-primary/25 bg-primary-soft/45 hover:border-primary/45" : "border-border bg-background hover:bg-secondary/40"}`}
             >
               <span className={`text-[10px] font-semibold sm:text-[11px] ${isToday && !active ? "text-primary" : ""}`}>{day}</span>
