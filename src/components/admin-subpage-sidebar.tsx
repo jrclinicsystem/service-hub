@@ -7,13 +7,14 @@ import {
   Sparkles,
   Stethoscope,
   Tag,
+  UserRound,
   Users,
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 
 import logo from "@/assets/jr-clinic-logo.png";
 
-type ActiveSection = "team" | "catalog" | "finance" | "access" | "availability";
+type ActiveSection = "team" | "catalog" | "finance" | "access" | "availability" | "clients";
 
 const mainItems = [
   { href: "/admin#agendamentos", label: "Agendamentos", icon: CalendarDays },
@@ -24,7 +25,8 @@ const mainItems = [
 
 const secondaryItems = [
   { to: "/admin/equipe", label: "Agenda da equipe", icon: Users, active: "team" as const },
-  { to: "/admin/disponibilidade", label: "Dias e turnos", icon: Clock3, active: "availability" as const },
+  { to: "/admin/disponibilidade", label: "Disponibilidade", icon: Clock3, active: "availability" as const },
+  { to: "/admin/clientes", label: "Clientes", icon: UserRound, active: "clients" as const },
   { to: "/admin/acessos", label: "Acessos", icon: ShieldCheck, active: "access" as const },
   { to: "/admin/financeiro", label: "Financeiro", icon: CircleDollarSign, active: "finance" as const },
 ] as const;
