@@ -190,6 +190,7 @@ body:has(a.admin-sidebar-presence-anchor) a.admin-sidebar-presence-anchor {
     color: var(--foreground);
     font-family: inherit;
     text-align: left;
+    text-decoration: none;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
   }
@@ -334,13 +335,23 @@ body:has(a.admin-sidebar-presence-anchor) a.admin-sidebar-presence-anchor {
     pointer-events: none;
   }
 
-  .admin-access-shortcut {
+  .admin-availability-shortcut {
     top: 443px !important;
     bottom: auto !important;
   }
 
-  .admin-finance-shortcut {
+  .admin-client-shortcut {
     top: 492px !important;
+    bottom: auto !important;
+  }
+
+  .admin-access-shortcut {
+    top: 541px !important;
+    bottom: auto !important;
+  }
+
+  .admin-finance-shortcut {
+    top: 590px !important;
     bottom: auto !important;
   }
 }
