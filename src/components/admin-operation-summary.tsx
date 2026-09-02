@@ -67,8 +67,8 @@ export function AdminOperationSummary({ appointments }: { appointments: any[] })
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <TrendingUp className="size-4 text-primary" />
-            <h2 className="text-sm font-semibold sm:text-base">Resumo operacional</h2>
+            <TrendingUp className="size-4.5 text-primary" />
+            <h2 className="text-base font-bold tracking-[-0.01em] text-foreground sm:text-lg">Resumo operacional</h2>
           </div>
           <p className="mt-1 text-[10px] text-muted-foreground sm:text-[11px]">Visão rápida da movimentação da clínica.</p>
         </div>
@@ -85,7 +85,7 @@ export function AdminOperationSummary({ appointments }: { appointments: any[] })
       <div className="mt-4 flex min-h-0 flex-1 flex-col rounded-xl border border-border/70 bg-background/60 p-3">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold">Receita prevista</p>
+            <p className="text-sm font-bold text-foreground sm:text-base">Receita prevista</p>
             <p className="mt-0.5 text-[9px] text-muted-foreground">Últimos 6 meses, desconsiderando cancelados</p>
           </div>
           <div className="text-right">
@@ -114,7 +114,7 @@ function MiniMetric({ icon: Icon, label, value }: any) {
   return (
     <div className="rounded-xl bg-secondary/45 p-3">
       <Icon className="size-3.5 text-primary" />
-      <p className="mt-2 truncate text-[9px] text-muted-foreground">{label}</p>
+      <p className="mt-2 truncate text-[10px] font-semibold text-foreground/75 sm:text-[11px]">{label}</p>
       <p className="mt-0.5 truncate text-sm font-semibold sm:text-base">{value}</p>
     </div>
   );
