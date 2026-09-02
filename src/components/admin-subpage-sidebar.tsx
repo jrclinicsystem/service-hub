@@ -17,31 +17,32 @@ import logo from "@/assets/jr-clinic-logo.png";
 type ActiveSection = "home" | "team" | "catalog" | "finance" | "access" | "availability" | "clients";
 
 const mainItems = [
-  { href: "/admin#agendamentos", label: "Agendamentos", icon: CalendarDays },
-  { href: "/admin#servicos", label: "Serviços", icon: Stethoscope },
-  { href: "/admin#promocoes", label: "Promoções", icon: Tag },
-  { href: "/admin#horarios", label: "Horários", icon: Clock3 },
+  { hash: "agendamentos", label: "Agendamentos", icon: CalendarDays },
+  { hash: "servicos", label: "Serviços", icon: Stethoscope },
+  { hash: "promocoes", label: "Promoções", icon: Tag },
+  { hash: "horarios", label: "Horários", icon: Clock3 },
 ] as const;
 
 const secondaryItems = [
   { to: "/admin/equipe", label: "Agenda da equipe", icon: Users, active: "team" as const },
   { to: "/admin/disponibilidade", label: "Disponibilidade", icon: Clock3, active: "availability" as const },
-  { to: "/admin/clientes", label: "Clientes", icon: UserRound, active: "clients" as const },
   { to: "/admin/acessos", label: "Acessos", icon: ShieldCheck, active: "access" as const },
   { to: "/admin/financeiro", label: "Financeiro", icon: CircleDollarSign, active: "finance" as const },
 ] as const;
 
-const itemClass = (selected: boolean) =>
+const itemClass = (selected: boolean, plainActive = false) =>
   `flex min-h-11 items-center gap-3 rounded-xl border px-3.5 text-[13px] font-medium transition ${
     selected
-      ? "border-white/12 bg-white/12 text-white shadow-sm"
+      ? plainActive
+        ? "border-transparent bg-transparent text-white shadow-none"
+        : "border-white/12 bg-white/12 text-white shadow-sm"
       : "border-transparent text-white/70 hover:bg-white/[0.07] hover:text-white"
   }`;
 
 export function AdminSubpageSidebar({ active }: { active: ActiveSection }) {
   return (
     <aside className="fixed inset-y-0 left-0 z-50 hidden w-[252px] flex-col border-r border-primary-foreground/10 bg-primary text-primary-foreground lg:flex">
-      <Link to="/admin" className="flex h-20 items-center border-b border-white/10 px-6">
+      <Link to="/admin" preload="intent" className="flex h-20 items-center border-b border-white/10 px-6">
         <img src={logo} alt="JR Clinic" className="h-10 w-auto brightness-0 invert" />
       </Link>
 
@@ -55,16 +56,27 @@ export function AdminSubpageSidebar({ active }: { active: ActiveSection }) {
           {mainItems.map((item) => {
             const Icon = item.icon;
             return (
-              <a key={item.href} href={item.href} className={itemClass(false)}>
+              <Link
+                key={item.hash}
+                to="/admin"
+                hash={item.hash}
+                preload="intent"
+                className={itemClass(false)}
+              >
                 <Icon className="size-4 shrink-0 opacity-80" />
                 <span>{item.label}</span>
-              </a>
+              </Link>
             );
           })}
 
-          <Link to="/admin/catalogo" className={itemClass(active === "catalog")}>
+          <Link to="/admin/catalogo" preload="intent" className={itemClass(active === "catalog")}>
             <Sparkles className="size-4 shrink-0 opacity-80" />
             <span>Destaque do catálogo</span>
+          </Link>
+
+          <Link to="/admin/clientes" preload="intent" className={itemClass(active === "clients")}>
+            <UserRound className="size-4 shrink-0 opacity-80" />
+            <span>Clientes</span>
           </Link>
         </div>
 
@@ -74,7 +86,12 @@ export function AdminSubpageSidebar({ active }: { active: ActiveSection }) {
           {secondaryItems.map((item) => {
             const Icon = item.icon;
             return (
-              <Link key={item.to} to={item.to} className={itemClass(active === item.active)}>
+              <Link
+                key={item.to}
+                to={item.to}
+                preload="intent"
+                className={itemClass(active === item.active, item.active === "team")}
+              >
                 <Icon className="size-4 shrink-0 opacity-80" />
                 <span>{item.label}</span>
               </Link>
@@ -86,6 +103,7 @@ export function AdminSubpageSidebar({ active }: { active: ActiveSection }) {
       <div className="mt-auto p-4">
         <Link
           to="/"
+          preload="intent"
           className="flex min-h-10 items-center justify-between rounded-xl border border-white/10 px-3.5 text-xs font-medium text-white/65 transition hover:bg-white/10 hover:text-white"
         >
           Ver site
