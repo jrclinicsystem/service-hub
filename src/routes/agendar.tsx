@@ -28,6 +28,7 @@ import { formatPrice } from "@/lib/clinic";
 
 const title = "Agendar atendimento — JR Clinic";
 const description = "Escolha o serviço, profissional, horário e a forma de pagamento do agendamento.";
+const db = supabase as any;
 
 const searchSchema = z.object({ servico: z.string().optional() });
 
@@ -59,13 +60,6 @@ const days = Array.from({ length: 14 }).map((_, index) => {
   };
 });
 
-function periodForTime(time: string) {
-  const hour = Number(time.slice(0, 2));
-  if (hour < 12) return "morning";
-  if (hour < 18) return "afternoon";
-  return "evening";
-}
-
 type PaymentChoice = "deposit" | "full" | "onsite";
 type PaymentKind = "deposit" | "full";
 
@@ -81,7 +75,7 @@ type BookingPaymentSession = {
 
 function Agendar() {
   const { servico } = Route.useSearch();
-  const { services, timeSlots, serviceProfessionals, depositPercent } = Route.useLoaderData();
+  const { services, serviceProfessionals, depositPercent } = Route.useLoaderData();
   const navigate = Route.useNavigate();
   const authNavigate = useNavigate();
   const { user } = useAuth();
@@ -99,8 +93,8 @@ function Agendar() {
   }, [service, serviceProfessionals]);
 
   const [professionalId, setProfessionalId] = useState("");
-  const [professionalSlots, setProfessionalSlots] = useState<any[] | null>(null);
-  const [professionalAvailability, setProfessionalAvailability] = useState<any[]>([]);
+  const [availableSlots, setAvailableSlots] = useState<any[]>([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
   const [day, setDay] = useState(days.find((item) => !item.disabled)?.key ?? days[0]!.key);
   const [time, setTime] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -113,13 +107,7 @@ function Agendar() {
   const [busy, setBusy] = useState(false);
 
   const selectedProfessional = professionals.find((item: any) => item.id === professionalId) ?? professionals[0];
-  const selectedDay = days.find((item) => item.key === day) ?? days[0]!;
-  const baseTimeSlots = professionalSlots ?? timeSlots;
-  const displayedTimeSlots = useMemo(() => baseTimeSlots.filter((slot: any) => {
-    if (!slot.is_available) return false;
-    if (!professionalAvailability.length) return true;
-    return professionalAvailability.some((item: any) => item.weekday === selectedDay.weekdayNumber && item.period === periodForTime(slot.slot) && item.is_available);
-  }), [baseTimeSlots, professionalAvailability, selectedDay.weekdayNumber]);
+  const displayedTimeSlots = availableSlots;
   const hasService = Boolean(service);
   const total = Number(service?.price ?? 0);
   const safeDepositPercent = Number.isFinite(Number(depositPercent)) ? Number(depositPercent) : 50;
@@ -147,16 +135,9 @@ function Agendar() {
   const phoneDigits = phone.replace(/\D/g, "");
   const validWhatsApp = phoneDigits.length >= 10 && phoneDigits.length <= 15;
 
-  const isDayAvailable = (weekdayNumber: number) => {
-    if (weekdayNumber === 0) return false;
-    if (!professionalAvailability.length) return true;
-    return professionalAvailability.some((item: any) => item.weekday === weekdayNumber && item.is_available);
-  };
-
   useEffect(() => {
     setProfessionalId(professionals[0]?.id ?? "");
-    setProfessionalSlots(null);
-    setProfessionalAvailability([]);
+    setAvailableSlots([]);
     setTime(null);
     setPaymentChoice("deposit");
     setPaymentSession(null);
@@ -165,34 +146,31 @@ function Agendar() {
 
   useEffect(() => {
     let cancelled = false;
-    if (!professionalId) {
-      setProfessionalSlots(null);
-      setProfessionalAvailability([]);
+    setTime(null);
+
+    if (!professionalId || !day) {
+      setAvailableSlots([]);
+      setSlotsLoading(false);
       return;
     }
 
-    void Promise.all([
-      supabase.from("professional_time_slots").select("slot, is_available, sort_order").eq("professional_id", professionalId).order("sort_order").order("slot"),
-      supabase.from("professional_availability_periods").select("weekday, period, is_available").eq("professional_id", professionalId).order("weekday").order("period"),
-    ]).then(([slotsResult, availabilityResult]) => {
-      if (cancelled) return;
-      if (slotsResult.error || !slotsResult.data?.length) setProfessionalSlots(timeSlots as any[]);
-      else setProfessionalSlots(slotsResult.data as any[]);
-      setProfessionalAvailability(availabilityResult.error ? [] : (availabilityResult.data as any[] ?? []));
-      setTime(null);
-    });
+    setSlotsLoading(true);
+    void db
+      .rpc("get_professional_booking_slots", { _professional_id: professionalId, _date: day })
+      .then(({ data, error }: any) => {
+        if (cancelled) return;
+        if (error) {
+          console.error("Falha ao carregar horários da data", error);
+          setAvailableSlots([]);
+          toast.error("Não foi possível carregar os horários desta data.");
+        } else {
+          setAvailableSlots((data ?? []).filter((slot: any) => slot.is_available));
+        }
+        setSlotsLoading(false);
+      });
 
     return () => { cancelled = true; };
-  }, [professionalId, timeSlots]);
-
-  useEffect(() => {
-    if (!professionalId) return;
-    const current = days.find((item) => item.key === day);
-    if (current && isDayAvailable(current.weekdayNumber)) return;
-    const firstAvailable = days.find((item) => isDayAvailable(item.weekdayNumber));
-    if (firstAvailable) setDay(firstAvailable.key);
-    setTime(null);
-  }, [professionalAvailability, professionalId]);
+  }, [professionalId, day]);
 
   useEffect(() => {
     if (time && !displayedTimeSlots.some((slot: any) => slot.slot === time)) setTime(null);
@@ -358,18 +336,20 @@ function Agendar() {
               <h2 className="text-base font-semibold sm:text-lg">Data e horário</h2>
               <div className="mt-4 flex gap-2 overflow-x-auto pb-1 sm:grid sm:grid-cols-7 sm:overflow-visible">
                 {days.map((item) => {
-                  const unavailable = item.disabled || !isDayAvailable(item.weekdayNumber);
+                  const unavailable = item.disabled;
                   return <button key={item.key} type="button" disabled={unavailable || !service || !professionalId} onClick={() => { setDay(item.key); setTime(null); resetPreparedPayment(); }} className={`w-[54px] shrink-0 rounded-xl border px-2 py-2.5 text-center transition disabled:opacity-35 sm:w-auto ${day === item.key && service && !unavailable ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background hover:bg-secondary"}`}><span className="block text-[9px] opacity-70">{item.weekday}</span><span className="mt-0.5 block text-sm font-semibold">{item.label}</span></button>;
                 })}
               </div>
 
               <p className="mt-5 text-xs font-medium text-muted-foreground">Horários disponíveis para {selectedProfessional?.name ?? "o profissional"}</p>
-              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {displayedTimeSlots.map((slot: any) => (
-                  <button key={slot.slot} type="button" disabled={!professionalId || !service} onClick={() => { setTime(slot.slot); resetPreparedPayment(); }} className={`rounded-xl border px-2 py-2.5 text-xs font-medium transition disabled:opacity-35 sm:text-sm ${time === slot.slot ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background hover:bg-secondary"}`}>{slot.slot}</button>
-                ))}
-              </div>
-              {professionalId && displayedTimeSlots.length === 0 ? <p className="mt-3 text-xs text-destructive">Este profissional não atende nesse dia/turno ou ainda não liberou horários.</p> : null}
+              {slotsLoading ? <div className="mt-3 rounded-xl bg-secondary/60 px-3 py-3 text-xs text-muted-foreground">Carregando horários desta data...</div> : (
+                <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {displayedTimeSlots.map((slot: any) => (
+                    <button key={slot.slot} type="button" disabled={!professionalId || !service} onClick={() => { setTime(slot.slot); resetPreparedPayment(); }} className={`rounded-xl border px-2 py-2.5 text-xs font-medium transition disabled:opacity-35 sm:text-sm ${time === slot.slot ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background hover:bg-secondary"}`}>{slot.slot}</button>
+                  ))}
+                </div>
+              )}
+              {professionalId && !slotsLoading && displayedTimeSlots.length === 0 ? <p className="mt-3 text-xs text-destructive">Não há horários liberados para esta data.</p> : null}
             </section>
 
             <section className="rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-6">
