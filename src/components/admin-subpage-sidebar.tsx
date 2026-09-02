@@ -25,7 +25,6 @@ const mainItems = [
 
 const secondaryItems = [
   { to: "/admin/equipe", label: "Agenda da equipe", icon: Users, active: "team" as const },
-  { to: "/admin/disponibilidade", label: "Disponibilidade", icon: Clock3, active: "availability" as const },
   { to: "/admin/acessos", label: "Acessos", icon: ShieldCheck, active: "access" as const },
   { to: "/admin/financeiro", label: "Financeiro", icon: CircleDollarSign, active: "finance" as const },
 ] as const;
@@ -41,7 +40,7 @@ const itemClass = (selected: boolean, plainActive = false) =>
 
 export function AdminSubpageSidebar({ active }: { active: ActiveSection }) {
   return (
-    <aside className="fixed inset-y-0 left-0 z-50 hidden w-[252px] flex-col border-r border-primary-foreground/10 bg-primary text-primary-foreground lg:flex">
+    <aside className="admin-subpage-sidebar fixed inset-y-0 left-0 z-50 hidden w-[252px] flex-col border-r border-primary-foreground/10 bg-primary text-primary-foreground lg:flex">
       <Link to="/admin" preload="intent" className="flex h-20 items-center border-b border-white/10 px-6">
         <img src={logo} alt="JR Clinic" className="h-10 w-auto brightness-0 invert" />
       </Link>
@@ -68,6 +67,11 @@ export function AdminSubpageSidebar({ active }: { active: ActiveSection }) {
               </Link>
             );
           })}
+
+          <Link to="/admin/disponibilidade" preload="intent" className={itemClass(active === "availability")}>
+            <Clock3 className="size-4 shrink-0 opacity-80" />
+            <span>Disponibilidade</span>
+          </Link>
 
           <Link to="/admin/catalogo" preload="intent" className={itemClass(active === "catalog")}>
             <Sparkles className="size-4 shrink-0 opacity-80" />

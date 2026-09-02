@@ -494,6 +494,7 @@ function Admin() {
 
           <TabsContent value="horarios" className="mt-4 sm:mt-5">
             <SectionHeader title="Horários disponíveis" subtitle="Ative ou pause horários exibidos no agendamento." />
+            <CustomTimeSlotAdder onAdded={refresh} />
             <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
               {data.timeSlots.map((slot: any) => (
                 <div key={slot.id} className="flex min-h-[74px] items-center justify-between rounded-2xl border border-border bg-card px-3.5 py-3 shadow-soft sm:p-4">
@@ -543,6 +544,56 @@ function Admin() {
           </TabsContent>
         </Tabs>
       </main>
+    </div>
+  );
+}
+
+function CustomTimeSlotAdder({ onAdded }: { onAdded: () => void }) {
+  const [time, setTime] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const addCustomTime = async () => {
+    if (!time) {
+      toast.error("Escolha um horário para adicionar.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const sortOrder = Number(time.replace(":", ""));
+      const { error } = await db
+        .from("time_slots")
+        .upsert(
+          { slot: time, is_available: true, sort_order: sortOrder },
+          { onConflict: "slot" },
+        );
+      if (error) throw error;
+
+      setTime("");
+      toast.success("Horário adicionado e ativado.");
+      onAdded();
+    } catch (err: any) {
+      toast.error(err?.message || "Não foi possível adicionar o horário.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-soft sm:flex-row sm:items-end">
+      <div className="w-full sm:max-w-[220px]">
+        <Label>Adicionar horário personalizado</Label>
+        <Input
+          type="time"
+          value={time}
+          onChange={(event) => setTime(event.target.value)}
+          className="mt-2"
+        />
+      </div>
+      <Button type="button" onClick={addCustomTime} disabled={saving || !time}>
+        <Plus className="size-4" />
+        {saving ? "Adicionando..." : "Adicionar horário"}
+      </Button>
     </div>
   );
 }

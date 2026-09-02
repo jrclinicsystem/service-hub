@@ -332,19 +332,24 @@ body:has(a.admin-sidebar-presence-anchor) a.admin-sidebar-presence-anchor {
     box-shadow: none !important;
   }
 
-  /* Top group: catalog and clients. Bottom group starts after the divider. */
-  .admin-catalog-shortcut {
+  /* Top group follows the same order as the admin menu. */
+  .admin-availability-shortcut {
     top: 325px !important;
     bottom: auto !important;
   }
 
-  .admin-client-shortcut {
+  .admin-catalog-shortcut {
     top: 374px !important;
     bottom: auto !important;
   }
 
+  .admin-client-shortcut {
+    top: 423px !important;
+    bottom: auto !important;
+  }
+
   .admin-team-shortcut {
-    top: 443px !important;
+    top: 492px !important;
     bottom: auto !important;
     left: 18px !important;
     width: 214px !important;
@@ -363,11 +368,6 @@ body:has(a.admin-sidebar-presence-anchor) a.admin-sidebar-presence-anchor {
     pointer-events: none;
   }
 
-  .admin-availability-shortcut {
-    top: 492px !important;
-    bottom: auto !important;
-  }
-
   .admin-access-shortcut {
     top: 541px !important;
     bottom: auto !important;
@@ -376,5 +376,29 @@ body:has(a.admin-sidebar-presence-anchor) a.admin-sidebar-presence-anchor {
   .admin-finance-shortcut {
     top: 590px !important;
     bottom: auto !important;
+  }
+}
+
+
+/* route-transition-sidebar-guard: never expose two desktop admin sidebars during a route swap. */
+@media (min-width: 1024px) {
+  body:has(.admin-subpage-sidebar) .admin-sidebar-shortcut {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+
+  body:has(.admin-subpage-sidebar) a.admin-sidebar-presence-anchor {
+    display: none !important;
+  }
+
+  body:has(.admin-subpage-sidebar) main.max-w-\[1480px\] div:has(> [role="tablist"]) {
+    display: none !important;
+  }
+
+  body:has(.admin-subpage-sidebar) header.sticky {
+    visibility: hidden !important;
+    pointer-events: none !important;
   }
 }
