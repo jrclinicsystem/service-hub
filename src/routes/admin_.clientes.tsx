@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { Cake, CalendarDays, Gift, MessageCircle, Pencil, Plus, RefreshCw, Search, Trash2, UserRound } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { AdminSubpageSidebar } from "@/components/admin-subpage-sidebar";
@@ -116,6 +116,7 @@ function ClientsPage() {
   const [customBenefit, setCustomBenefit] = useState("");
   const [active, setActive] = useState(true);
   const [saving, setSaving] = useState(false);
+  const formRef = useRef<HTMLElement | null>(null);
 
   const today = todayParts();
   const birthdayClients = useMemo(() => data.filter((client: any) => {
@@ -150,7 +151,7 @@ function ClientsPage() {
     setDiscount(client.birthday_discount_percent == null ? "" : String(client.birthday_discount_percent));
     setCustomBenefit(client.birthday_custom_benefit || "");
     setActive(client.is_active !== false);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    requestAnimationFrame(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
 
   const save = async () => {
@@ -172,12 +173,11 @@ function ClientsPage() {
         birthday_discount_percent: benefitType === "percent" ? Number(discount) : null,
         birthday_custom_benefit: benefitType === "custom" ? customBenefit.trim() : null,
         is_active: active,
-        created_by: authData.user?.id ?? null,
       };
 
       const result = editingId
-        ? await db.from("clients").update({ ...payload, created_by: undefined }).eq("id", editingId)
-        : await db.from("clients").insert(payload);
+        ? await db.from("clients").update(payload).eq("id", editingId).select("id").single()
+        : await db.from("clients").insert({ ...payload, created_by: authData.user?.id ?? null }).select("id").single();
       if (result.error) throw result.error;
 
       toast.success(editingId ? "Cliente atualizado." : "Cliente cadastrado.");
@@ -217,8 +217,8 @@ function ClientsPage() {
           <section className="mt-7 rounded-3xl border border-border bg-card px-5 py-4 shadow-soft"><div className="flex items-center gap-3"><Cake className="size-5 text-primary" /><div><p className="text-sm font-semibold">Nenhum aniversário hoje</p><p className="text-xs text-muted-foreground">Quando houver um aniversariante, o alerta e o botão de WhatsApp aparecerão aqui automaticamente.</p></div></div></section>
         )}
 
-        <section className="mt-6 rounded-3xl border border-border bg-card p-5 shadow-soft sm:p-6">
-          <div className="flex items-center gap-2"><Plus className="size-5 text-primary" /><h2 className="text-lg font-bold">{editingId ? "Editar cliente" : "Cadastrar cliente"}</h2></div>
+        <section ref={formRef} className="mt-6 scroll-mt-6 rounded-3xl border border-border bg-card p-5 shadow-soft sm:p-6">
+          <div className="flex items-center gap-2">{editingId ? <Pencil className="size-5 text-primary" /> : <Plus className="size-5 text-primary" />}<h2 className="text-lg font-bold">{editingId ? "Editar cliente" : "Cadastrar cliente"}</h2></div>
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
             <div><Label>Nome</Label><Input className="mt-2" value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome completo" /></div>
             <div><Label>WhatsApp</Label><Input className="mt-2" inputMode="tel" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="(85) 99999-9999" /></div>
@@ -238,7 +238,7 @@ function ClientsPage() {
             {filtered.length === 0 ? <div className="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">Nenhum cliente encontrado.</div> : filtered.map((client: any) => {
               const parts = birthParts(client.birth_date);
               const isBirthday = client.is_active && parts.month === today.month && parts.day === today.day;
-              return <article key={client.id} className={`flex flex-col gap-4 rounded-2xl border p-4 sm:flex-row sm:items-center sm:justify-between ${isBirthday ? "border-emerald-300 bg-emerald-50/40" : "border-border"}`}><div className="flex min-w-0 items-center gap-3"><span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary"><UserRound className="size-4" /></span><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="truncate font-semibold">{client.name}</p>{isBirthday ? <Badge className="bg-emerald-600 text-white">Aniversário hoje</Badge> : null}{!client.is_active ? <Badge variant="secondary">Inativo</Badge> : null}</div><div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"><span>{client.whatsapp}</span><span className="flex items-center gap-1"><CalendarDays className="size-3" /> {formatBirthDate(client.birth_date)}</span></div></div></div><div className="flex shrink-0 flex-wrap gap-2">{isBirthday ? <Button size="sm" className="bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => openBirthdayWhatsApp(client)}><MessageCircle className="size-4" /> WhatsApp</Button> : null}<Button size="sm" variant="outline" onClick={() => editClient(client)}><Pencil className="size-4" /> Editar</Button><Button size="sm" variant="ghost" className="text-destructive" onClick={async () => { if (!window.confirm(`Excluir ${client.name} do cadastro?`)) return; const { error: deleteError } = await db.from("clients").delete().eq("id", client.id); if (deleteError) { toast.error(deleteError.message); return; } toast.success("Cliente removido."); if (editingId === client.id) resetForm(); await refetch(); }}><Trash2 className="size-4" /></Button></div></article>;
+              return <article key={client.id} className={`flex flex-col gap-4 rounded-2xl border p-4 sm:flex-row sm:items-center sm:justify-between ${isBirthday ? "border-emerald-300 bg-emerald-50/40" : "border-border"}`}><div className="flex min-w-0 items-center gap-3"><span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary"><UserRound className="size-4" /></span><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="truncate font-semibold">{client.name}</p>{isBirthday ? <Badge className="bg-emerald-600 text-white">Aniversário hoje</Badge> : null}{!client.is_active ? <Badge variant="secondary">Inativo</Badge> : null}</div><div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"><span>{client.whatsapp}</span><span className="flex items-center gap-1"><CalendarDays className="size-3" /> {formatBirthDate(client.birth_date)}</span></div></div></div><div className="flex shrink-0 flex-wrap gap-2">{isBirthday ? <Button size="sm" className="bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => openBirthdayWhatsApp(client)}><MessageCircle className="size-4" /> WhatsApp</Button> : null}<Button type="button" size="sm" variant="outline" onClick={() => editClient(client)}><Pencil className="size-4" /> Editar</Button><Button size="sm" variant="ghost" className="text-destructive" onClick={async () => { if (!window.confirm(`Excluir ${client.name} do cadastro?`)) return; const { error: deleteError } = await db.from("clients").delete().eq("id", client.id); if (deleteError) { toast.error(deleteError.message); return; } toast.success("Cliente removido."); if (editingId === client.id) resetForm(); await refetch(); }}><Trash2 className="size-4" /></Button></div></article>;
             })}
           </div>
         </section>
