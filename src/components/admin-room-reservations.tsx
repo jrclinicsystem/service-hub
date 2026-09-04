@@ -316,7 +316,38 @@ export function AdminRoomReservations() {
 
       <section className="mt-6 rounded-3xl border border-border bg-card p-5 shadow-soft sm:p-6">
         <div><h2 className="text-lg font-semibold">Salas cadastradas</h2><p className="mt-1 text-xs text-muted-foreground">As profissionais vinculadas ficam automaticamente bloqueadas quando a sala recebe uma reserva administrativa.</p></div>
-        <div className="mt-4 grid gap-3 md:grid-cols-2">{rooms.map((room: any) => { const linked = linkedByRoom.get(room.id) ?? []; return <article key={room.id} className="rounded-2xl border border-border p-4"><div className="flex items-start justify-between gap-3"><div><div className="flex items-center gap-2"><Building2 className="size-4 text-primary" /><p className="font-semibold">{room.name}</p>{!room.is_active ? <Badge variant="secondary">Inativa</Badge> : null}</div><div className="mt-2 flex flex-wrap gap-1.5">{linked.length ? linked.map((id) => <Badge key={id} variant="outline" className="text-[10px]"><UsersRound className="mr-1 size-3" /> {professionalMap.get(id)?.name || "Profissional"}</Badge>) : <span className="text-[10px] text-muted-foreground">Nenhuma profissional vinculada.</span>}</div></div><Button type="button" size="sm" variant="outline" onClick={() => editRoom(room)}><Pencil className="size-3.5" /> Editar</Button></div></article>; })}</div>
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          {rooms.map((room: any) => {
+            const linked = linkedByRoom.get(room.id) ?? [];
+            return (
+              <article key={room.id} className="rounded-2xl border border-border p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Building2 className="size-4 text-primary" />
+                      <p className="font-semibold">{String(room.name)}</p>
+                      {!room.is_active ? <Badge variant="secondary">Inativa</Badge> : null}
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {linked.length ? linked.map((id) => {
+                        const professionalName = professionalMap.get(id)?.name || "Profissional";
+                        return (
+                          <Badge key={id} variant="outline" className="text-[10px]">
+                            <UsersRound className="mr-1 size-3" />
+                            {professionalName}
+                          </Badge>
+                        );
+                      }) : <span className="text-[10px] text-muted-foreground">Nenhuma profissional vinculada.</span>}
+                    </div>
+                  </div>
+                  <Button type="button" size="sm" variant="outline" onClick={() => editRoom(room)}>
+                    <Pencil className="size-3.5" /> Editar
+                  </Button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
       </section>
 
       <section className="mt-6 rounded-3xl border border-border bg-card p-5 shadow-soft sm:p-6">
