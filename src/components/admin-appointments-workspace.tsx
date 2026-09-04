@@ -297,7 +297,7 @@ export function AdminAppointmentsWorkspace({ appointments, onStatusChange, onRef
 
       <CreateAppointmentDialog open={createOpen} onOpenChange={setCreateOpen} onCreated={() => { setCreateOpen(false); setScope("pending"); onRefresh(); }} />
       <CalendarDayDialog date={calendarDayOpen} appointments={appointments} open={Boolean(calendarDayOpen)} onOpenChange={(open) => { if (!open) setCalendarDayOpen(null); }} />
-      <AppointmentAdminDialog appointment={selected} open={Boolean(selected)} onOpenChange={(open: boolean) => !open && setSelected(null)} onConfirm={() => selected && act(selected, "confirmado")} onCancel={() => selected && act(selected, "cancelado")} onAttended={() => selected && completeAttendance(selected)} busy={busyAction} />
+      <AppointmentAdminDialog appointment={selected} open={Boolean(selected)} onOpenChange={(open: boolean) => !open && setSelected(null)} onConfirm={() => selected && act(selected, "confirmado")} onCancel={() => selected && act(selected, "cancelado")} onAttended={() => selected && completeAttendance(selected)} onPriceSaved={(value: number) => { setSelected((current: any) => current ? { ...current, service_price_snapshot: value, balance_amount: value } : current); onRefresh(); }} busy={busyAction} />
       <NewAppointmentAlert appointment={incoming} open={Boolean(incoming)} onLater={() => setIncoming(null)} onConfirm={() => incoming && act(incoming, "confirmado")} onCancel={() => incoming && act(incoming, "cancelado")} busy={busyAction} />
     </section>
   );
@@ -471,7 +471,28 @@ function AdminStatusBadge({ status }: { status: string }) { const variant = stat
 function SmallInfo({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) { return <div className="min-w-0"><p className="text-[9px] uppercase tracking-wide text-muted-foreground">{label}</p><p className={`mt-0.5 truncate text-xs font-medium ${accent ? "text-primary" : ""}`}>{value}</p></div>; }
 function DetailBox({ icon: Icon, label, value }: any) { return <div className="flex items-start gap-3 rounded-2xl border border-border bg-card p-3"><span className="grid size-8 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary"><Icon className="size-4" /></span><div className="min-w-0"><p className="text-[9px] uppercase tracking-wide text-muted-foreground">{label}</p><p className="mt-1 break-words text-sm font-medium">{value}</p></div></div>; }
 
-function AppointmentAdminDialog({ appointment, open, onOpenChange, onConfirm, onCancel, onAttended, busy }: any) {
+function AppointmentPriceEditor({ appointment, onSaved }: any) {
+  const total = Number(appointment?.service_price_snapshot ?? appointment?.service?.price ?? 0);
+  const [value, setValue] = useState(total.toFixed(2));
+  const [saving, setSaving] = useState(false);
+  useEffect(() => { setValue(total.toFixed(2)); }, [appointment?.id, total]);
+  if (!appointment || (appointment.payment_choice && appointment.payment_choice !== "onsite")) return null;
+  const save = async () => {
+    const parsed = Number(value.replace(",", "."));
+    if (!Number.isFinite(parsed) || parsed < 0) { toast.error("Informe um valor válido para o atendimento."); return; }
+    const nextPrice = Math.round((parsed + Number.EPSILON) * 100) / 100;
+    setSaving(true);
+    const { error } = await db.rpc("update_appointment_custom_price", { _appointment_id: appointment.id, _new_price: nextPrice });
+    setSaving(false);
+    if (error) { toast.error("Não foi possível alterar o valor.", { description: error.message }); return; }
+    setValue(nextPrice.toFixed(2));
+    toast.success("Valor do atendimento atualizado.", { description: appointment.status === "atendido" ? "A receita foi recalculada automaticamente." : "A alteração vale somente para este agendamento." });
+    onSaved?.(nextPrice);
+  };
+  return <div className="mt-3 rounded-2xl border border-border bg-background/70 p-3"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-semibold">Alterar valor do atendimento</p><p className="mt-0.5 text-[10px] text-muted-foreground">Pode ser ajustado mesmo depois do agendamento, sem alterar o catálogo.</p></div><span className="shrink-0 text-xs font-semibold text-primary">{formatPrice(total)}</span></div><div className="mt-3 flex flex-col gap-2 sm:flex-row"><Input type="number" min="0" step="0.01" inputMode="decimal" value={value} onChange={(event) => setValue(event.target.value)} disabled={saving} /><Button type="button" className="rounded-xl sm:shrink-0" onClick={() => void save()} disabled={saving}>{saving ? "Salvando..." : "Salvar novo valor"}</Button></div></div>;
+}
+
+function AppointmentAdminDialog({ appointment, open, onOpenChange, onConfirm, onCancel, onAttended, onPriceSaved, busy }: any) {
   if (!appointment) return null;
   const approved = approvedPayment(appointment);
   const total = Number(appointment.service_price_snapshot ?? appointment.service?.price ?? 0);
@@ -485,6 +506,7 @@ function AppointmentAdminDialog({ appointment, open, onOpenChange, onConfirm, on
   return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="max-h-[92dvh] w-[calc(100%-1rem)] overflow-y-auto rounded-3xl p-5 sm:max-w-2xl sm:p-6"><DialogHeader><div className="flex flex-wrap items-center gap-2"><DialogTitle>{appointment.patient_name}</DialogTitle><AdminStatusBadge status={appointment.status} /></div><DialogDescription>{appointment.service?.name ?? "Atendimento"} · {formatDate(appointment.scheduled_date)} às {appointment.scheduled_time}</DialogDescription></DialogHeader>
     {proximity === "urgent" && appointment.status !== "cancelado" ? <div className="mt-2 flex items-center gap-2 rounded-xl bg-amber-100 p-3 text-xs font-semibold text-amber-900"><AlertTriangle className="size-4" /> {days === 0 ? "Atendimento hoje" : "Atendimento amanhã — faça o recontato"}</div> : null}
     <div className="mt-2 rounded-2xl bg-primary-soft/60 p-4"><div className="flex items-center gap-2 text-primary"><CreditCard className="size-4" /><p className="text-sm font-semibold">{paymentLabel(appointment)}</p></div><div className="mt-3 grid grid-cols-3 gap-2"><SmallInfo label="Total" value={formatPrice(total)} /><SmallInfo label="Pago" value={formatPrice(paid)} /><SmallInfo label="Restante" value={formatPrice(Number(appointment.balance_amount ?? Math.max(0, total - paid)))} /></div>{approved?.paid_at ? <p className="mt-3 text-[11px] text-muted-foreground">Pagamento confirmado em {formatDateTime(approved.paid_at)}</p> : null}</div>
+    <AppointmentPriceEditor appointment={appointment} onSaved={onPriceSaved} />
     <div className="mt-4 grid gap-2 sm:grid-cols-2"><DetailBox icon={CalendarDays} label="Data" value={formatDate(appointment.scheduled_date)} /><DetailBox icon={Clock3} label="Horário" value={appointment.scheduled_time} /><DetailBox icon={Stethoscope} label="Profissional" value={appointment.professional?.name ?? "Não definido"} /><DetailBox icon={UserRound} label="Paciente" value={appointment.patient_name} /><DetailBox icon={Phone} label="WhatsApp" value={appointment.patient_phone || "Não informado"} /><DetailBox icon={Mail} label="E-mail" value={appointment.patient_email || "Não informado"} /></div>
     {hasWhatsApp && appointment.status !== "cancelado" ? <div className="mt-4">{proximity === "urgent" ? <Button className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => openAppointmentWhatsApp(appointment, "reminder")}><MessageCircle className="size-4" /> {days === 0 ? "Falar com cliente" : "Recontatar cliente"}</Button> : appointment.status === "pendente" ? <Button variant="outline" className="rounded-xl border-emerald-600/40 text-emerald-700" onClick={() => openAppointmentWhatsApp(appointment, "confirmation")}><MessageCircle className="size-4" /> Confirmar pelo WhatsApp</Button> : null}</div> : null}
     <div className="mt-4 rounded-2xl border border-border p-4"><div className="grid gap-3 text-xs sm:grid-cols-2"><div><p className="text-[9px] uppercase tracking-wide text-muted-foreground">Criado em</p><p className="mt-1 font-medium">{formatDateTime(appointment.created_at)}</p></div><div><p className="text-[9px] uppercase tracking-wide text-muted-foreground">Status atualizado</p><p className="mt-1 font-medium">{formatDateTime(appointment.status_updated_at)}</p></div></div>{appointment.notes ? <div className="mt-3 border-t border-border pt-3"><p className="text-[9px] uppercase tracking-wide text-muted-foreground">Observações</p><p className="mt-1 text-sm">{appointment.notes}</p></div> : null}</div>

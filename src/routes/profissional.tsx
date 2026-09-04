@@ -112,7 +112,7 @@ async function loadProfessionalAgenda() {
   if (!access.data?.professional_id || !access.data.professional?.is_active || access.data.professional?.deleted_at) return { authorized: false as const, email };
 
   const [appointments, slots, availability] = await Promise.all([
-    db.from("appointments").select("id, professional_id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status, service_price_snapshot, balance_amount, service:services(name, price, duration_min), professional_response:appointment_professional_responses(response, responded_at)").eq("professional_id", access.data.professional_id).order("scheduled_date").order("scheduled_time"),
+    db.from("appointments").select("id, professional_id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status, payment_choice, service_price_snapshot, balance_amount, service:services(name, price, duration_min), professional_response:appointment_professional_responses(response, responded_at)").eq("professional_id", access.data.professional_id).order("scheduled_date").order("scheduled_time"),
     db.from("professional_time_slots").select("id, professional_id, slot, is_available, sort_order").eq("professional_id", access.data.professional_id).order("sort_order").order("slot"),
     db.from("professional_availability_periods").select("id, professional_id, weekday, period, is_available").eq("professional_id", access.data.professional_id).order("weekday").order("period"),
   ]);
@@ -283,7 +283,9 @@ function ProfessionalAgenda() {
 }
 
 function ProfessionalAppointmentCard({ appointment, onSaved }: any) {
-  const [busy, setBusy] = useState<"confirm" | "decline" | "attended" | null>(null);
+  const [busy, setBusy] = useState<"confirm" | "decline" | "attended" | "price" | null>(null);
+  const [editingPrice, setEditingPrice] = useState(false);
+  const [priceValue, setPriceValue] = useState("");
   const response = responseFor(appointment)?.response;
   const attended = appointment.status === "atendido";
   const confirmed = attended || response === "confirmado" || appointment.status === "confirmado";
@@ -318,6 +320,19 @@ function ProfessionalAppointmentCard({ appointment, onSaved }: any) {
     onSaved?.();
   };
 
+  const savePrice = async () => {
+    const parsed = Number(priceValue.replace(",", "."));
+    if (!Number.isFinite(parsed) || parsed < 0) { toast.error("Informe um valor válido para o atendimento."); return; }
+    const nextPrice = Math.round((parsed + Number.EPSILON) * 100) / 100;
+    setBusy("price");
+    const { error } = await db.rpc("update_appointment_custom_price", { _appointment_id: appointment.id, _new_price: nextPrice });
+    setBusy(null);
+    if (error) { toast.error("Não foi possível alterar o valor.", { description: error.message }); return; }
+    setEditingPrice(false);
+    toast.success("Valor do atendimento atualizado.", { description: appointment.status === "atendido" ? "A receita foi recalculada com o novo valor." : "O novo valor ficou salvo neste agendamento." });
+    onSaved?.();
+  };
+
   const openWhatsApp = (kind: "confirmation" | "reminder") => {
     const url = appointmentWhatsAppUrl(appointment, kind);
     if (!url) { toast.error("Este cliente não possui WhatsApp cadastrado."); return; }
@@ -332,6 +347,7 @@ function ProfessionalAppointmentCard({ appointment, onSaved }: any) {
     <div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="font-semibold">{appointment.patient_name}</p><Badge variant={confirmed ? "default" : "outline"} className="rounded-full text-[10px]">{label}</Badge>{confirmed ? <Badge className="rounded-full bg-primary-soft text-primary"><CheckCircle2 className="mr-1 size-3" /> Você confirmou</Badge> : null}</div><p className="mt-1 text-xs text-muted-foreground">{appointment.service?.name || "Procedimento"} · {formatPrice(total)}</p></div><div className="text-right"><p className="font-semibold">{appointment.scheduled_time}</p><p className="text-[10px] text-muted-foreground">{formatDate(appointment.scheduled_date)}</p></div></div>
     <div className="mt-3 grid gap-2 border-t border-border/70 pt-3 sm:grid-cols-2"><a href={appointment.patient_phone ? `tel:${appointment.patient_phone}` : undefined} className="flex items-center gap-2 text-xs text-muted-foreground"><Phone className="size-3.5" /> {appointment.patient_phone || "Telefone não informado"}</a><a href={appointment.patient_email ? `mailto:${appointment.patient_email}` : undefined} className="flex items-center gap-2 text-xs text-muted-foreground sm:justify-end"><Mail className="size-3.5" /> {appointment.patient_email || "E-mail não informado"}</a></div>
     {appointment.notes ? <p className="mt-3 rounded-xl bg-secondary/60 px-3 py-2 text-xs text-muted-foreground">{appointment.notes}</p> : null}
+    {(appointment.payment_choice ?? "onsite") === "onsite" ? <div className="mt-3 rounded-xl border border-border bg-card/80 p-3"><div className="flex items-center justify-between gap-3"><div><p className="text-[10px] uppercase tracking-wide text-muted-foreground">Valor do atendimento</p><p className="mt-0.5 text-sm font-semibold">{formatPrice(total)}</p></div>{!editingPrice ? <Button type="button" size="sm" variant="outline" className="rounded-xl" disabled={busy !== null} onClick={() => { setPriceValue(total.toFixed(2)); setEditingPrice(true); }}>Alterar valor</Button> : null}</div>{editingPrice ? <div className="mt-3 flex flex-col gap-2 sm:flex-row"><Input type="number" min="0" step="0.01" inputMode="decimal" value={priceValue} onChange={(event) => setPriceValue(event.target.value)} disabled={busy !== null} /><div className="flex gap-2"><Button type="button" size="sm" variant="outline" className="rounded-xl" disabled={busy !== null} onClick={() => setEditingPrice(false)}>Cancelar</Button><Button type="button" size="sm" className="rounded-xl" disabled={busy !== null} onClick={() => void savePrice()}>{busy === "price" ? "Salvando..." : "Salvar valor"}</Button></div></div> : null}</div> : null}
     {appointment.status !== "cancelado" && hasWhatsApp ? <div className="mt-3 flex flex-wrap gap-2">{proximity === "urgent" ? <Button type="button" className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => openWhatsApp("reminder")}><MessageCircle className="size-4" /> {days === 0 ? "Falar com cliente" : "Recontatar cliente"}</Button> : waiting ? <Button type="button" variant="outline" className="rounded-xl border-emerald-600/40 text-emerald-700 hover:bg-emerald-50" onClick={() => openWhatsApp("confirmation")}><MessageCircle className="size-4" /> Confirmar pelo WhatsApp</Button> : null}</div> : null}
     {waiting ? <div className="mt-3 grid gap-2 sm:grid-cols-2"><Button className="rounded-xl" disabled={busy !== null} onClick={() => void respond("confirmado")}><CheckCircle2 className="size-4" /> {busy === "confirm" ? "Confirmando..." : "Confirmar compromisso"}</Button><Button variant="outline" className="rounded-xl text-destructive" disabled={busy !== null} onClick={() => void respond("recusado")}><XCircle className="size-4" /> {busy === "decline" ? "Recusando..." : "Recusar"}</Button></div> : null}
     {canMarkAttended ? <div className="mt-3"><Button type="button" className="w-full rounded-xl bg-emerald-600 text-white hover:bg-emerald-700" disabled={busy !== null} onClick={() => void markAttended()}><CheckCircle2 className="size-4" /> {busy === "attended" ? "Confirmando atendimento..." : "Confirmar atendimento"}</Button><p className="mt-1.5 text-center text-[10px] text-muted-foreground">O valor só entra na receita após esta confirmação.</p></div> : null}

@@ -132,7 +132,7 @@ async function loadTeamAgenda() {
   const [professionals, access, appointments, services, links, slots, availability] = await Promise.all([
     db.from("professionals").select("id, name, specialty, avatar_url, is_active, sort_order, deleted_at").is("deleted_at", null).order("sort_order").order("name"),
     db.from("professional_access").select("id, professional_id, email, enabled, created_by, created_at, updated_at").order("created_at"),
-    db.from("appointments").select("id, professional_id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status, service_price_snapshot, service:services(id, name, price, duration_min)").order("scheduled_date").order("scheduled_time"),
+    db.from("appointments").select("id, professional_id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status, payment_choice, service_price_snapshot, service:services(id, name, price, duration_min)").order("scheduled_date").order("scheduled_time"),
     db.from("services").select("id, name, duration_min, price, is_active").eq("is_active", true).order("name"),
     db.from("service_professionals").select("service_id, professional_id"),
     db.from("professional_time_slots").select("id, professional_id, slot, is_available, sort_order").order("sort_order").order("slot"),
@@ -301,6 +301,7 @@ function TeamAgendaPage() {
                   <article key={appointment.id} className={`rounded-2xl border p-4 shadow-soft ${cardClass}`}>
                     {proximity === "urgent" && appointment.status !== "cancelado" ? <div className="mb-3 flex items-center gap-2 rounded-xl bg-amber-100 px-3 py-2 text-xs font-semibold text-amber-900"><AlertTriangle className="size-4" /> {days === 0 ? "Atendimento hoje" : "Atendimento amanhã — recontato recomendado"}</div> : proximity === "soon" ? <div className="mb-3 rounded-xl bg-amber-100/60 px-3 py-2 text-[11px] font-medium text-amber-900">Faltam {days} dias para este atendimento.</div> : null}
                     <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="font-semibold">{appointment.patient_name}</p><p className="mt-1 text-xs text-muted-foreground">{appointment.service?.name || "Atendimento"} · {formatPrice(Number(appointment.service_price_snapshot ?? appointment.service?.price ?? 0))}</p></div><div className="text-right"><p className="font-semibold">{appointment.scheduled_time}</p><p className="text-[10px] text-muted-foreground">{formatDate(appointment.scheduled_date)}</p></div></div>
+                    <ExistingAppointmentPriceEditor appointment={appointment} onSaved={refresh} />
                     {hasWhatsApp && appointment.status !== "cancelado" ? <div className="mt-3">{proximity === "urgent" ? <Button type="button" size="sm" className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => openAppointmentWhatsApp(appointment, selected, "reminder")}><MessageCircle className="size-4" /> {days === 0 ? "Falar com cliente" : "Recontatar cliente"}</Button> : appointment.status === "pendente" ? <Button type="button" size="sm" variant="outline" className="rounded-xl border-emerald-600/40 text-emerald-700" onClick={() => openAppointmentWhatsApp(appointment, selected, "confirmation")}><MessageCircle className="size-4" /> Confirmar pelo WhatsApp</Button> : null}</div> : null}
                     <div className="mt-3 flex items-center justify-between border-t border-border/70 pt-3"><Badge variant={appointment.status === "confirmado" ? "default" : "outline"} className="rounded-full">{appointmentStatusLabel(appointment.status)}</Badge><Button type="button" variant="ghost" size="icon" className="text-destructive" onClick={async () => { if (!window.confirm(`Apagar o agendamento de ${appointment.patient_name}?`)) return; const { error: removeError } = await db.from("appointments").delete().eq("id", appointment.id); if (removeError) { toast.error(removeError.message); return; } toast.success("Agendamento apagado."); await refresh(); }}><Trash2 className="size-4" /></Button></div>
                   </article>
@@ -433,6 +434,28 @@ function EditAgendaModal({ open, onClose, professional, access, services, linked
       <div className="sm:col-span-2"><Label>Serviços vinculados</Label><div className="mt-2 grid max-h-56 gap-2 overflow-y-auto rounded-2xl border border-border p-2 sm:grid-cols-2">{services.map((service: any) => { const selected = serviceIds.includes(service.id); return <button key={service.id} type="button" onClick={() => setServiceIds((current) => selected ? current.filter((id) => id !== service.id) : [...current, service.id])} className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-xs ${selected ? "border-primary bg-primary-soft text-primary" : "border-border"}`}><span className={`grid size-4 place-items-center rounded border ${selected ? "border-primary bg-primary text-primary-foreground" : "border-border"}`}>{selected ? <Check className="size-3" /> : null}</span>{service.name}</button>; })}</div></div>
     </div>
   </ModalShell>;
+}
+
+function ExistingAppointmentPriceEditor({ appointment, onSaved }: any) {
+  const total = Number(appointment?.service_price_snapshot ?? appointment?.service?.price ?? 0);
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(total.toFixed(2));
+  const [saving, setSaving] = useState(false);
+  if (!appointment || (appointment.payment_choice && appointment.payment_choice !== "onsite")) return null;
+  const save = async () => {
+    const parsed = Number(value.replace(",", "."));
+    if (!Number.isFinite(parsed) || parsed < 0) { toast.error("Informe um valor válido para o atendimento."); return; }
+    const nextPrice = Math.round((parsed + Number.EPSILON) * 100) / 100;
+    setSaving(true);
+    const { error } = await db.rpc("update_appointment_custom_price", { _appointment_id: appointment.id, _new_price: nextPrice });
+    setSaving(false);
+    if (error) { toast.error("Não foi possível alterar o valor.", { description: error.message }); return; }
+    setEditing(false);
+    setValue(nextPrice.toFixed(2));
+    toast.success("Valor atualizado.", { description: appointment.status === "atendido" ? "A receita foi recalculada com o novo valor." : "A alteração vale somente para este agendamento." });
+    await onSaved?.();
+  };
+  return <div className="mt-3 rounded-xl border border-border/70 bg-background/65 p-3"><div className="flex items-center justify-between gap-3"><div><p className="text-[10px] uppercase tracking-wide text-muted-foreground">Valor do atendimento</p><p className="mt-0.5 text-sm font-semibold">{formatPrice(total)}</p></div>{!editing ? <Button type="button" size="sm" variant="outline" className="rounded-xl" onClick={() => { setValue(total.toFixed(2)); setEditing(true); }}>Alterar valor</Button> : null}</div>{editing ? <div className="mt-3 flex flex-col gap-2 sm:flex-row"><Input type="number" min="0" step="0.01" inputMode="decimal" value={value} onChange={(event) => setValue(event.target.value)} disabled={saving} /><div className="flex gap-2"><Button type="button" size="sm" variant="outline" className="rounded-xl" disabled={saving} onClick={() => setEditing(false)}>Cancelar</Button><Button type="button" size="sm" className="rounded-xl" disabled={saving} onClick={() => void save()}>{saving ? "Salvando..." : "Salvar valor"}</Button></div></div> : null}</div>;
 }
 
 function NewAppointmentModal({ open, onClose, professional, services, onSaved }: any) {
