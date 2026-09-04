@@ -1,0 +1,33 @@
+name: One-time professional portal tools patch
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch-professional-portal:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply professional portal patch
+        run: python .github/scripts/patch_professional_portal_tools.py
+
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/routes/profissional.tsx
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Add client tools and weekday scheduling to professional portal"
+            git push origin HEAD:main
+          fi
