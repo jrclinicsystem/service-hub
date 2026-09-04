@@ -24,7 +24,9 @@ function isoDate(year: number, month: number, day: number) {
 
 function monthStart(value?: string) {
   if (value && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    const [year, month] = value.split("-").map(Number);
+    const [yearStr, monthStr] = value.split("-");
+    const year = Number(yearStr);
+    const month = Number(monthStr);
     return new Date(year, month - 1, 1, 12);
   }
   const now = new Date();

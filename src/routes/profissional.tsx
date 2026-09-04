@@ -265,13 +265,9 @@ function ProfessionalAgenda() {
 
         <ProfessionalWeeklySchedule professionalId={data.professional.id} />
 
-        <ProfessionalWeeklySchedule professionalId={data.professional.id} />
-
         <ProfessionalDateAvailability professionalId={data.professional.id} fallbackSlots={data.slots} fallbackAvailability={data.availability} />
 
-        <ProfessionalClientBookingTools professionalId={data.professional.id} onAppointmentCreated={() => refetch()} />
-
-        <ProfessionalClientBookingTools professionalId={data.professional.id} onAppointmentCreated={() => refetch()} />
+        <ProfessionalClientBookingTools professionalId={data.professional.id} onAppointmentCreated={() => { refetch().catch(() => {}); }} />
 
         <section className="mt-7">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><h2 className="text-lg font-semibold">Meus atendimentos</h2><p className="mt-1 text-xs text-muted-foreground">Os atendimentos próximos ganham destaque automaticamente. Com 1 dia de antecedência, o recontato pelo WhatsApp aparece.</p></div><div className="flex gap-2"><div className="grid grid-cols-2 rounded-xl bg-secondary/70 p-1"><button type="button" onClick={() => setScope("upcoming")} className={`rounded-lg px-3 py-2 text-xs ${scope === "upcoming" ? "bg-card shadow-sm" : "text-muted-foreground"}`}>Próximos</button><button type="button" onClick={() => setScope("all")} className={`rounded-lg px-3 py-2 text-xs ${scope === "all" ? "bg-card shadow-sm" : "text-muted-foreground"}`}>Todos</button></div><Input type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} className="w-[160px]" /></div></div>
