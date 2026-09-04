@@ -61,16 +61,21 @@ export const getCatalog = createServerFn({ method: "GET" }).handler(() => fetchC
 
 export const getHomeOverview = createServerFn({ method: "GET" }).handler(async () => {
   const supabase = publicClient();
-  const [catalog, professionals] = await Promise.all([
+  const db = supabase as any;
+  const [catalog, professionals, settings] = await Promise.all([
     fetchCatalog(),
     supabase.from("professionals").select("id", { count: "exact", head: true }).eq("is_active", true),
+    db.from("business_settings").select("address, maps_url").eq("id", 1).maybeSingle(),
   ]);
 
   if (professionals.error) throw professionals.error;
+  if (settings.error) throw settings.error;
 
   return {
     ...catalog,
     activeProfessionals: professionals.count ?? 0,
+    businessAddress: settings.data?.address?.trim() || null,
+    mapsUrl: settings.data?.maps_url?.trim() || null,
   };
 });
 
