@@ -1,0 +1,33 @@
+name: One-time post-booking price edit patch
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch-post-booking-price-edit:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply post-booking price edit patch
+        run: python .github/scripts/patch_post_booking_price_edit.py
+
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/routes/profissional.tsx src/components/admin-appointments-workspace.tsx src/routes/admin_.equipe.tsx
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Allow editing booked appointment values"
+            git push origin HEAD:main
+          fi
