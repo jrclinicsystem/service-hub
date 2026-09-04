@@ -24,6 +24,8 @@ import { toast } from "sonner";
 
 import logo from "@/assets/jr-clinic-logo.png";
 import { AppointmentCalendar } from "@/components/appointment-calendar";
+import { ProfessionalClientBookingTools } from "@/components/professional-client-booking-tools";
+import { ProfessionalWeeklySchedule } from "@/components/professional-weekly-schedule";
 import { ProfessionalDateAvailability } from "@/components/professional-date-availability";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -261,31 +263,11 @@ function ProfessionalAgenda() {
 
         <div className="mt-7"><AppointmentCalendar appointments={data.appointments} selectedDate={dateFilter} onSelectDate={setDateFilter} title="Meu calendário" description="Toque em um dia para filtrar os atendimentos daquela data." /></div>
 
+        <ProfessionalWeeklySchedule professionalId={data.professional.id} />
+
         <ProfessionalDateAvailability professionalId={data.professional.id} fallbackSlots={data.slots} fallbackAvailability={data.availability} />
 
-        <section className="mt-4 rounded-3xl border border-primary/15 bg-primary-soft/20 p-4 shadow-soft sm:mt-7 sm:p-6">
-          <button type="button" className="flex w-full items-center justify-between gap-4 text-left sm:cursor-default" onClick={() => setDaysOpen((open) => !open)}>
-            <div><h2 className="text-lg font-bold text-foreground">Padrão geral de dias e turnos</h2><p className="mt-1 text-xs font-medium text-foreground/70">{activePeriods} turno(s) ativo(s). Usado quando uma data ainda não foi personalizada.</p></div>
-            <ChevronDown className={`size-5 shrink-0 text-primary transition-transform sm:hidden ${daysOpen ? "rotate-180" : ""}`} />
-          </button>
-          <div className={`${daysOpen ? "block" : "hidden"} mt-5 space-y-3 sm:block`}>
-            <p className="text-xs text-muted-foreground">Este é o padrão semanal. Uma configuração feita em “Minha disponibilidade por data” sempre tem prioridade sobre este padrão.</p>
-            {weekdays.map((day) => <div key={day.value} className="rounded-2xl border border-border bg-card p-4"><p className="mb-3 text-sm font-semibold">{day.label}</p><div className="grid gap-2 sm:grid-cols-3">{periods.map((period) => { const row = data.availability.find((item: any) => item.weekday === day.value && item.period === period.value); const checked = row?.is_available ?? false; return <div key={period.value} className="flex items-center justify-between rounded-xl bg-secondary/50 px-3 py-2.5"><div><p className="text-xs font-medium">{period.label}</p><p className="text-[9px] text-muted-foreground">{period.detail}</p></div><Switch checked={checked} onCheckedChange={(value) => setAvailability(day.value, period.value, value)} /></div>; })}</div></div>)}
-          </div>
-        </section>
-
-        <section className="mt-4 rounded-3xl border border-primary/15 bg-primary-soft/20 p-4 shadow-soft sm:mt-7 sm:p-6">
-          <button type="button" className="flex w-full items-center justify-between gap-4 text-left sm:cursor-default" onClick={() => setHoursOpen((open) => !open)}>
-            <div><h2 className="text-lg font-bold text-foreground">Horários do padrão geral</h2><p className="mt-1 text-xs font-medium text-foreground/70">{data.slots.filter((slot: any) => slot.is_available).length} horário(s) ativo(s). Usados como base nas datas sem personalização.</p></div>
-            <ChevronDown className={`size-5 shrink-0 text-primary transition-transform sm:hidden ${hoursOpen ? "rotate-180" : ""}`} />
-          </button>
-          <div className={`${hoursOpen ? "block" : "hidden"} mt-5 sm:block`}>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><p className="text-xs text-muted-foreground">Mantenha aqui apenas os horários que normalmente fazem parte da sua rotina.</p><div className="flex gap-2"><Input type="time" value={newTime} onChange={(e) => setNewTime(e.target.value)} className="min-w-0 flex-1 sm:w-[150px] sm:flex-none" /><Button type="button" onClick={addTime} disabled={savingTime}><Plus className="size-4" /> Adicionar</Button></div></div>
-            <div className="mt-5 grid gap-2 sm:grid-cols-2">
-              {data.slots.length === 0 ? <p className="col-span-full rounded-2xl border border-dashed border-border bg-card p-5 text-center text-sm text-muted-foreground">Nenhum horário cadastrado.</p> : data.slots.map((slot: any) => <div key={slot.id} className="flex items-center justify-between rounded-2xl border border-border bg-card px-4 py-3"><div><p className="font-semibold tabular-nums">{slot.slot}</p><p className="text-[10px] text-muted-foreground">{slot.is_available ? "Disponível" : "Pausado"}</p></div><div className="flex items-center gap-2"><Switch checked={slot.is_available} onCheckedChange={async (checked) => { const { error: updateError } = await db.from("professional_time_slots").update({ is_available: checked, updated_at: new Date().toISOString() }).eq("id", slot.id); if (updateError) { toast.error(updateError.message); return; } await refetch(); }} /><Button type="button" variant="ghost" size="icon" className="text-destructive" onClick={async () => { if (!window.confirm(`Remover o horário ${slot.slot}?`)) return; const { error: removeError } = await db.from("professional_time_slots").delete().eq("id", slot.id); if (removeError) { toast.error(removeError.message); return; } toast.success("Horário removido."); await refetch(); }}><Trash2 className="size-4" /></Button></div></div>)}
-            </div>
-          </div>
-        </section>
+        <ProfessionalClientBookingTools professionalId={data.professional.id} onAppointmentCreated={() => refetch()} />
 
         <section className="mt-7">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><h2 className="text-lg font-semibold">Meus atendimentos</h2><p className="mt-1 text-xs text-muted-foreground">Os atendimentos próximos ganham destaque automaticamente. Com 1 dia de antecedência, o recontato pelo WhatsApp aparece.</p></div><div className="flex gap-2"><div className="grid grid-cols-2 rounded-xl bg-secondary/70 p-1"><button type="button" onClick={() => setScope("upcoming")} className={`rounded-lg px-3 py-2 text-xs ${scope === "upcoming" ? "bg-card shadow-sm" : "text-muted-foreground"}`}>Próximos</button><button type="button" onClick={() => setScope("all")} className={`rounded-lg px-3 py-2 text-xs ${scope === "all" ? "bg-card shadow-sm" : "text-muted-foreground"}`}>Todos</button></div><Input type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} className="w-[160px]" /></div></div>
