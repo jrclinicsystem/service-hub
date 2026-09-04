@@ -81,6 +81,7 @@ function paymentLabel(item: any) {
 }
 
 function statusLabel(status: string) {
+  if (status === "atendido") return "Atendido";
   if (status === "confirmado") return "Confirmado";
   if (status === "cancelado") return "Cancelado";
   if (status === "aguardando_pagamento") return "Aguardando pagamento";
@@ -201,7 +202,7 @@ export function AdminAppointmentsWorkspace({ appointments, onStatusChange, onRef
       const futureOrToday = item.scheduled_date >= today;
       if (futureOrToday && (item.status === "pendente" || item.status === "aguardando_pagamento")) result.pending += 1;
       if (futureOrToday && item.status === "confirmado") result.accepted += 1;
-      if (!futureOrToday || item.status === "cancelado") result.history += 1;
+      if (!futureOrToday || item.status === "cancelado" || item.status === "atendido") result.history += 1;
       result.all += 1;
       return result;
     }, { pending: 0, accepted: 0, history: 0, all: 0 });
@@ -214,7 +215,7 @@ export function AdminAppointmentsWorkspace({ appointments, onStatusChange, onRef
       const futureOrToday = item.scheduled_date >= today;
       const pending = futureOrToday && (item.status === "pendente" || item.status === "aguardando_pagamento");
       const accepted = futureOrToday && item.status === "confirmado";
-      const history = !futureOrToday || item.status === "cancelado";
+      const history = !futureOrToday || item.status === "cancelado" || item.status === "atendido";
       if (scope === "pending" && !pending) return false;
       if (scope === "accepted" && !accepted) return false;
       if (scope === "history" && !history) return false;
@@ -236,6 +237,21 @@ export function AdminAppointmentsWorkspace({ appointments, onStatusChange, onRef
     setIncoming(null);
     setSelected((current: any) => current?.id === appointment.id ? { ...current, status } : current);
     if (status === "confirmado") setScope("accepted");
+  };
+
+  const completeAttendance = async (appointment: any) => {
+    setBusyAction(true);
+    const { error } = await db.rpc("mark_appointment_attended", { _appointment_id: appointment.id });
+    setBusyAction(false);
+    if (error) {
+      toast.error("Não foi possível confirmar o atendimento.", { description: error.message });
+      return false;
+    }
+    toast.success("Atendimento concluído.", { description: "O valor agora foi contabilizado na receita." });
+    setSelected((current: any) => current?.id === appointment.id ? { ...current, status: "atendido" } : current);
+    setScope("history");
+    onRefresh();
+    return true;
   };
 
   const removeAppointment = async (appointment: any) => {
@@ -276,21 +292,24 @@ export function AdminAppointmentsWorkspace({ appointments, onStatusChange, onRef
       </div>
 
       <div className="mt-3 grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
-        {filtered.length === 0 ? <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center lg:col-span-2 2xl:col-span-3"><CalendarDays className="mx-auto size-5 text-muted-foreground" /><p className="mt-3 text-sm text-muted-foreground">Nenhum agendamento nesta seleção.</p></div> : filtered.map((appointment) => <AdminAppointmentCard key={appointment.id} appointment={appointment} onOpen={() => setSelected(appointment)} onDelete={() => removeAppointment(appointment)} deleting={deletingId === appointment.id} />)}
+        {filtered.length === 0 ? <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center lg:col-span-2 2xl:col-span-3"><CalendarDays className="mx-auto size-5 text-muted-foreground" /><p className="mt-3 text-sm text-muted-foreground">Nenhum agendamento nesta seleção.</p></div> : filtered.map((appointment) => <AdminAppointmentCard key={appointment.id} appointment={appointment} onOpen={() => setSelected(appointment)} onDelete={() => removeAppointment(appointment)} onAttended={() => completeAttendance(appointment)} deleting={deletingId === appointment.id} />)}
       </div>
 
       <CreateAppointmentDialog open={createOpen} onOpenChange={setCreateOpen} onCreated={() => { setCreateOpen(false); setScope("pending"); onRefresh(); }} />
       <CalendarDayDialog date={calendarDayOpen} appointments={appointments} open={Boolean(calendarDayOpen)} onOpenChange={(open) => { if (!open) setCalendarDayOpen(null); }} />
-      <AppointmentAdminDialog appointment={selected} open={Boolean(selected)} onOpenChange={(open: boolean) => !open && setSelected(null)} onConfirm={() => selected && act(selected, "confirmado")} onCancel={() => selected && act(selected, "cancelado")} busy={busyAction} />
+      <AppointmentAdminDialog appointment={selected} open={Boolean(selected)} onOpenChange={(open: boolean) => !open && setSelected(null)} onConfirm={() => selected && act(selected, "confirmado")} onCancel={() => selected && act(selected, "cancelado")} onAttended={() => selected && completeAttendance(selected)} busy={busyAction} />
       <NewAppointmentAlert appointment={incoming} open={Boolean(incoming)} onLater={() => setIncoming(null)} onConfirm={() => incoming && act(incoming, "confirmado")} onCancel={() => incoming && act(incoming, "cancelado")} busy={busyAction} />
     </section>
   );
 }
 
-function AdminAppointmentCard({ appointment, onOpen, onDelete, deleting }: any) {
+function AdminAppointmentCard({ appointment, onOpen, onDelete, onAttended, deleting }: any) {
+  const [attendanceBusy, setAttendanceBusy] = useState(false);
   const proximity = appointment.status === "cancelado" ? "past" : appointmentProximity(appointment.scheduled_date);
   const days = daysUntilAppointment(appointment.scheduled_date);
   const hasWhatsApp = normalizeWhatsAppPhone(appointment.patient_phone).length > 0;
+  const scheduledMoment = new Date(`${appointment.scheduled_date}T${appointment.scheduled_time}:00`);
+  const canMarkAttended = appointment.status === "confirmado" && Number.isFinite(scheduledMoment.getTime()) && scheduledMoment.getTime() <= Date.now();
   const cardClass = proximity === "urgent" ? "border-amber-500/60 bg-amber-50/70 shadow-md" : proximity === "soon" ? "border-amber-300/60 bg-amber-50/35" : "border-border bg-card";
   return <article className={`rounded-2xl border p-4 text-left shadow-soft transition hover:shadow-md ${cardClass}`}>
     {proximity === "urgent" && appointment.status !== "cancelado" ? <div className="mb-3 flex items-center gap-2 rounded-xl bg-amber-100 px-3 py-2 text-xs font-semibold text-amber-900"><AlertTriangle className="size-4" /> {days === 0 ? "Atendimento hoje" : "Atendimento amanhã — recontato recomendado"}</div> : proximity === "soon" ? <div className="mb-3 rounded-xl bg-amber-100/60 px-3 py-2 text-[11px] font-medium text-amber-900">Faltam {days} dias para este atendimento.</div> : null}
@@ -300,6 +319,8 @@ function AdminAppointmentCard({ appointment, onOpen, onDelete, deleting }: any) 
       <div className="mt-3 grid grid-cols-3 gap-2"><SmallInfo label="Data" value={formatDate(appointment.scheduled_date)} /><SmallInfo label="Horário" value={appointment.scheduled_time} /><SmallInfo label="Pagamento" value={paymentLabel(appointment)} accent /></div>
     </button>
     {hasWhatsApp && appointment.status !== "cancelado" ? <div className="mt-3">{proximity === "urgent" ? <Button type="button" size="sm" className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => openAppointmentWhatsApp(appointment, "reminder")}><MessageCircle className="size-4" /> {days === 0 ? "Falar com cliente" : "Recontatar cliente"}</Button> : appointment.status === "pendente" ? <Button type="button" size="sm" variant="outline" className="rounded-xl border-emerald-600/40 text-emerald-700 hover:bg-emerald-50" onClick={() => openAppointmentWhatsApp(appointment, "confirmation")}><MessageCircle className="size-4" /> Confirmar pelo WhatsApp</Button> : null}</div> : null}
+    {canMarkAttended ? <div className="mt-3"><Button type="button" size="sm" className="w-full rounded-xl bg-emerald-600 text-white hover:bg-emerald-700" disabled={attendanceBusy} onClick={async () => { setAttendanceBusy(true); await onAttended?.(); setAttendanceBusy(false); }}><Check className="size-4" /> {attendanceBusy ? "Confirmando atendimento..." : "Confirmar atendimento"}</Button></div> : null}
+    {appointment.status === "atendido" ? <div className="mt-3 rounded-xl bg-emerald-50 px-3 py-2 text-center text-[11px] font-semibold text-emerald-800">Atendido · valor já contabilizado na receita</div> : null}
     <div className="mt-3 flex items-center justify-between gap-3 border-t border-border/70 pt-3"><p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{appointment.patient_phone || "Sem telefone"}</p><Button type="button" variant="ghost" size="icon" className="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive" onClick={onDelete} disabled={deleting} title="Apagar agendamento"><Trash2 className="size-3.5" /></Button><button type="button" onClick={onOpen} className="shrink-0 text-xs font-semibold text-primary hover:underline">{formatPrice(Number(appointment.service_price_snapshot ?? appointment.service?.price ?? 0))} · Detalhes →</button></div>
   </article>;
 }
@@ -442,16 +463,18 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated }: { open: bool
 }
 
 function CategoryButton({ active, label, count, onClick }: { active: boolean; label: string; count: number; onClick: () => void }) { return <button type="button" onClick={onClick} className={`flex min-h-[54px] items-center justify-between rounded-xl border px-3 text-left transition ${active ? "border-primary bg-primary-soft/70 text-primary" : "border-border bg-background hover:bg-secondary/40"}`}><span className="text-xs font-semibold sm:text-sm">{label}</span><span className={`grid min-w-7 place-items-center rounded-full px-2 py-1 text-[10px] font-semibold ${active ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>{count}</span></button>; }
-function AdminStatusBadge({ status }: { status: string }) { const variant = status === "cancelado" ? "destructive" : status === "confirmado" ? "default" : "secondary"; return <Badge variant={variant as any} className="shrink-0 rounded-full px-2.5 text-[10px] font-normal">{statusLabel(status)}</Badge>; }
+function AdminStatusBadge({ status }: { status: string }) { const variant = status === "cancelado" ? "destructive" : status === "confirmado" || status === "atendido" ? "default" : "secondary"; return <Badge variant={variant as any} className={`shrink-0 rounded-full px-2.5 text-[10px] font-normal ${status === "atendido" ? "bg-emerald-600 text-white hover:bg-emerald-600" : ""}`}>{statusLabel(status)}</Badge>; }
 function SmallInfo({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) { return <div className="min-w-0"><p className="text-[9px] uppercase tracking-wide text-muted-foreground">{label}</p><p className={`mt-0.5 truncate text-xs font-medium ${accent ? "text-primary" : ""}`}>{value}</p></div>; }
 function DetailBox({ icon: Icon, label, value }: any) { return <div className="flex items-start gap-3 rounded-2xl border border-border bg-card p-3"><span className="grid size-8 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary"><Icon className="size-4" /></span><div className="min-w-0"><p className="text-[9px] uppercase tracking-wide text-muted-foreground">{label}</p><p className="mt-1 break-words text-sm font-medium">{value}</p></div></div>; }
 
-function AppointmentAdminDialog({ appointment, open, onOpenChange, onConfirm, onCancel, busy }: any) {
+function AppointmentAdminDialog({ appointment, open, onOpenChange, onConfirm, onCancel, onAttended, busy }: any) {
   if (!appointment) return null;
   const approved = approvedPayment(appointment);
   const total = Number(appointment.service_price_snapshot ?? appointment.service?.price ?? 0);
   const paid = Number(approved?.amount ?? 0);
-  const canDecide = appointment.status !== "cancelado" && appointment.status !== "confirmado" && appointment.status !== "aguardando_pagamento";
+  const canDecide = appointment.status !== "cancelado" && appointment.status !== "confirmado" && appointment.status !== "atendido" && appointment.status !== "aguardando_pagamento";
+  const scheduledMoment = new Date(`${appointment.scheduled_date}T${appointment.scheduled_time}:00`);
+  const canMarkAttended = appointment.status === "confirmado" && Number.isFinite(scheduledMoment.getTime()) && scheduledMoment.getTime() <= Date.now();
   const days = daysUntilAppointment(appointment.scheduled_date);
   const proximity = appointmentProximity(appointment.scheduled_date);
   const hasWhatsApp = normalizeWhatsAppPhone(appointment.patient_phone).length > 0;
@@ -462,6 +485,8 @@ function AppointmentAdminDialog({ appointment, open, onOpenChange, onConfirm, on
     {hasWhatsApp && appointment.status !== "cancelado" ? <div className="mt-4">{proximity === "urgent" ? <Button className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => openAppointmentWhatsApp(appointment, "reminder")}><MessageCircle className="size-4" /> {days === 0 ? "Falar com cliente" : "Recontatar cliente"}</Button> : appointment.status === "pendente" ? <Button variant="outline" className="rounded-xl border-emerald-600/40 text-emerald-700" onClick={() => openAppointmentWhatsApp(appointment, "confirmation")}><MessageCircle className="size-4" /> Confirmar pelo WhatsApp</Button> : null}</div> : null}
     <div className="mt-4 rounded-2xl border border-border p-4"><div className="grid gap-3 text-xs sm:grid-cols-2"><div><p className="text-[9px] uppercase tracking-wide text-muted-foreground">Criado em</p><p className="mt-1 font-medium">{formatDateTime(appointment.created_at)}</p></div><div><p className="text-[9px] uppercase tracking-wide text-muted-foreground">Status atualizado</p><p className="mt-1 font-medium">{formatDateTime(appointment.status_updated_at)}</p></div></div>{appointment.notes ? <div className="mt-3 border-t border-border pt-3"><p className="text-[9px] uppercase tracking-wide text-muted-foreground">Observações</p><p className="mt-1 text-sm">{appointment.notes}</p></div> : null}</div>
     {canDecide ? <DialogFooter className="mt-4 grid grid-cols-2 gap-2 sm:flex"><Button variant="destructive" disabled={busy} onClick={onCancel}><X className="size-4" /> Cancelar</Button><Button disabled={busy} onClick={onConfirm}><Check className="size-4" /> Confirmar manualmente</Button></DialogFooter> : null}
+    {canMarkAttended ? <DialogFooter className="mt-4"><Button className="w-full bg-emerald-600 text-white hover:bg-emerald-700 sm:w-auto" disabled={busy} onClick={onAttended}><Check className="size-4" /> Confirmar atendimento</Button></DialogFooter> : null}
+    {appointment.status === "atendido" ? <div className="mt-4 rounded-xl bg-emerald-50 px-3 py-2 text-center text-xs font-semibold text-emerald-800">Atendimento concluído · receita contabilizada</div> : null}
   </DialogContent></Dialog>;
 }
 

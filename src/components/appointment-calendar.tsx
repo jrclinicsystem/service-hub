@@ -58,7 +58,7 @@ export function AppointmentCalendar({
       if (!appointment?.scheduled_date || appointment.status === "cancelado") continue;
       const current = result.get(appointment.scheduled_date) ?? { total: 0, pending: 0, confirmed: 0 };
       current.total += 1;
-      if (appointment.status === "confirmado") current.confirmed += 1;
+      if (appointment.status === "confirmado" || appointment.status === "atendido") current.confirmed += 1;
       else current.pending += 1;
       result.set(appointment.scheduled_date, current);
     }

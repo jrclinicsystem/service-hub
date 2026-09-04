@@ -270,7 +270,7 @@ function Admin() {
   }
 
   const revenue = data.appointments
-    .filter((item: any) => item.status !== "cancelado")
+    .filter((item: any) => item.status === "atendido")
     .reduce((total: number, item: any) => total + Number(item.service_price_snapshot ?? item.service?.price ?? 0), 0);
   const uniquePatients = new Set(data.appointments.map((item: any) => item.patient_email)).size;
   const activeServices = data.services.filter((item: any) => item.is_active).length;
@@ -342,7 +342,7 @@ function Admin() {
 
         <div className="mt-5 grid grid-cols-2 gap-2.5 sm:mt-8 sm:gap-4 lg:grid-cols-4">
           <Metric icon={CalendarDays} label="Agendamentos" value={String(data.appointments.length)} hint="no sistema" />
-          <Metric icon={CircleDollarSign} label="Receita" value={formatPrice(revenue)} hint="estimada" />
+          <Metric icon={CircleDollarSign} label="Receita" value={formatPrice(revenue)} hint="realizada" />
           <Metric icon={Stethoscope} label="Serviços" value={String(activeServices)} hint="ativos" />
           <Metric icon={Users} label="Pacientes" value={String(uniquePatients)} hint="e-mails únicos" />
         </div>

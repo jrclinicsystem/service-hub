@@ -283,10 +283,13 @@ function ProfessionalAgenda() {
 }
 
 function ProfessionalAppointmentCard({ appointment, onSaved }: any) {
-  const [busy, setBusy] = useState<"confirm" | "decline" | null>(null);
+  const [busy, setBusy] = useState<"confirm" | "decline" | "attended" | null>(null);
   const response = responseFor(appointment)?.response;
-  const confirmed = response === "confirmado" || appointment.status === "confirmado";
+  const attended = appointment.status === "atendido";
+  const confirmed = attended || response === "confirmado" || appointment.status === "confirmado";
   const waiting = appointment.status === "pendente" && !confirmed;
+  const scheduledMoment = new Date(`${appointment.scheduled_date}T${appointment.scheduled_time}:00`);
+  const canMarkAttended = appointment.status === "confirmado" && Number.isFinite(scheduledMoment.getTime()) && scheduledMoment.getTime() <= Date.now();
   const proximity = appointment.status === "cancelado" ? "past" : appointmentProximity(appointment.scheduled_date);
   const days = daysUntilAppointment(appointment.scheduled_date);
   const hasWhatsApp = normalizeWhatsAppPhone(appointment.patient_phone).length > 0;
@@ -302,13 +305,26 @@ function ProfessionalAppointmentCard({ appointment, onSaved }: any) {
     onSaved?.();
   };
 
+  const markAttended = async () => {
+    if (!canMarkAttended || busy !== null) return;
+    setBusy("attended");
+    const { error } = await db.rpc("mark_appointment_attended", { _appointment_id: appointment.id });
+    setBusy(null);
+    if (error) {
+      toast.error("Não foi possível confirmar o atendimento.", { description: error.message });
+      return;
+    }
+    toast.success("Atendimento concluído.", { description: "O valor deste serviço agora entrou na receita da clínica." });
+    onSaved?.();
+  };
+
   const openWhatsApp = (kind: "confirmation" | "reminder") => {
     const url = appointmentWhatsAppUrl(appointment, kind);
     if (!url) { toast.error("Este cliente não possui WhatsApp cadastrado."); return; }
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
-  const label = appointment.status === "cancelado" ? (response === "recusado" ? "recusado por você" : "cancelado") : confirmed ? "confirmado" : waiting ? "aguardando confirmação" : appointment.status;
+  const label = appointment.status === "cancelado" ? (response === "recusado" ? "recusado por você" : "cancelado") : attended ? "atendido" : confirmed ? "confirmado" : waiting ? "aguardando confirmação" : appointment.status;
   const cardClass = proximity === "urgent" ? "border-amber-500/60 bg-amber-50/70 shadow-md" : proximity === "soon" ? "border-amber-300/60 bg-amber-50/35" : "border-border bg-card";
 
   return <article className={`rounded-2xl border p-4 shadow-soft transition ${cardClass} ${appointment.status === "cancelado" ? "opacity-60" : ""}`}>
@@ -318,6 +334,8 @@ function ProfessionalAppointmentCard({ appointment, onSaved }: any) {
     {appointment.notes ? <p className="mt-3 rounded-xl bg-secondary/60 px-3 py-2 text-xs text-muted-foreground">{appointment.notes}</p> : null}
     {appointment.status !== "cancelado" && hasWhatsApp ? <div className="mt-3 flex flex-wrap gap-2">{proximity === "urgent" ? <Button type="button" className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => openWhatsApp("reminder")}><MessageCircle className="size-4" /> {days === 0 ? "Falar com cliente" : "Recontatar cliente"}</Button> : waiting ? <Button type="button" variant="outline" className="rounded-xl border-emerald-600/40 text-emerald-700 hover:bg-emerald-50" onClick={() => openWhatsApp("confirmation")}><MessageCircle className="size-4" /> Confirmar pelo WhatsApp</Button> : null}</div> : null}
     {waiting ? <div className="mt-3 grid gap-2 sm:grid-cols-2"><Button className="rounded-xl" disabled={busy !== null} onClick={() => void respond("confirmado")}><CheckCircle2 className="size-4" /> {busy === "confirm" ? "Confirmando..." : "Confirmar compromisso"}</Button><Button variant="outline" className="rounded-xl text-destructive" disabled={busy !== null} onClick={() => void respond("recusado")}><XCircle className="size-4" /> {busy === "decline" ? "Recusando..." : "Recusar"}</Button></div> : null}
+    {canMarkAttended ? <div className="mt-3"><Button type="button" className="w-full rounded-xl bg-emerald-600 text-white hover:bg-emerald-700" disabled={busy !== null} onClick={() => void markAttended()}><CheckCircle2 className="size-4" /> {busy === "attended" ? "Confirmando atendimento..." : "Confirmar atendimento"}</Button><p className="mt-1.5 text-center text-[10px] text-muted-foreground">O valor só entra na receita após esta confirmação.</p></div> : null}
+    {attended ? <div className="mt-3 flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800"><CheckCircle2 className="size-4" /> Atendimento concluído · valor contabilizado na receita</div> : null}
   </article>;
 }
 
