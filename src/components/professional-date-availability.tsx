@@ -55,7 +55,7 @@ export function ProfessionalDateAvailability({ professionalId, fallbackSlots, fa
       const { error } = await db.from("professional_date_time_slots").upsert({ professional_id: professionalId, available_date: date, slot: newTime, is_available: true, sort_order: Number(newTime.replace(":", "")) }, { onConflict: "professional_id,available_date,slot" });
       if (error) throw error;
       setNewTime("");
-      toast.success("Horário liberado para esta data.");
+      toast.success("Horário liberado somente para esta data.");
       await refresh();
     } catch (err: any) {
       toast.error(err?.message || "Não foi possível liberar o horário.");
@@ -69,31 +69,50 @@ export function ProfessionalDateAvailability({ professionalId, fallbackSlots, fa
       if (clearError) throw clearError;
       const { error } = await db.from("professional_date_time_slots").insert({ professional_id: professionalId, available_date: date, slot: "00:00", is_available: false, sort_order: 0 });
       if (error) throw error;
-      toast.success("Dia fechado para novos agendamentos.");
+      toast.success("Esta data foi fechada para novos agendamentos.");
       await refresh();
     } catch (err: any) {
       toast.error(err?.message || "Não foi possível fechar o dia.");
     } finally { setSaving(false); }
   };
 
-  const useGeneralPattern = async () => {
+  const useWeeklyPattern = async () => {
     const { error } = await db.from("professional_date_time_slots").delete().eq("professional_id", professionalId).eq("available_date", date);
     if (error) { toast.error(error.message); return; }
-    toast.success("Esta data voltou a usar o padrão geral.");
+    toast.success("Esta data voltou a usar o padrão semanal.");
     await refresh();
   };
 
-  const copyGeneralPattern = async () => {
+  const copyWeeklyPattern = async () => {
     const weekday = new Date(`${date}T12:00:00`).getDay();
-    const available = fallbackSlots.filter((slot: any) => slot.is_available && (!fallbackAvailability.length || fallbackAvailability.some((row: any) => row.weekday === weekday && row.period === periodForTime(slot.slot) && row.is_available)));
-    if (!available.length) { toast.info("Seu padrão geral não possui horários ativos neste dia."); return; }
     setSaving(true);
     try {
+      const weeklyResult = await db
+        .from("professional_weekday_time_slots")
+        .select("slot,is_available,sort_order")
+        .eq("professional_id", professionalId)
+        .eq("weekday", weekday)
+        .order("sort_order")
+        .order("slot");
+      if (weeklyResult.error) throw weeklyResult.error;
+
+      const weeklyRows = weeklyResult.data ?? [];
+      let available = weeklyRows.filter((slot: any) => slot.slot !== "00:00" && slot.is_available);
+
+      if (!weeklyRows.length) {
+        available = fallbackSlots.filter((slot: any) => slot.is_available && (!fallbackAvailability.length || fallbackAvailability.some((row: any) => row.weekday === weekday && row.period === periodForTime(slot.slot) && row.is_available)));
+      }
+
+      if (!available.length) {
+        toast.info("Seu padrão semanal não possui horários ativos neste dia.");
+        return;
+      }
+
       const { error: clearError } = await db.from("professional_date_time_slots").delete().eq("professional_id", professionalId).eq("available_date", date);
       if (clearError) throw clearError;
       const { error } = await db.from("professional_date_time_slots").insert(available.map((slot: any) => ({ professional_id: professionalId, available_date: date, slot: slot.slot, is_available: true, sort_order: slot.sort_order ?? Number(slot.slot.replace(":", "")) })));
       if (error) throw error;
-      toast.success("Padrão geral copiado para esta data.");
+      toast.success("Padrão deste dia da semana copiado para a data.");
       await refresh();
     } catch (err: any) {
       toast.error(err?.message || "Não foi possível copiar os horários.");
@@ -103,17 +122,17 @@ export function ProfessionalDateAvailability({ professionalId, fallbackSlots, fa
   return (
     <section className="mt-4 rounded-3xl border border-primary/25 bg-primary-soft/30 p-4 shadow-soft sm:mt-7 sm:p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div><div className="flex items-center gap-2"><CalendarDays className="size-5 text-primary" /><h2 className="text-lg font-bold">Minha disponibilidade por data</h2></div><p className="mt-1 text-xs text-muted-foreground">Escolha uma data e libere somente os horários em que você realmente poderá atender.</p></div>
+        <div><div className="flex items-center gap-2"><CalendarDays className="size-5 text-primary" /><h2 className="text-lg font-bold">Exceção por data</h2></div><p className="mt-1 max-w-2xl text-xs text-muted-foreground">Use somente quando um dia específico for diferente do seu padrão semanal. Os horários definidos aqui valem apenas para a data escolhida e têm prioridade sobre o padrão da semana.</p></div>
         <Input type="date" min={todayIso()} value={date} onChange={(event) => setDate(event.target.value)} className="sm:w-[180px]" />
       </div>
 
       <div className="mt-5 rounded-2xl border border-border bg-card p-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-semibold capitalize">{formattedDate}</p><p className="mt-1 text-[11px] text-muted-foreground">{rows.length === 0 ? "Usando o padrão geral" : isClosed ? "Dia fechado" : "Horários personalizados para esta data"}</p></div><div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={copyGeneralPattern} disabled={saving}><Copy className="size-4" /> Copiar padrão</Button><Button size="sm" variant="outline" onClick={closeDay} disabled={saving}><XCircle className="size-4" /> Não atendo</Button>{rows.length ? <Button size="sm" variant="ghost" onClick={useGeneralPattern} disabled={saving}>Usar padrão geral</Button> : null}</div></div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-semibold capitalize">{formattedDate}</p><p className="mt-1 text-[11px] text-muted-foreground">{rows.length === 0 ? "Usando o padrão semanal" : isClosed ? "Data fechada" : "Horários personalizados somente para esta data"}</p></div><div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={copyWeeklyPattern} disabled={saving}><Copy className="size-4" /> Copiar padrão do dia</Button><Button size="sm" variant="outline" onClick={closeDay} disabled={saving}><XCircle className="size-4" /> Não atendo</Button>{rows.length ? <Button size="sm" variant="ghost" onClick={useWeeklyPattern} disabled={saving}>Usar padrão semanal</Button> : null}</div></div>
 
         <div className="mt-4 flex gap-2"><Input type="time" value={newTime} onChange={(event) => setNewTime(event.target.value)} className="min-w-0 flex-1 sm:max-w-[180px]" /><Button onClick={addTime} disabled={saving || !newTime}><Plus className="size-4" /> Adicionar</Button></div>
 
         <div className="mt-5">
-          {query.isLoading ? <p className="text-xs text-muted-foreground">Carregando...</p> : isClosed ? <div className="rounded-xl bg-destructive/5 px-4 py-5 text-center"><p className="text-sm font-semibold text-destructive">Você marcou que não atende nesta data.</p></div> : rows.length === 0 ? <div className="rounded-xl bg-secondary/50 px-4 py-5 text-center"><p className="text-xs text-muted-foreground">Nenhuma personalização nesta data. O cliente verá os horários do seu padrão geral.</p></div> : <div className="grid gap-2 sm:grid-cols-2">{visibleRows.map((row: any) => <div key={row.id} className="flex items-center justify-between rounded-xl border border-border px-3 py-3"><div><p className="font-semibold tabular-nums">{row.slot}</p><p className="text-[10px] text-muted-foreground">{row.is_available ? "Disponível nesta data" : "Pausado"}</p></div><div className="flex items-center gap-2"><Switch checked={row.is_available} onCheckedChange={async (checked) => { const { error } = await db.from("professional_date_time_slots").update({ is_available: checked }).eq("id", row.id); if (error) { toast.error(error.message); return; } await refresh(); }} /><Button type="button" size="icon" variant="ghost" className="text-destructive" onClick={async () => { const { error } = await db.from("professional_date_time_slots").delete().eq("id", row.id); if (error) { toast.error(error.message); return; } await refresh(); }}><Trash2 className="size-4" /></Button></div></div>)}</div>}
+          {query.isLoading ? <p className="text-xs text-muted-foreground">Carregando...</p> : isClosed ? <div className="rounded-xl bg-destructive/5 px-4 py-5 text-center"><p className="text-sm font-semibold text-destructive">Você marcou que não atende nesta data.</p></div> : rows.length === 0 ? <div className="rounded-xl bg-secondary/50 px-4 py-5 text-center"><p className="text-xs text-muted-foreground">Nenhuma exceção nesta data. O cliente verá os horários definidos para este dia da semana.</p></div> : <div className="grid gap-2 sm:grid-cols-2">{visibleRows.map((row: any) => <div key={row.id} className="flex items-center justify-between rounded-xl border border-border px-3 py-3"><div><p className="font-semibold tabular-nums">{row.slot}</p><p className="text-[10px] text-muted-foreground">{row.is_available ? "Disponível nesta data" : "Pausado"}</p></div><div className="flex items-center gap-2"><Switch checked={row.is_available} onCheckedChange={async (checked) => { const { error } = await db.from("professional_date_time_slots").update({ is_available: checked }).eq("id", row.id); if (error) { toast.error(error.message); return; } await refresh(); }} /><Button type="button" size="icon" variant="ghost" className="text-destructive" onClick={async () => { const { error } = await db.from("professional_date_time_slots").delete().eq("id", row.id); if (error) { toast.error(error.message); return; } await refresh(); }}><Trash2 className="size-4" /></Button></div></div>)}</div>}
         </div>
       </div>
     </section>
