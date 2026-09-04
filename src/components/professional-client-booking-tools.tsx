@@ -57,6 +57,7 @@ export function ProfessionalClientBookingTools({ professionalId, onAppointmentCr
   const [clientSearch, setClientSearch] = useState("");
   const [selectedClientId, setSelectedClientId] = useState("");
   const [serviceId, setServiceId] = useState("");
+  const [appointmentValue, setAppointmentValue] = useState("");
   const [date, setDate] = useState(todayIso());
   const [time, setTime] = useState("");
   const [notes, setNotes] = useState("");
@@ -149,7 +150,9 @@ export function ProfessionalClientBookingTools({ professionalId, onAppointmentCr
 
     setSavingAppointment(true);
     try {
-      const total = Number(selectedService.price ?? 0);
+      const parsedValue = Number(appointmentValue.replace(",", "."));
+      if (!Number.isFinite(parsedValue) || parsedValue < 0) { toast.error("Informe um valor válido para o atendimento."); return; }
+      const total = Math.round((parsedValue + Number.EPSILON) * 100) / 100;
       const { error } = await db.from("appointments").insert({
         user_id: null,
         client_id: selectedClient.id,
@@ -173,6 +176,7 @@ export function ProfessionalClientBookingTools({ professionalId, onAppointmentCr
       setSelectedClientId("");
       setClientSearch("");
       setServiceId("");
+      setAppointmentValue("");
       setDate(todayIso());
       setTime("");
       setNotes("");
@@ -213,7 +217,8 @@ export function ProfessionalClientBookingTools({ professionalId, onAppointmentCr
             {!selectedClientId ? <div className="mt-2 max-h-36 space-y-1 overflow-y-auto rounded-xl border border-border p-1.5">{filteredClients.length ? filteredClients.map((client: any) => <button key={client.id} type="button" onClick={() => selectClient(client)} className="flex w-full items-center justify-between gap-3 rounded-lg px-2.5 py-2 text-left hover:bg-secondary/60"><span className="min-w-0"><span className="block truncate text-xs font-medium">{client.name}</span><span className="block truncate text-[9px] text-muted-foreground">{client.whatsapp}{client.email ? ` · ${client.email}` : ""}</span></span></button>) : <p className="px-2 py-3 text-center text-[10px] text-muted-foreground">Nenhum cliente encontrado.</p>}</div> : <div className="mt-2 flex items-center justify-between rounded-xl bg-primary-soft px-3 py-2"><div className="min-w-0"><p className="truncate text-xs font-semibold text-primary">{selectedClient?.name}</p><p className="truncate text-[9px] text-muted-foreground">{selectedClient?.whatsapp}</p></div><Check className="size-4 text-primary" /></div>}
           </div>
 
-          <div className="mt-3"><Label>Serviço</Label><Select value={serviceId} onValueChange={setServiceId}><SelectTrigger className="mt-1.5"><SelectValue placeholder="Selecione o serviço" /></SelectTrigger><SelectContent>{services.map((service: any) => <SelectItem key={service.id} value={service.id}>{service.name} · {formatPrice(Number(service.price ?? 0))}</SelectItem>)}</SelectContent></Select></div>
+          <div className="mt-3"><Label>Serviço</Label><Select value={serviceId} onValueChange={(value) => { setServiceId(value); const service = services.find((item: any) => item.id === value); setAppointmentValue(service ? String(Number(service.price ?? 0).toFixed(2)) : ""); }}><SelectTrigger className="mt-1.5"><SelectValue placeholder="Selecione o serviço" /></SelectTrigger><SelectContent>{services.map((service: any) => <SelectItem key={service.id} value={service.id}>{service.name} · {formatPrice(Number(service.price ?? 0))}</SelectItem>)}</SelectContent></Select></div>
+          <div className="mt-3"><Label>Valor do atendimento</Label><Input className="mt-1.5" type="number" min="0" step="0.01" inputMode="decimal" value={appointmentValue} onChange={(event) => setAppointmentValue(event.target.value)} placeholder="0,00" disabled={!serviceId} /><p className="mt-1 text-[10px] text-muted-foreground">O preço padrão é preenchido automaticamente, mas você pode alterar livremente para aplicar desconto ou valor combinado.</p></div>
           <div className="mt-3 grid gap-3 sm:grid-cols-2"><div><Label>Data</Label><Input className="mt-1.5" type="date" min={todayIso()} value={date} onChange={(event) => setDate(event.target.value)} /></div><div><Label>Horário</Label><Select value={time} onValueChange={setTime} disabled={slotsLoading}><SelectTrigger className="mt-1.5"><SelectValue placeholder={slotsLoading ? "Carregando..." : slots.length ? "Selecione" : "Sem horário"} /></SelectTrigger><SelectContent>{slots.map((slot: any) => <SelectItem key={`${slot.slot}-${slot.source ?? "slot"}`} value={slot.slot}>{slot.slot}</SelectItem>)}</SelectContent></Select></div></div>
           <div className="mt-3"><Label>Observações</Label><Textarea className="mt-1.5 min-h-20" value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Opcional" /></div>
           <Button type="button" className="mt-4 w-full rounded-xl" onClick={() => void createAppointment()} disabled={savingAppointment || slotsLoading || !selectedClientId || !serviceId || !time}>{savingAppointment ? "Salvando..." : "Criar agendamento"}</Button>

@@ -437,6 +437,7 @@ function EditAgendaModal({ open, onClose, professional, access, services, linked
 
 function NewAppointmentModal({ open, onClose, professional, services, onSaved }: any) {
   const [serviceId, setServiceId] = useState("");
+  const [appointmentValue, setAppointmentValue] = useState("");
   const [clients, setClients] = useState<any[]>([]);
   const [clientsLoading, setClientsLoading] = useState(false);
   const [clientSearch, setClientSearch] = useState("");
@@ -530,12 +531,16 @@ function NewAppointmentModal({ open, onClose, professional, services, onSaved }:
     setPatientEmail("");
   };
 
-  const reset = () => { setServiceId(""); setClients([]); setClientSearch(""); setSelectedClientId(""); setPatientName(""); setPatientEmail(""); setPatientPhone(""); setDate(todayIso()); setTime(""); setNotes(""); };
+  const reset = () => { setServiceId(""); setAppointmentValue(""); setClients([]); setClientSearch(""); setSelectedClientId(""); setPatientName(""); setPatientEmail(""); setPatientPhone(""); setDate(todayIso()); setTime(""); setNotes(""); };
   const save = async () => {
     if (!serviceId || !patientName.trim() || !date || !time) { toast.error("Preencha serviço, cliente, data e horário."); return; }
     const selectedService = services.find((service: any) => service.id === serviceId);
+    if (!selectedService) { toast.error("Serviço não encontrado."); return; }
+    const parsedValue = Number(appointmentValue.replace(",", "."));
+    if (!Number.isFinite(parsedValue) || parsedValue < 0) { toast.error("Informe um valor válido para o atendimento."); return; }
+    const total = Math.round((parsedValue + Number.EPSILON) * 100) / 100;
     setBusy(true);
-    const { error } = await db.from("appointments").insert({ user_id: null, client_id: selectedClientId || null, professional_id: professional.id, service_id: serviceId, patient_name: patientName.trim(), patient_email: patientEmail.trim().toLowerCase(), patient_phone: patientPhone.trim(), scheduled_date: date, scheduled_time: time, notes: notes.trim(), status: "pendente", payment_choice: "onsite", service_price_snapshot: Number(selectedService?.price ?? 0), deposit_percent: 0, deposit_amount: 0, balance_amount: Number(selectedService?.price ?? 0) });
+    const { error } = await db.from("appointments").insert({ user_id: null, client_id: selectedClientId || null, professional_id: professional.id, service_id: serviceId, patient_name: patientName.trim(), patient_email: patientEmail.trim().toLowerCase(), patient_phone: patientPhone.trim(), scheduled_date: date, scheduled_time: time, notes: notes.trim(), status: "pendente", payment_choice: "onsite", service_price_snapshot: total, deposit_percent: 0, deposit_amount: 0, balance_amount: total });
     setBusy(false);
     if (error) { toast.error(error.message); return; }
     toast.success("Agendamento enviado para confirmação.", { description: `${professional.name} precisa confirmar o compromisso na própria agenda.` }); reset(); onClose(); await onSaved();
@@ -543,7 +548,8 @@ function NewAppointmentModal({ open, onClose, professional, services, onSaved }:
 
   return <ModalShell open={open} onClose={() => { if (!busy) { reset(); onClose(); } }} title="Novo agendamento" description={`Adicionar atendimento à agenda de ${professional.name}. Ele ficará aguardando a confirmação da profissional.`} width="max-w-xl" footer={<><Button variant="outline" onClick={onClose} disabled={busy}>Cancelar</Button><Button onClick={save} disabled={busy || slotsLoading || !services.length || !allowedSlots.length}>{busy ? "Salvando..." : "Enviar para confirmação"}</Button></>}>
     <div className="grid gap-4 sm:grid-cols-2">
-      <div className="sm:col-span-2"><Field label="Serviço"><Select value={serviceId} onValueChange={setServiceId}><SelectTrigger><SelectValue placeholder="Selecione o serviço" /></SelectTrigger><SelectContent>{services.map((service: any) => <SelectItem key={service.id} value={service.id}>{service.name}</SelectItem>)}</SelectContent></Select></Field></div>
+      <div className="sm:col-span-2"><Field label="Serviço"><Select value={serviceId} onValueChange={(value) => { setServiceId(value); const service = services.find((item: any) => item.id === value); setAppointmentValue(service ? String(Number(service.price ?? 0).toFixed(2)) : ""); }}><SelectTrigger><SelectValue placeholder="Selecione o serviço" /></SelectTrigger><SelectContent>{services.map((service: any) => <SelectItem key={service.id} value={service.id}>{service.name} · {formatPrice(Number(service.price ?? 0))}</SelectItem>)}</SelectContent></Select></Field></div>
+      <div className="sm:col-span-2"><Field label="Valor do atendimento"><Input type="number" min="0" step="0.01" inputMode="decimal" value={appointmentValue} onChange={(e) => setAppointmentValue(e.target.value)} disabled={!serviceId || busy} /></Field><p className="mt-1 text-[10px] text-muted-foreground">Preço preenchido pelo catálogo, com liberdade para alterar o valor deste agendamento.</p></div>
       <div className="sm:col-span-2">
         <div className="flex items-center justify-between gap-3">
           <Label>Selecionar cliente cadastrado</Label>
