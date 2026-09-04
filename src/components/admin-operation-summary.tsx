@@ -25,16 +25,18 @@ export function AdminOperationSummary({ appointments }: { appointments: any[] })
     const sevenDays = new Date(today);
     sevenDays.setDate(sevenDays.getDate() + 7);
 
-    const active = appointments.filter((item) => item.status !== "cancelado");
-    const confirmed = active.filter((item) => item.status === "confirmado");
-    const pending = active.filter((item) => item.status !== "confirmado");
+    const nonCancelled = appointments.filter((item) => item.status !== "cancelado");
+    const attended = nonCancelled.filter((item) => item.status === "atendido");
+    const confirmedOrAttended = nonCancelled.filter((item) => item.status === "confirmado" || item.status === "atendido");
+    const pending = nonCancelled.filter((item) => item.status === "pendente" || item.status === "aguardando_pagamento");
     const currentMonth = monthKey(now);
-    const monthAppointments = active.filter((item) => String(item.scheduled_date ?? "").startsWith(currentMonth));
-    const monthRevenue = monthAppointments.reduce((sum, item) => sum + appointmentValue(item), 0);
-    const totalRevenue = active.reduce((sum, item) => sum + appointmentValue(item), 0);
-    const averageTicket = active.length ? totalRevenue / active.length : 0;
-    const confirmationRate = active.length ? Math.round((confirmed.length / active.length) * 100) : 0;
-    const upcomingSeven = active.filter((item) => {
+    const monthAttended = attended.filter((item) => String(item.scheduled_date ?? "").startsWith(currentMonth));
+    const monthRevenue = monthAttended.reduce((sum, item) => sum + appointmentValue(item), 0);
+    const totalRevenue = attended.reduce((sum, item) => sum + appointmentValue(item), 0);
+    const averageTicket = attended.length ? totalRevenue / attended.length : 0;
+    const confirmationRate = nonCancelled.length ? Math.round((confirmedOrAttended.length / nonCancelled.length) * 100) : 0;
+    const upcomingSeven = nonCancelled.filter((item) => {
+      if (item.status === "atendido") return false;
       const date = localDate(item.scheduled_date);
       return date && date >= today && date <= sevenDays;
     }).length;
@@ -42,7 +44,7 @@ export function AdminOperationSummary({ appointments }: { appointments: any[] })
     const chart = Array.from({ length: 6 }, (_, index) => {
       const date = new Date(now.getFullYear(), now.getMonth() - (5 - index), 1, 12);
       const key = monthKey(date);
-      const revenue = active
+      const revenue = attended
         .filter((item) => String(item.scheduled_date ?? "").startsWith(key))
         .reduce((sum, item) => sum + appointmentValue(item), 0);
       return {
@@ -53,7 +55,7 @@ export function AdminOperationSummary({ appointments }: { appointments: any[] })
 
     return {
       monthRevenue,
-      monthAppointments: monthAppointments.length,
+      monthAppointments: monthAttended.length,
       averageTicket,
       confirmationRate,
       upcomingSeven,
@@ -70,7 +72,7 @@ export function AdminOperationSummary({ appointments }: { appointments: any[] })
             <TrendingUp className="size-4.5 text-primary" />
             <h2 className="text-base font-bold tracking-[-0.01em] text-foreground sm:text-lg">Resumo operacional</h2>
           </div>
-          <p className="mt-1 text-[10px] text-muted-foreground sm:text-[11px]">Visão rápida da movimentação da clínica.</p>
+          <p className="mt-1 text-[10px] text-muted-foreground sm:text-[11px]">Receita contabilizada somente após o atendimento ser concluído.</p>
         </div>
         <span className="rounded-full bg-primary-soft px-2.5 py-1 text-[9px] font-semibold uppercase tracking-wide text-primary">Atual</span>
       </div>
@@ -85,11 +87,11 @@ export function AdminOperationSummary({ appointments }: { appointments: any[] })
       <div className="mt-4 flex min-h-0 flex-1 flex-col rounded-xl border border-border/70 bg-background/60 p-3">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-bold text-foreground sm:text-base">Receita prevista</p>
-            <p className="mt-0.5 text-[9px] text-muted-foreground">Últimos 6 meses, desconsiderando cancelados</p>
+            <p className="text-sm font-bold text-foreground sm:text-base">Receita realizada</p>
+            <p className="mt-0.5 text-[9px] text-muted-foreground">Últimos 6 meses · somente atendimentos concluídos</p>
           </div>
           <div className="text-right">
-            <p className="text-xs font-semibold text-primary">{summary.monthAppointments} neste mês</p>
+            <p className="text-xs font-semibold text-primary">{summary.monthAppointments} atendido(s) neste mês</p>
             <p className="text-[9px] text-muted-foreground">{summary.pending} pendência(s) ativas</p>
           </div>
         </div>
