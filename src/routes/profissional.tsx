@@ -265,7 +265,11 @@ function ProfessionalAgenda() {
 
         <ProfessionalWeeklySchedule professionalId={data.professional.id} />
 
+        <ProfessionalWeeklySchedule professionalId={data.professional.id} />
+
         <ProfessionalDateAvailability professionalId={data.professional.id} fallbackSlots={data.slots} fallbackAvailability={data.availability} />
+
+        <ProfessionalClientBookingTools professionalId={data.professional.id} onAppointmentCreated={() => refetch()} />
 
         <ProfessionalClientBookingTools professionalId={data.professional.id} onAppointmentCreated={() => refetch()} />
 
