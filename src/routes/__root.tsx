@@ -9,6 +9,7 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import {
+  Building2,
   CalendarDays,
   CircleDollarSign,
   Clock3,
@@ -62,6 +63,11 @@ const AvailabilityInlinePage = lazy(async () => {
 const ClientsInlinePage = lazy(async () => {
   const module = await import("./admin_.clientes");
   return { default: module.Route.options.component as ComponentType };
+});
+
+const RoomsInlinePage = lazy(async () => {
+  const module = await import("@/components/admin-room-reservations");
+  return { default: module.AdminRoomReservations as ComponentType };
 });
 
 function NotFoundComponent() {
@@ -167,7 +173,7 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
-type InlineAdminSection = "availability" | "catalog" | "clients" | "team" | "access" | "finance" | null;
+type InlineAdminSection = "availability" | "catalog" | "clients" | "rooms" | "team" | "access" | "finance" | null;
 type MainAdminSection = "agendamentos" | "servicos" | "promocoes" | "horarios" | "acessos";
 
 const mainSectionLabels: Record<MainAdminSection, string> = {
@@ -253,6 +259,15 @@ function PersistentAdminSidebar({
           <span>Clientes</span>
         </button>
 
+        <button
+          type="button"
+          className={`persistent-admin-sidebar-item${inlineSection === "rooms" ? " is-active" : ""}`}
+          onClick={() => onInlineSection("rooms")}
+        >
+          <Building2 className="size-4 shrink-0" />
+          <span>Reservas de Salas</span>
+        </button>
+
         <div className="persistent-admin-sidebar-divider" />
 
         <button
@@ -303,7 +318,7 @@ function MobileAdminNav({
   onInlineSection: (section: Exclude<InlineAdminSection, null>) => void;
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
-  const moreActive = inlineSection === "availability" || inlineSection === "clients" || inlineSection === "team" || inlineSection === "access" || inlineSection === "finance";
+  const moreActive = inlineSection === "availability" || inlineSection === "clients" || inlineSection === "rooms" || inlineSection === "team" || inlineSection === "access" || inlineSection === "finance";
 
   const selectMain = (section: MainAdminSection) => {
     setMoreOpen(false);
@@ -364,6 +379,10 @@ function MobileAdminNav({
               <span className="admin-mobile-more-option-icon"><UserRound /></span>
               <span><strong>Clientes</strong><small>Cadastro e aniversariantes</small></span>
             </button>
+            <button type="button" className="admin-mobile-more-option" role="menuitem" onClick={() => selectInline("rooms")}>
+              <span className="admin-mobile-more-option-icon"><Building2 /></span>
+              <span><strong>Reservas de Salas</strong><small>Aluguel e bloqueio de consultórios</small></span>
+            </button>
             <button type="button" className="admin-mobile-more-option" role="menuitem" onClick={() => selectInline("access")}>
               <span className="admin-mobile-more-option-icon"><ShieldCheck /></span>
               <span><strong>Acessos</strong><small>Administradores e colaboradores</small></span>
@@ -420,6 +439,7 @@ function SystemAccess() {
     void import("./admin_.disponibilidade");
     void import("./admin_.catalogo");
     void import("./admin_.clientes");
+    void import("@/components/admin-room-reservations");
     void import("./admin_.equipe");
     void import("./admin_.acessos");
     void import("./admin_.financeiro");
@@ -439,6 +459,10 @@ function SystemAccess() {
     }
     if (section === "clientes") {
       setInlineSection("clients");
+      return undefined;
+    }
+    if (section === "salas") {
+      setInlineSection("rooms");
       return undefined;
     }
     if (section === "equipe") {
@@ -504,7 +528,7 @@ function SystemAccess() {
 
   const openInlineSection = (section: Exclude<InlineAdminSection, null>) => {
     setInlineSection(section);
-    const hash = section === "availability" ? "disponibilidade" : section === "catalog" ? "catalogo" : section === "clients" ? "clientes" : section === "team" ? "equipe" : section === "access" ? "acessos" : "financeiro";
+    const hash = section === "availability" ? "disponibilidade" : section === "catalog" ? "catalogo" : section === "clients" ? "clientes" : section === "rooms" ? "salas" : section === "team" ? "equipe" : section === "access" ? "acessos" : "financeiro";
     window.history.replaceState(window.history.state, "", `/admin#${hash}`);
   };
 
@@ -515,8 +539,10 @@ function SystemAccess() {
         ? CatalogInlinePage
         : inlineSection === "clients"
           ? ClientsInlinePage
-          : inlineSection === "team"
-            ? TeamInlinePage
+          : inlineSection === "rooms"
+            ? RoomsInlinePage
+            : inlineSection === "team"
+              ? TeamInlinePage
             : inlineSection === "access"
               ? AccessInlinePage
               : inlineSection === "finance"
@@ -570,6 +596,15 @@ function SystemAccess() {
           >
             <UserRound className="size-4 shrink-0 opacity-80" />
             <span>Clientes</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => openInlineSection("rooms")}
+            className={`admin-sidebar-shortcut admin-room-shortcut${inlineSection === "rooms" ? " is-active" : ""}`}
+            aria-pressed={inlineSection === "rooms"}
+          >
+            <Building2 className="size-4 shrink-0 opacity-80" />
+            <span>Reservas de Salas</span>
           </button>
           <button
             type="button"

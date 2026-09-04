@@ -27,6 +27,7 @@ import { AppointmentCalendar } from "@/components/appointment-calendar";
 import { ProfessionalClientBookingTools } from "@/components/professional-client-booking-tools";
 import { ProfessionalWeeklySchedule } from "@/components/professional-weekly-schedule";
 import { ProfessionalDateAvailability } from "@/components/professional-date-availability";
+import { ProfessionalRoomBlocks } from "@/components/professional-room-blocks";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -266,6 +267,8 @@ function ProfessionalAgenda() {
         <ProfessionalWeeklySchedule professionalId={data.professional.id} />
 
         <ProfessionalDateAvailability professionalId={data.professional.id} fallbackSlots={data.slots} fallbackAvailability={data.availability} />
+
+        <ProfessionalRoomBlocks professionalId={data.professional.id} selectedDate={dateFilter || today} />
 
         <ProfessionalClientBookingTools professionalId={data.professional.id} onAppointmentCreated={() => { refetch().catch(() => {}); }} />
 

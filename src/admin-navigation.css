@@ -348,8 +348,13 @@ body:has(a.admin-sidebar-presence-anchor) a.admin-sidebar-presence-anchor {
     bottom: auto !important;
   }
 
+  .admin-room-shortcut {
+    top: 472px !important;
+    bottom: auto !important;
+  }
+
   .admin-team-shortcut {
-    top: 492px !important;
+    top: 541px !important;
     bottom: auto !important;
     left: 18px !important;
     width: 214px !important;
@@ -369,12 +374,12 @@ body:has(a.admin-sidebar-presence-anchor) a.admin-sidebar-presence-anchor {
   }
 
   .admin-access-shortcut {
-    top: 541px !important;
+    top: 590px !important;
     bottom: auto !important;
   }
 
   .admin-finance-shortcut {
-    top: 590px !important;
+    top: 639px !important;
     bottom: auto !important;
   }
 }
