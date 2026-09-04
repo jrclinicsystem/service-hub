@@ -98,7 +98,13 @@ export function AdminRoomReservations() {
   const [savingReservation, setSavingReservation] = useState(false);
 
   const roomNameMap = useMemo(() => new Map(rooms.map((room: any) => [room.id, room.name])), [rooms]);
-  const professionalMap = useMemo(() => new Map(professionals.map((professional: any) => [professional.id, professional])), [professionals]);
+  const professionalMap = useMemo(() => {
+    const map = new Map<string, { name: string }>();
+    for (const professional of professionals) {
+      map.set(professional.id, professional as { name: string });
+    }
+    return map;
+  }, [professionals]);
   const linkedByRoom = useMemo(() => {
     const map = new Map<string, string[]>();
     for (const link of links) {
@@ -310,15 +316,92 @@ export function AdminRoomReservations() {
 
       <section className="mt-6 rounded-3xl border border-border bg-card p-5 shadow-soft sm:p-6">
         <div><h2 className="text-lg font-semibold">Salas cadastradas</h2><p className="mt-1 text-xs text-muted-foreground">As profissionais vinculadas ficam automaticamente bloqueadas quando a sala recebe uma reserva administrativa.</p></div>
-        <div className="mt-4 grid gap-3 md:grid-cols-2">{rooms.map((room: any) => { const linked = linkedByRoom.get(room.id) ?? []; return <article key={room.id} className="rounded-2xl border border-border p-4"><div className="flex items-start justify-between gap-3"><div><div className="flex items-center gap-2"><Building2 className="size-4 text-primary" /><p className="font-semibold">{room.name}</p>{!room.is_active ? <Badge variant="secondary">Inativa</Badge> : null}</div><div className="mt-2 flex flex-wrap gap-1.5">{linked.length ? linked.map((id) => <Badge key={id} variant="outline" className="text-[10px]"><UsersRound className="mr-1 size-3" /> {professionalMap.get(id)?.name || "Profissional"}</Badge>) : <span className="text-[10px] text-muted-foreground">Nenhuma profissional vinculada.</span>}</div></div><Button type="button" size="sm" variant="outline" onClick={() => editRoom(room)}><Pencil className="size-3.5" /> Editar</Button></div></article>; })}</div>
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          {rooms.map((room: any) => {
+            const linked = linkedByRoom.get(room.id) ?? [];
+            return (
+              <article key={room.id} className="rounded-2xl border border-border p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Building2 className="size-4 text-primary" />
+                      <p className="font-semibold">{String(room.name)}</p>
+                      {!room.is_active ? <Badge variant="secondary">Inativa</Badge> : null}
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {linked.length ? linked.map((id) => {
+                        const professionalName = professionalMap.get(id)?.name || "Profissional";
+                        return (
+                          <Badge key={id} variant="outline" className="text-[10px]">
+                            <UsersRound className="mr-1 size-3" />
+                            {professionalName}
+                          </Badge>
+                        );
+                      }) : <span className="text-[10px] text-muted-foreground">Nenhuma profissional vinculada.</span>}
+                    </div>
+                  </div>
+                  <Button type="button" size="sm" variant="outline" onClick={() => editRoom(room)}>
+                    <Pencil className="size-3.5" /> Editar
+                  </Button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
       </section>
 
       <section className="mt-6 rounded-3xl border border-border bg-card p-5 shadow-soft sm:p-6">
-        <div><h2 className="text-lg font-semibold">Próximas reservas</h2><p className="mt-1 text-xs text-muted-foreground">Períodos ativos ficam indisponíveis automaticamente nas agendas vinculadas.</p></div>
-        <div className="mt-4 space-y-3">{upcomingReservations.length ? upcomingReservations.map((reservation: any) => <article key={reservation.id} className="rounded-2xl border border-primary/15 bg-primary/[0.025] p-4"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="font-semibold">{roomNameMap.get(reservation.room_id) || "Sala"}</p><Badge>{rentalLabel(reservation.rental_type)}</Badge></div><p className="mt-1 text-sm">{reservation.renter_name}</p><div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"><span className="flex items-center gap-1"><CalendarDays className="size-3.5" /> {formatDate(reservation.reservation_date)}</span><span className="flex items-center gap-1"><Clock3 className="size-3.5" /> {reservation.start_time.slice(0,5)} às {reservation.end_time.slice(0,5)}</span><span>{formatMoney(reservation.amount)}</span></div>{reservation.notes ? <p className="mt-2 text-xs text-muted-foreground">{reservation.notes}</p> : null}</div><Button type="button" variant="outline" className="text-destructive" onClick={() => void cancelReservation(reservation)}><XCircle className="size-4" /> Cancelar reserva</Button></div></article>) : <div className="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">Nenhuma reserva futura.</div>}</div>
+        <div>
+          <h2 className="text-lg font-semibold">Próximas reservas</h2>
+          <p className="mt-1 text-xs text-muted-foreground">Períodos ativos ficam indisponíveis automaticamente nas agendas vinculadas.</p>
+        </div>
+        <div className="mt-4 space-y-3">
+          {upcomingReservations.length ? upcomingReservations.map((reservation: any) => (
+            <article key={reservation.id} className="rounded-2xl border border-primary/15 bg-primary/[0.025] p-4">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-semibold">{String(roomNameMap.get(reservation.room_id) || "Sala")}</p>
+                    <Badge>{rentalLabel(reservation.rental_type)}</Badge>
+                  </div>
+                  <p className="mt-1 text-sm">{String(reservation.renter_name)}</p>
+                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1"><CalendarDays className="size-3.5" /> {formatDate(reservation.reservation_date)}</span>
+                    <span className="flex items-center gap-1"><Clock3 className="size-3.5" /> {String(reservation.start_time).slice(0, 5)} às {String(reservation.end_time).slice(0, 5)}</span>
+                    <span>{formatMoney(reservation.amount)}</span>
+                  </div>
+                  {reservation.notes ? <p className="mt-2 text-xs text-muted-foreground">{String(reservation.notes)}</p> : null}
+                </div>
+                <Button type="button" variant="outline" className="text-destructive" onClick={() => void cancelReservation(reservation)}>
+                  <XCircle className="size-4" /> Cancelar reserva
+                </Button>
+              </div>
+            </article>
+          )) : <div className="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">Nenhuma reserva futura.</div>}
+        </div>
       </section>
 
-      {historyReservations.length ? <section className="mt-6 rounded-3xl border border-border bg-card p-5 shadow-soft sm:p-6"><h2 className="text-lg font-semibold">Histórico de reservas</h2><div className="mt-4 space-y-2">{historyReservations.slice(0, 40).map((reservation: any) => <div key={reservation.id} className="flex flex-col gap-2 rounded-2xl border border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between"><div><div className="flex flex-wrap items-center gap-2"><p className="text-sm font-semibold">{roomNameMap.get(reservation.room_id) || "Sala"}</p><Badge variant="secondary">{reservation.status === "cancelled" ? "Cancelada" : "Concluída pelo período"}</Badge></div><p className="mt-1 text-xs text-muted-foreground">{reservation.renter_name} · {formatDate(reservation.reservation_date)} · {reservation.start_time.slice(0,5)} às {reservation.end_time.slice(0,5)}</p></div><span className="text-xs font-medium">{formatMoney(reservation.amount)}</span></div>)}</div></section> : null}
+      {historyReservations.length ? (
+        <section className="mt-6 rounded-3xl border border-border bg-card p-5 shadow-soft sm:p-6">
+          <h2 className="text-lg font-semibold">Histórico de reservas</h2>
+          <div className="mt-4 space-y-2">
+            {historyReservations.slice(0, 40).map((reservation: any) => (
+              <div key={reservation.id} className="flex flex-col gap-2 rounded-2xl border border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-semibold">{String(roomNameMap.get(reservation.room_id) || "Sala")}</p>
+                    <Badge variant="secondary">{reservation.status === "cancelled" ? "Cancelada" : "Concluída pelo período"}</Badge>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {String(reservation.renter_name)} · {formatDate(reservation.reservation_date)} · {String(reservation.start_time).slice(0, 5)} às {String(reservation.end_time).slice(0, 5)}
+                  </p>
+                </div>
+                <span className="text-xs font-medium">{formatMoney(reservation.amount)}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
     </main>
   );
 }
