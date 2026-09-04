@@ -98,7 +98,13 @@ export function AdminRoomReservations() {
   const [savingReservation, setSavingReservation] = useState(false);
 
   const roomNameMap = useMemo(() => new Map(rooms.map((room: any) => [room.id, room.name])), [rooms]);
-  const professionalMap = useMemo(() => new Map<string, { name: string }>(professionals.map((professional: any) => [professional.id, professional])), [professionals]);
+  const professionalMap = useMemo(() => {
+    const map = new Map<string, { name: string }>();
+    for (const professional of professionals) {
+      map.set(professional.id, professional as { name: string });
+    }
+    return map;
+  }, [professionals]);
   const linkedByRoom = useMemo(() => {
     const map = new Map<string, string[]>();
     for (const link of links) {
