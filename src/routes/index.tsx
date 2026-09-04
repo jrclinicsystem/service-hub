@@ -8,9 +8,9 @@ import { SiteHeader } from "@/components/site-header";
 import { Button } from "@/components/ui/button";
 import { getHomeOverview } from "@/lib/clinic.functions";
 
-const title = "JR Clinic — Consultas, exames e agendamento online";
+const title = "JR Clinic - Procedimentos | Profissionais | Agendamento Online";
 const description =
-  "Catálogo de serviços clínicos da JR Clinic com valores, detalhes e agendamento online em poucos passos.";
+  "Conheça os procedimentos, profissionais e faça seu agendamento online na JR Clinic.";
 
 const tickerItems = [
   "Odontologia",
