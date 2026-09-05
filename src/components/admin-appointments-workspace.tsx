@@ -239,31 +239,45 @@ export function AdminAppointmentsWorkspace({ appointments, onStatusChange, onRef
     if (status === "confirmado") setScope("accepted");
   };
 
-  const completeAttendance = async (appointment: any) => {
-    setBusyAction(true);
-    const { error } = await db.rpc("mark_appointment_attended", { _appointment_id: appointment.id });
-    setBusyAction(false);
-    if (error) {
-      toast.error("Não foi possível confirmar o atendimento.", { description: error.message });
-      return false;
-    }
-    toast.success("Atendimento concluído.", { description: "O valor agora foi contabilizado na receita." });
-    setSelected((current: any) => current?.id === appointment.id ? { ...current, status: "atendido" } : current);
-    setScope("history");
-    onRefresh();
+  const completeAttendance = async (_appointment: any) => {
+    window.location.assign("/admin/financeiro");
     return true;
   };
 
   const removeAppointment = async (appointment: any) => {
     if (!window.confirm(`Apagar o agendamento de ${appointment.patient_name}? Esta ação não pode ser desfeita.`)) return;
     setDeletingId(appointment.id);
-    const { error } = await db.from("appointments").delete().eq("id", appointment.id);
-    setDeletingId(null);
-    if (error) { toast.error(error.message); return; }
-    if (selected?.id === appointment.id) setSelected(null);
-    if (incoming?.id === appointment.id) setIncoming(null);
-    toast.success("Agendamento apagado.");
-    onRefresh();
+    try {
+      const { data: deletedRows, error } = await db.from("appointments").delete().eq("id", appointment.id).select("id");
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      if (!(deletedRows ?? []).some((row: any) => row.id === appointment.id)) {
+        toast.error("O agendamento não foi apagado.", { description: "A operação não removeu o registro. Verifique suas permissões e tente novamente." });
+        onRefresh();
+        return;
+      }
+
+      const { data: remaining, error: verifyError } = await db.from("appointments").select("id").eq("id", appointment.id).maybeSingle();
+      if (verifyError) {
+        toast.error("Não foi possível confirmar a exclusão.", { description: verifyError.message });
+        onRefresh();
+        return;
+      }
+      if (remaining) {
+        toast.error("O agendamento não foi apagado.", { description: "O registro ainda existe após a tentativa de exclusão." });
+        onRefresh();
+        return;
+      }
+
+      if (selected?.id === appointment.id) setSelected(null);
+      if (incoming?.id === appointment.id) setIncoming(null);
+      toast.success("Agendamento apagado.");
+      onRefresh();
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   return (
@@ -319,7 +333,7 @@ function AdminAppointmentCard({ appointment, onOpen, onDelete, onAttended, delet
       <div className="mt-3 grid grid-cols-3 gap-2"><SmallInfo label="Data" value={formatDate(appointment.scheduled_date)} /><SmallInfo label="Horário" value={appointment.scheduled_time} /><SmallInfo label="Pagamento" value={paymentLabel(appointment)} accent /></div>
     </button>
     {hasWhatsApp && appointment.status !== "cancelado" ? <div className="mt-3">{proximity === "urgent" ? <Button type="button" size="sm" className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => openAppointmentWhatsApp(appointment, "reminder")}><MessageCircle className="size-4" /> {days === 0 ? "Falar com cliente" : "Recontatar cliente"}</Button> : appointment.status === "pendente" ? <Button type="button" size="sm" variant="outline" className="rounded-xl border-emerald-600/40 text-emerald-700 hover:bg-emerald-50" onClick={() => openAppointmentWhatsApp(appointment, "confirmation")}><MessageCircle className="size-4" /> Confirmar pelo WhatsApp</Button> : null}</div> : null}
-    {canMarkAttended ? <div className="mt-3"><Button type="button" size="sm" className="w-full rounded-xl bg-emerald-600 text-white hover:bg-emerald-700" disabled={attendanceBusy} onClick={async () => { setAttendanceBusy(true); await onAttended?.(); setAttendanceBusy(false); }}><Check className="size-4" /> {attendanceBusy ? "Confirmando atendimento..." : "Confirmar atendimento"}</Button></div> : null}
+    {canMarkAttended ? <div className="mt-3"><Button type="button" size="sm" className="w-full rounded-xl bg-emerald-600 text-white hover:bg-emerald-700" disabled={attendanceBusy} onClick={async () => { setAttendanceBusy(true); await onAttended?.(); setAttendanceBusy(false); }}><Check className="size-4" /> {attendanceBusy ? "Abrindo Financeiro..." : "Finalizar no Financeiro"}</Button></div> : null}
     {appointment.status === "atendido" ? <div className="mt-3 rounded-xl bg-emerald-50 px-3 py-2 text-center text-[11px] font-semibold text-emerald-800">Atendido · valor já contabilizado na receita</div> : null}
     <div className="mt-3 flex items-center justify-between gap-3 border-t border-border/70 pt-3"><p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{appointment.patient_phone || "Sem telefone"}</p><Button type="button" variant="ghost" size="icon" className="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive" onClick={onDelete} disabled={deleting} title="Apagar agendamento"><Trash2 className="size-3.5" /></Button><button type="button" onClick={onOpen} className="shrink-0 text-xs font-semibold text-primary hover:underline">{formatPrice(Number(appointment.service_price_snapshot ?? appointment.service?.price ?? 0))} · Detalhes →</button></div>
   </article>;
@@ -397,7 +411,6 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated }: { open: bool
     const allowed = new Set(links.filter((link) => link.service_id === serviceId).map((link) => link.professional_id));
     return professionals.filter((professional) => allowed.has(professional.id));
   }, [serviceId, links, professionals]);
-
 
   const selectSavedClient = (clientId: string) => {
     setSelectedClientId(clientId);
@@ -511,7 +524,7 @@ function AppointmentAdminDialog({ appointment, open, onOpenChange, onConfirm, on
     {hasWhatsApp && appointment.status !== "cancelado" ? <div className="mt-4">{proximity === "urgent" ? <Button className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => openAppointmentWhatsApp(appointment, "reminder")}><MessageCircle className="size-4" /> {days === 0 ? "Falar com cliente" : "Recontatar cliente"}</Button> : appointment.status === "pendente" ? <Button variant="outline" className="rounded-xl border-emerald-600/40 text-emerald-700" onClick={() => openAppointmentWhatsApp(appointment, "confirmation")}><MessageCircle className="size-4" /> Confirmar pelo WhatsApp</Button> : null}</div> : null}
     <div className="mt-4 rounded-2xl border border-border p-4"><div className="grid gap-3 text-xs sm:grid-cols-2"><div><p className="text-[9px] uppercase tracking-wide text-muted-foreground">Criado em</p><p className="mt-1 font-medium">{formatDateTime(appointment.created_at)}</p></div><div><p className="text-[9px] uppercase tracking-wide text-muted-foreground">Status atualizado</p><p className="mt-1 font-medium">{formatDateTime(appointment.status_updated_at)}</p></div></div>{appointment.notes ? <div className="mt-3 border-t border-border pt-3"><p className="text-[9px] uppercase tracking-wide text-muted-foreground">Observações</p><p className="mt-1 text-sm">{appointment.notes}</p></div> : null}</div>
     {canDecide ? <DialogFooter className="mt-4 grid grid-cols-2 gap-2 sm:flex"><Button variant="destructive" disabled={busy} onClick={onCancel}><X className="size-4" /> Cancelar</Button><Button disabled={busy} onClick={onConfirm}><Check className="size-4" /> Confirmar manualmente</Button></DialogFooter> : null}
-    {canMarkAttended ? <DialogFooter className="mt-4"><Button className="w-full bg-emerald-600 text-white hover:bg-emerald-700 sm:w-auto" disabled={busy} onClick={onAttended}><Check className="size-4" /> Confirmar atendimento</Button></DialogFooter> : null}
+    {canMarkAttended ? <DialogFooter className="mt-4"><Button className="w-full bg-emerald-600 text-white hover:bg-emerald-700 sm:w-auto" disabled={busy} onClick={onAttended}><Check className="size-4" /> Finalizar no Financeiro</Button></DialogFooter> : null}
     {appointment.status === "atendido" ? <div className="mt-4 rounded-xl bg-emerald-50 px-3 py-2 text-center text-xs font-semibold text-emerald-800">Atendimento concluído · receita contabilizada</div> : null}
   </DialogContent></Dialog>;
 }
