@@ -124,7 +124,7 @@ begin
   if _commission_amount < 0 then raise exception 'Comissão inválida.'; end if;
   if nullif(trim(_reason),'') is null then raise exception 'Informe o motivo do ajuste manual.'; end if;
 
-  select pc.*,fe.net_amount into _commission,_net
+  select pc,fe.net_amount into _commission,_net
   from public.professional_commissions pc
   join public.financial_entries fe on fe.id=pc.financial_entry_id
   where pc.id=_commission_id
