@@ -6,3 +6,5 @@ pnpm-lock.yaml
 package-lock.json
 bun.lock
 routeTree.gen.ts
+src/components/finance-staging-workspace.tsx
+src/components/finance-completion-suite.tsx
