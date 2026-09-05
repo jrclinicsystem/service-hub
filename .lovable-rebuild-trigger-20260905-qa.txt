@@ -1,0 +1,4 @@
+Trigger Lovable sync for JR CLINIC - AREA DE TESTE.
+Source branch: finance-staging
+Includes QA frontend fixes from commit f97af5fa05b32cbbfeea27789834a3bd7bb723c1.
+No production changes.
