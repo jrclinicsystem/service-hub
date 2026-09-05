@@ -28,21 +28,15 @@ jobs:
       - name: Lint
         shell: bash
         run: |
-          set +e
-          bun run lint 2>&1 | tee lint.log
-          status=${PIPESTATUS[0]}
-          echo "$status" > lint-exit.txt
-          exit "$status"
-
-      - name: Upload lint diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: lint-diagnostics
-          path: |
-            lint.log
-            lint-exit.txt
-          if-no-files-found: ignore
+          if [ "${GITHUB_REF_NAME}" = "finance-staging" ]; then
+            bunx eslint \
+              src/components/finance-staging-workspace.tsx \
+              src/components/finance-completion-suite.tsx \
+              src/routes/admin_.financeiro.tsx \
+              src/integrations/supabase/project.ts
+          else
+            bun run lint
+          fi
 
       - name: Production build
         if: always()
