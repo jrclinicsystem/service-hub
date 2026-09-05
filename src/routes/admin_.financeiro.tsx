@@ -1,6 +1,7 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 
 import { AdminSubpageSidebar } from "@/components/admin-subpage-sidebar";
+import { FinanceCompletionSuite } from "@/components/finance-completion-suite";
 import { FinanceStagingWorkspace } from "@/components/finance-staging-workspace";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -8,7 +9,9 @@ export const Route = createFileRoute("/admin_/financeiro")({
   ssr: false,
   beforeLoad: async () => {
     const { data, error } = await supabase.auth.getUser();
-    if (error || !data.user) throw redirect({ to: "/auth", search: { next: "/admin/financeiro" } });
+    if (error || !data.user) {
+      throw redirect({ to: "/auth", search: { next: "/admin/financeiro" } });
+    }
   },
   head: () => ({
     meta: [
@@ -25,6 +28,7 @@ function FinancePage() {
       <AdminSubpageSidebar active="finance" />
       <main className="min-h-screen">
         <FinanceStagingWorkspace />
+        <FinanceCompletionSuite />
       </main>
     </div>
   );
