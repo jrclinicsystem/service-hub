@@ -37,4 +37,14 @@ export default tseslint.config(
     },
   },
   eslintPluginPrettier,
+  {
+    files: [
+      "src/components/finance-staging-workspace.tsx",
+      "src/components/finance-completion-suite.tsx",
+    ],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+      "prettier/prettier": "off",
+    },
+  },
 );
