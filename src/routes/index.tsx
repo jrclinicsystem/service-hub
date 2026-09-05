@@ -119,6 +119,30 @@ function Home() {
               </div>
             </div>
 
+            {catalog.businessAddress ? (
+              <div className="mx-auto mt-4 flex max-w-[650px] flex-col gap-3 rounded-2xl border border-primary/10 bg-card/75 p-3.5 text-left shadow-[0_18px_36px_-32px_rgba(15,77,62,0.5)] backdrop-blur sm:mx-0 sm:mt-5 sm:flex-row sm:items-center sm:justify-between sm:p-4">
+                <div className="flex min-w-0 flex-1 items-center gap-3">
+                  <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+                    <MapPin className="size-4.5" strokeWidth={1.9} />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[9px] font-semibold uppercase tracking-[0.15em] text-primary/70 sm:text-[10px]">Onde estamos</p>
+                    <p className="mt-0.5 line-clamp-2 text-xs font-medium leading-5 text-foreground sm:text-sm">{catalog.businessAddress}</p>
+                  </div>
+                </div>
+                {locationUrl ? (
+                  <a
+                    href={locationUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-full border border-primary/15 bg-background px-4 text-xs font-semibold text-primary transition hover:bg-primary/5"
+                  >
+                    <Navigation className="size-3.5" />
+                    Ver rota
+                  </a>
+                ) : null}
+              </div>
+            ) : null}
           </div>
 
           <div className="home-hero relative min-w-0 lg:pl-2">
