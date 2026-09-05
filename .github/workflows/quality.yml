@@ -32,6 +32,7 @@ jobs:
             bunx eslint \
               src/components/finance-staging-workspace.tsx \
               src/components/finance-completion-suite.tsx \
+              src/components/finance-attendance-completion.tsx \
               src/routes/admin_.financeiro.tsx \
               src/integrations/supabase/project.ts
           else
