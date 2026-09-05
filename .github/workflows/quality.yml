@@ -29,14 +29,25 @@ jobs:
         shell: bash
         run: |
           if [ "${GITHUB_REF_NAME}" = "finance-staging" ]; then
+            set +e
             bunx eslint \
               src/components/finance-staging-workspace.tsx \
               src/components/finance-completion-suite.tsx \
               src/routes/admin_.financeiro.tsx \
-              src/integrations/supabase/project.ts
+              src/integrations/supabase/project.ts 2>&1 | tee finance-lint.log
+            status=${PIPESTATUS[0]}
+            exit "$status"
           else
             bun run lint
           fi
+
+      - name: Upload finance lint diagnostics
+        if: always() && github.ref_name == 'finance-staging'
+        uses: actions/upload-artifact@v4
+        with:
+          name: finance-lint-diagnostics
+          path: finance-lint.log
+          if-no-files-found: ignore
 
       - name: Production build
         if: always()
