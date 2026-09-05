@@ -1,6 +1,12 @@
 -- Finance staging: RLS-aware reporting views and dashboard metrics.
 
-create or replace view public.accounts_payable_with_status
+-- These views predate some staging-only columns. Recreate them so the
+-- expanded column list is deterministic after schema evolution.
+drop view if exists public.accounts_payable_with_status;
+drop view if exists public.accounts_receivable_with_status;
+drop view if exists public.payment_totals_current_month;
+
+create view public.accounts_payable_with_status
 with (security_invoker = true)
 as
 select ap.*,
@@ -10,7 +16,7 @@ select ap.*,
   end as display_status
 from public.accounts_payable ap;
 
-create or replace view public.accounts_receivable_with_status
+create view public.accounts_receivable_with_status
 with (security_invoker = true)
 as
 select ar.*,
@@ -20,7 +26,7 @@ select ar.*,
   end as display_status
 from public.accounts_receivable ar;
 
-create or replace view public.payment_totals_current_month
+create view public.payment_totals_current_month
 with (security_invoker = true)
 as
 select pm.code, pm.name,
