@@ -1,7 +1,7 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 
 import { AdminSubpageSidebar } from "@/components/admin-subpage-sidebar";
-import { FinanceStagingDashboard } from "@/components/finance-staging-dashboard";
+import { FinanceStagingWorkspace } from "@/components/finance-staging-workspace";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/admin_/financeiro")({
@@ -24,7 +24,7 @@ function FinancePage() {
     <div className="min-h-screen bg-background lg:pl-[252px]">
       <AdminSubpageSidebar active="finance" />
       <main className="min-h-screen">
-        <FinanceStagingDashboard />
+        <FinanceStagingWorkspace />
       </main>
     </div>
   );
