@@ -2,7 +2,7 @@ name: Quality Check
 
 on:
   push:
-    branches: [main]
+    branches: [main, finance-staging]
   pull_request:
     branches: [main]
 
@@ -30,4 +30,6 @@ jobs:
 
       - name: Production build
         if: always()
+        env:
+          VITE_SUPABASE_PUBLISHABLE_KEY: staging-ci-placeholder
         run: bun run build
