@@ -1,6 +1,7 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 
 import { AdminSubpageSidebar } from "@/components/admin-subpage-sidebar";
+import { FinanceAttendanceCompletion } from "@/components/finance-attendance-completion";
 import { FinanceCompletionSuite } from "@/components/finance-completion-suite";
 import { FinanceStagingWorkspace } from "@/components/finance-staging-workspace";
 import { supabase } from "@/integrations/supabase/client";
@@ -27,6 +28,7 @@ function FinancePage() {
     <div className="min-h-screen bg-background lg:pl-[252px]">
       <AdminSubpageSidebar active="finance" />
       <main className="min-h-screen">
+        <FinanceAttendanceCompletion />
         <FinanceStagingWorkspace />
         <FinanceCompletionSuite />
       </main>
