@@ -124,13 +124,18 @@ begin
   if _commission_amount < 0 then raise exception 'Comissão inválida.'; end if;
   if nullif(trim(_reason),'') is null then raise exception 'Informe o motivo do ajuste manual.'; end if;
 
-  select pc,fe.net_amount into _commission,_net
+  select * into _commission
   from public.professional_commissions pc
-  join public.financial_entries fe on fe.id=pc.financial_entry_id
   where pc.id=_commission_id
-  for update of pc;
+  for update;
 
   if not found then raise exception 'Comissão não encontrada.'; end if;
+
+  select fe.net_amount into _net
+  from public.financial_entries fe
+  where fe.id=_commission.financial_entry_id;
+
+  if _net is null then raise exception 'Lançamento financeiro da comissão não foi encontrado.'; end if;
   if _commission.status='cancelled' then raise exception 'Comissão cancelada não pode ser ajustada.'; end if;
   if _commission_amount > _net then raise exception 'Comissão maior que o valor líquido do atendimento.'; end if;
 
