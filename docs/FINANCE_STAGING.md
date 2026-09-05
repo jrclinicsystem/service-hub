@@ -2,13 +2,25 @@
 
 This branch is reserved for development and validation of the financial module. It must not be merged into `main` until the financial workflow is approved in staging.
 
+## Environment status
+
+- Git branch: `finance-staging`
+- Production branch: `main`
+- Production Supabase: unchanged and isolated from finance development.
+- Staging Supabase project: `JR Clinic Finance Staging`
+- Staging Supabase project ref: `aurualytmbmudlfebujv`
+- Staging region: `sa-east-1`
+- Staging cost confirmed at creation: R$ 0 / free project according to the Supabase account response at setup time.
+- `supabase/config.toml` on this branch points to staging, not production.
+- The staging frontend no longer contains a fallback to the production Supabase project. It requires a staging publishable key through `VITE_SUPABASE_PUBLISHABLE_KEY` before it can connect.
+
 ## Safety rules
 
 - Production remains on `main` and keeps using the current production Supabase project.
 - Financial development happens only on `finance-staging`.
 - Do not apply finance migrations to the production Supabase project during development.
-- The staging frontend must use a separate Supabase development branch/project before any financial write functionality is enabled.
-- Test data must be synthetic or copied only after removing/avoiding sensitive production data.
+- Do not copy real patient/client data into staging. Use synthetic test data.
+- Never add the production Supabase URL/key as a fallback in `finance-staging`.
 - Final production rollout should happen through reviewed migrations and a controlled merge after backup/checkpoint.
 
 ## Integration boundary
