@@ -1,0 +1,49 @@
+name: Deep QA Checkup
+
+on:
+  push:
+    branches: [finance-staging]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  full-code-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - name: Full repository lint
+        run: bun run lint
+      - name: Strict TypeScript check
+        run: bunx tsc -p tsconfig.json --noEmit
+      - name: Static frontend reference audit
+        if: always()
+        run: node qa/static-audit.mjs
+      - name: Production build
+        if: always()
+        env:
+          VITE_SUPABASE_PUBLISHABLE_KEY: staging-qa-placeholder
+        run: bun run build
+
+  public-browser-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install Playwright for QA runner
+        run: npm install --no-save --no-package-lock @playwright/test@1.55.0
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Browser smoke and interaction audit
+        env:
+          APP_URL: https://modelodeteste.lovable.app
+        run: node qa/public-browser-audit.mjs
