@@ -133,8 +133,7 @@ export function FinanceAttendanceCompletion() {
       return toast.error("Informe um desconto válido.");
     if (!Number.isInteger(parsedInstallments) || parsedInstallments < 1)
       return toast.error("Informe uma quantidade de parcelas válida.");
-    if (received === "yes" && !method)
-      return toast.error("Selecione a forma de pagamento.");
+    if (received === "yes" && !method) return toast.error("Selecione a forma de pagamento.");
     if (received === "no" && !dueDate)
       return toast.error("Informe o vencimento do valor a receber.");
     if (parsedCommission !== null && !manualReason.trim())
