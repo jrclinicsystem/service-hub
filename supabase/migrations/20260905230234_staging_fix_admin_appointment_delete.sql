@@ -1,5 +1,5 @@
--- STAGING ONLY: fix admin appointment deletion semantics during Deep QA.
--- Do not promote this file to production without a separate rollout review.
+-- STAGING ONLY: fix admin appointment deletion semantics.
+-- Production remains read-only reference during Deep QA.
 
 revoke insert, update, delete on table public.appointments from anon;
 grant select, insert, update, delete on table public.appointments to authenticated;
