@@ -277,8 +277,8 @@
 @media (prefers-reduced-motion: reduce) {
   .home-copy,
   .home-hero,
-  .home-hero-image,
-  .home-availability {
+  .home-availability,
+  .home-hero-image {
     animation: none !important;
   }
 }
@@ -296,7 +296,7 @@ a[href*="lovable.dev"] [id*="badge"],
 
 /* Desktop admin navigation: emerald sidebar inspired by a native SaaS dashboard. */
 @media (min-width: 1024px) {
-  body:has(a[href="/admin/equipe"]) header {
+  body:has(a[href="/admin/equipe"]) header.sticky.top-0.z-40 {
     position: fixed !important;
     inset: 0 auto 0 0 !important;
     width: 250px !important;
@@ -307,7 +307,7 @@ a[href*="lovable.dev"] [id*="badge"],
     box-shadow: 14px 0 42px rgb(15 77 62 / 0.11);
   }
 
-  body:has(a[href="/admin/equipe"]) header > div {
+  body:has(a[href="/admin/equipe"]) header.sticky.top-0.z-40 > div {
     height: 100% !important;
     max-width: none !important;
     flex-direction: column !important;
@@ -316,38 +316,38 @@ a[href*="lovable.dev"] [id*="badge"],
     padding: 28px 18px 22px !important;
   }
 
-  body:has(a[href="/admin/equipe"]) header > div > div:first-child {
+  body:has(a[href="/admin/equipe"]) header.sticky.top-0.z-40 > div > div:first-child {
     flex-direction: column !important;
     align-items: flex-start !important;
     gap: 12px !important;
   }
 
-  body:has(a[href="/admin/equipe"]) header img {
+  body:has(a[href="/admin/equipe"]) header.sticky.top-0.z-40 img {
     height: 38px !important;
     filter: brightness(0) invert(1);
     opacity: 0.96;
   }
 
-  body:has(a[href="/admin/equipe"]) header > div > div:first-child > span {
+  body:has(a[href="/admin/equipe"]) header.sticky.top-0.z-40 > div > div:first-child > span {
     display: none !important;
   }
 
-  body:has(a[href="/admin/equipe"]) header p {
+  body:has(a[href="/admin/equipe"]) header.sticky.top-0.z-40 p {
     color: rgb(255 250 246 / 0.72) !important;
   }
 
-  body:has(a[href="/admin/equipe"]) header p:first-child {
+  body:has(a[href="/admin/equipe"]) header.sticky.top-0.z-40 p:first-child {
     color: var(--sidebar-foreground) !important;
     font-size: 13px !important;
   }
 
-  body:has(a[href="/admin/equipe"]) header > div > div:last-child {
+  body:has(a[href="/admin/equipe"]) header.sticky.top-0.z-40 > div > div:last-child {
     width: 100% !important;
     flex-direction: column !important;
     gap: 7px !important;
   }
 
-  body:has(a[href="/admin/equipe"]) header > div > div:last-child > * {
+  body:has(a[href="/admin/equipe"]) header.sticky.top-0.z-40 > div > div:last-child > * {
     width: 100% !important;
     height: 40px !important;
     justify-content: flex-start !important;
@@ -356,7 +356,7 @@ a[href*="lovable.dev"] [id*="badge"],
     color: rgb(255 250 246 / 0.78) !important;
   }
 
-  body:has(a[href="/admin/equipe"]) header > div > div:last-child > *:hover {
+  body:has(a[href="/admin/equipe"]) header.sticky.top-0.z-40 > div > div:last-child > *:hover {
     background: rgb(255 250 246 / 0.09) !important;
     color: var(--sidebar-foreground) !important;
   }
