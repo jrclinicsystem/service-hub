@@ -138,10 +138,15 @@ export function FinanceAttendanceCompletion() {
       toast.error("Informe um desconto válido.");
       return;
     }
-    if (!Number.isInteger(parsedInstallments) || parsedInstallments < 1) {
-      toast.error("Informe uma quantidade de parcelas válida.");
+    if (
+      !Number.isInteger(parsedInstallments) ||
+      parsedInstallments < 1 ||
+      parsedInstallments > 12
+    ) {
+      toast.error("Informe uma quantidade de parcelas entre 1 e 12.");
       return;
     }
+
     if (received === "yes" && !method) {
       toast.error("Selecione a forma de pagamento.");
       return;
@@ -299,11 +304,11 @@ export function FinanceAttendanceCompletion() {
               </div>
             )}
             <div>
-              <Label>Parcelas</Label>
+              <Label>Parcelas (1 a 12)</Label>
               <Input
                 type="number"
                 min="1"
-                max="24"
+                max="12"
                 value={installments}
                 onChange={(event) => setInstallments(event.target.value)}
               />

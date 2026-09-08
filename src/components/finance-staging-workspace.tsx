@@ -182,7 +182,14 @@ async function loadFullOverview(from: string, to: string) {
       .select("*")
       .order("effective_from", { ascending: false })
       .limit(100),
+    db
+      .from("professionals")
+      .select("id,name,sort_order,is_active")
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true })
+      .order("name", { ascending: true }),
   ]);
+
   for (const result of results) if (result.error) throw result.error;
   const [
     dashboard,
@@ -198,6 +205,7 @@ async function loadFullOverview(from: string, to: string) {
     centers,
     categories,
     rules,
+    professionalsDirectory,
   ] = results;
   return {
     dashboard: dashboard.data ?? [],
@@ -213,6 +221,7 @@ async function loadFullOverview(from: string, to: string) {
     centers: centers.data ?? [],
     categories: categories.data ?? [],
     rules: rules.data ?? [],
+    professionalsDirectory: professionalsDirectory.data ?? [],
   };
 }
 
@@ -475,15 +484,18 @@ function FullFinanceWorkspace({
   const todayCash = (data?.cash ?? []).find((row: any) => row.business_date === fortalezaIso());
   const professionals = useMemo(() => {
     const map = new Map<string, string>();
+    for (const row of data?.professionalsDirectory ?? [])
+      if (row?.id) map.set(row.id, row.name || "Profissional");
     for (const row of data?.entries ?? [])
-      if (row.professional_id)
+      if (row.professional_id && !map.has(row.professional_id))
         map.set(
           row.professional_id,
           row.professional_name_snapshot ||
             `Profissional ${String(row.professional_id).slice(0, 8)}`,
         );
     return [...map.entries()].map(([id, name]) => ({ id, name }));
-  }, [data?.entries]);
+  }, [data?.professionalsDirectory, data?.entries]);
+
   const services = useMemo(() => {
     const map = new Map<string, string>();
     for (const row of data?.entries ?? [])
@@ -1406,7 +1418,7 @@ function FullFinanceWorkspace({
                   onChange={(e) => setFee({ ...fee, method: e.target.value })}
                 >
                   {methods
-                    .filter((m: any) => m.is_card)
+                    .filter((m: any) => m.code !== "pix" && (m.is_card || m.code === "pix_machine"))
                     .map((m: any) => (
                       <option key={m.id} value={m.code}>
                         {m.name}
@@ -1424,18 +1436,26 @@ function FullFinanceWorkspace({
                   onChange={(e) => setFee({ ...fee, fixed: e.target.value })}
                 />
                 <div className="grid grid-cols-2 gap-2">
-                  <Input
-                    type="number"
-                    min="1"
-                    value={fee.min}
-                    onChange={(e) => setFee({ ...fee, min: e.target.value })}
-                  />
-                  <Input
-                    type="number"
-                    min="1"
-                    value={fee.max}
-                    onChange={(e) => setFee({ ...fee, max: e.target.value })}
-                  />
+                  <div>
+                    <Label className="text-xs">Parcela mínima (1 a 12)</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      max="12"
+                      value={fee.min}
+                      onChange={(e) => setFee({ ...fee, min: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Parcela máxima (1 a 12)</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      max="12"
+                      value={fee.max}
+                      onChange={(e) => setFee({ ...fee, max: e.target.value })}
+                    />
+                  </div>
                 </div>
                 <Input
                   type="date"
@@ -1457,12 +1477,22 @@ function FullFinanceWorkspace({
                           fixed < 0
                         )
                           throw new Error("Taxas inválidas.");
+                        const min = Number(fee.min);
+                        const max = Number(fee.max);
+                        if (!Number.isInteger(min) || min < 1 || min > 12)
+                          throw new Error("Parcela mínima deve ficar entre 1 e 12.");
+                        if (!Number.isInteger(max) || max < 1 || max > 12)
+                          throw new Error("Parcela máxima deve ficar entre 1 e 12.");
+                        if (max < min)
+                          throw new Error(
+                            "Parcela máxima deve ser maior ou igual à parcela mínima.",
+                          );
                         const result = await db.rpc("set_payment_method_fee", {
                           _payment_method_code: fee.method,
                           _fee_percent: percent,
                           _fixed_fee: fixed,
-                          _installments_min: Number(fee.min),
-                          _installments_max: Number(fee.max),
+                          _installments_min: min,
+                          _installments_max: max,
                           _effective_from: fee.effective,
                         });
                         if (result.error) throw result.error;
@@ -1477,7 +1507,7 @@ function FullFinanceWorkspace({
               <div className="mt-4 space-y-2">
                 {(data.fees ?? [])
                   .filter((f: any) => f.is_active)
-                  .slice(0, 8)
+
                   .map((f: any) => (
                     <div key={f.id} className="rounded-xl border border-border px-3 py-2 text-xs">
                       {methodMap.get(f.payment_method_id) || "Pagamento"} · {Number(f.fee_percent)}%
