@@ -8,6 +8,11 @@ if old not in commission:
     raise SystemExit('commission grouping anchor not found')
 commission = commission.replace(old, new, 1)
 commission = commission.replace(
+    'const current = grouped.get(professionalId) ?? { professionalId, name, rows: [] };',
+    'const current = grouped.get(professionalId) ?? { professionalId, name, rows: [] as any[] };',
+    1,
+)
+commission = commission.replace(
     '<p className="text-sm text-muted-foreground">Nenhuma comissão encontrada.</p>',
     '<p className="text-sm text-muted-foreground">Nenhuma comissão pendente no momento.</p>',
 )
