@@ -4,6 +4,8 @@ import { AdminSubpageSidebar } from "@/components/admin-subpage-sidebar";
 import { FinanceAttendanceCompletion } from "@/components/finance-attendance-completion";
 import { FinanceCommissionPaymentActions } from "@/components/finance-commission-payment-actions";
 import { FinanceCompletionSuite } from "@/components/finance-completion-suite";
+import { FinanceManualEntry } from "@/components/finance-manual-entry";
+import { FinanceMixedPayment } from "@/components/finance-mixed-payment";
 import { FinanceStagingWorkspace } from "@/components/finance-staging-workspace";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -35,6 +37,14 @@ function FinancePage() {
             display: none !important;
           }
 
+          .finance-page:has([role="tablist"] > [role="tab"]:first-child[data-state="active"]) .finance-mixed-payment {
+            display: block;
+          }
+
+          .finance-page:has([role="tablist"] > [role="tab"]:nth-child(3)[data-state="active"]) .finance-manual-entry {
+            display: block;
+          }
+
           .finance-page:has([role="tablist"] > [role="tab"]:nth-child(6)[data-state="active"]) .finance-commission-payment-actions {
             display: block;
           }
@@ -52,8 +62,12 @@ function FinancePage() {
               display: none;
             }
 
-            .finance-page:has([role="tablist"] > [role="tab"][data-state="active"]:not(:first-child)) > section:first-of-type + div > header,
-            .finance-page:has([role="tablist"] > [role="tab"][data-state="active"]:not(:first-child)) > section:first-of-type + div > section:first-of-type {
+            .finance-page:has([role="tablist"] > [role="tab"][data-state="active"]:not(:first-child)) > section:first-of-type + section {
+              display: none;
+            }
+
+            .finance-page:has([role="tablist"] > [role="tab"][data-state="active"]:not(:first-child)) > section:first-of-type + section + div > header,
+            .finance-page:has([role="tablist"] > [role="tab"][data-state="active"]:not(:first-child)) > section:first-of-type + section + div > section:first-of-type {
               display: none;
             }
 
@@ -63,7 +77,9 @@ function FinancePage() {
           }
         `}</style>
         <FinanceAttendanceCompletion />
+        <FinanceMixedPayment />
         <FinanceStagingWorkspace />
+        <FinanceManualEntry />
         <FinanceCommissionPaymentActions />
         <FinanceCompletionSuite />
       </main>
