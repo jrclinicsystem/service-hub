@@ -1,6 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, CircleDollarSign, HandCoins, UserRoundCheck } from "lucide-react";
+import {
+  CheckCircle2,
+  ChevronDown,
+  CircleDollarSign,
+  HandCoins,
+  UserRoundCheck,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -41,11 +47,17 @@ function relatedEntry(row: any) {
 }
 
 function paidAmount(row: any) {
-  return Math.max(0, Number(row?.paid_amount ?? (row?.status === "paid" ? row?.commission_amount : 0) ?? 0));
+  return Math.max(
+    0,
+    Number(row?.paid_amount ?? (row?.status === "paid" ? row?.commission_amount : 0) ?? 0),
+  );
 }
 
 function remainingAmount(row: any) {
-  return Math.max(0, Math.round((Number(row?.commission_amount ?? 0) - paidAmount(row)) * 100) / 100);
+  return Math.max(
+    0,
+    Math.round((Number(row?.commission_amount ?? 0) - paidAmount(row)) * 100) / 100,
+  );
 }
 
 async function loadCommissions() {
@@ -88,6 +100,9 @@ export function FinanceCommissionPaymentActions() {
   const queryClient = useQueryClient();
   const [amounts, setAmounts] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [expandedProfessionals, setExpandedProfessionals] = useState<Set<string>>(
+    () => new Set(),
+  );
   const query = useQuery({
     queryKey: ["finance-commission-payments-grouped"],
     queryFn: loadCommissions,
@@ -127,6 +142,15 @@ export function FinanceCommissionPaymentActions() {
       queryClient.invalidateQueries({ queryKey: ["finance-completion-report"] }),
       queryClient.invalidateQueries({ queryKey: ["professional-own-commissions"] }),
     ]);
+  };
+
+  const toggleProfessional = (professionalId: string) => {
+    setExpandedProfessionals((current) => {
+      const next = new Set(current);
+      if (next.has(professionalId)) next.delete(professionalId);
+      else next.add(professionalId);
+      return next;
+    });
   };
 
   const registerPayment = async (row: any, amount: number) => {
@@ -182,12 +206,13 @@ export function FinanceCommissionPaymentActions() {
           <div>
             <h2 className="text-lg font-semibold">Comissões por profissional</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Cada profissional aparece uma vez. Registre pagamento total, metade ou um valor personalizado. Todo valor pago entra automaticamente em Despesas.
+              Clique no nome do profissional para visualizar as comissões. Registre pagamento total,
+              metade ou um valor personalizado. Todo valor pago entra automaticamente em Despesas.
             </p>
           </div>
         </div>
 
-        <div className="mt-6 space-y-5">
+        <div className="mt-6 space-y-3">
           {query.isLoading ? (
             <p className="text-sm text-muted-foreground">Carregando comissões...</p>
           ) : groups.length ? (
@@ -198,114 +223,155 @@ export function FinanceCommissionPaymentActions() {
               );
               const groupPaid = group.rows.reduce((sum, row) => sum + paidAmount(row), 0);
               const groupRemaining = Math.max(0, groupTotal - groupPaid);
+              const expanded = expandedProfessionals.has(group.professionalId);
+              const contentId = `commission-group-${group.professionalId}`;
+
               return (
-                <article key={group.professionalId} className="overflow-hidden rounded-3xl border border-border bg-background/45">
-                  <header className="flex flex-col gap-2 border-b border-border bg-primary-soft/35 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-                    <div>
-                      <h3 className="font-semibold text-foreground">{group.name}</h3>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {group.rows.length} comissão(ões) · restante {money(groupRemaining)}
-                      </p>
+                <article
+                  key={group.professionalId}
+                  className="overflow-hidden rounded-3xl border border-border bg-background/45"
+                >
+                  <button
+                    type="button"
+                    className="flex w-full flex-col gap-2 bg-primary-soft/35 px-4 py-4 text-left transition-colors hover:bg-primary-soft/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset sm:flex-row sm:items-center sm:justify-between sm:px-5"
+                    aria-expanded={expanded}
+                    aria-controls={contentId}
+                    onClick={() => toggleProfessional(group.professionalId)}
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <ChevronDown
+                        className={`size-4 shrink-0 text-muted-foreground transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
+                      />
+                      <div className="min-w-0">
+                        <h3 className="truncate font-semibold text-foreground">{group.name}</h3>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {group.rows.length} comissão(ões) · restante {money(groupRemaining)}
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex gap-4 text-xs">
-                      <span><strong>{money(groupTotal)}</strong> total</span>
-                      <span><strong>{money(groupPaid)}</strong> pago</span>
+                    <div className="flex gap-4 pl-7 text-xs sm:pl-0">
+                      <span>
+                        <strong>{money(groupTotal)}</strong> total
+                      </span>
+                      <span>
+                        <strong>{money(groupPaid)}</strong> pago
+                      </span>
                     </div>
-                  </header>
+                  </button>
 
-                  <div className="divide-y divide-border">
-                    {group.rows.map((row: any) => {
-                      const entry = relatedEntry(row);
-                      const total = Number(row.commission_amount ?? 0);
-                      const paid = paidAmount(row);
-                      const remaining = remainingAmount(row);
-                      const partial = row.status !== "paid" && paid > 0;
-                      const busy = busyId === String(row.id);
-                      const custom = amounts[row.id] ?? "";
-                      return (
-                        <div key={row.id} className="p-4 sm:p-5">
-                          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                            <div className="min-w-0">
-                              <p className="text-sm font-semibold">
-                                {entry?.patient_name_snapshot || "Paciente não identificado"}
-                              </p>
-                              <p className="mt-1 text-xs text-muted-foreground">
-                                {entry?.service_name_snapshot || "Serviço não identificado"} · {formatDate(entry?.occurred_at)}
-                              </p>
-                              <p className="mt-1 text-[11px] text-muted-foreground">
-                                {commissionTypeLabel(row.commission_type)}
-                                {row.commission_type === "percentage" && row.percentage != null
-                                  ? ` · ${Number(row.percentage)}%`
-                                  : ""}
-                                {row.commission_type === "fixed_per_patient" && row.fixed_amount != null
-                                  ? ` · ${money(row.fixed_amount)} por paciente`
-                                  : ""}
-                              </p>
-                            </div>
-
-                            <div className="min-w-[250px]">
-                              <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                                <span>Total <strong className="ml-1">{money(total)}</strong></span>
-                                <span>Pago <strong className="ml-1">{money(paid)}</strong></span>
-                                <span>Restante <strong className="ml-1">{money(remaining)}</strong></span>
-                                <Badge variant={row.status === "paid" ? "default" : "secondary"}>
-                                  {row.status === "paid" ? "Pago" : partial ? "Parcial" : "Pendente"}
-                                </Badge>
+                  {expanded ? (
+                    <div id={contentId} className="divide-y divide-border border-t border-border">
+                      {group.rows.map((row: any) => {
+                        const entry = relatedEntry(row);
+                        const total = Number(row.commission_amount ?? 0);
+                        const paid = paidAmount(row);
+                        const remaining = remainingAmount(row);
+                        const partial = row.status !== "paid" && paid > 0;
+                        const busy = busyId === String(row.id);
+                        const custom = amounts[row.id] ?? "";
+                        return (
+                          <div key={row.id} className="p-4 sm:p-5">
+                            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                              <div className="min-w-0">
+                                <p className="text-sm font-semibold">
+                                  {entry?.patient_name_snapshot || "Paciente não identificado"}
+                                </p>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  {entry?.service_name_snapshot || "Serviço não identificado"} ·{" "}
+                                  {formatDate(entry?.occurred_at)}
+                                </p>
+                                <p className="mt-1 text-[11px] text-muted-foreground">
+                                  {commissionTypeLabel(row.commission_type)}
+                                  {row.commission_type === "percentage" && row.percentage != null
+                                    ? ` · ${Number(row.percentage)}%`
+                                    : ""}
+                                  {row.commission_type === "fixed_per_patient" &&
+                                  row.fixed_amount != null
+                                    ? ` · ${money(row.fixed_amount)} por paciente`
+                                    : ""}
+                                </p>
                               </div>
 
-                              {row.status === "paid" || remaining <= 0 ? (
-                                <div className="mt-3 flex items-center justify-end gap-2 text-xs text-muted-foreground">
-                                  <CheckCircle2 className="size-4 text-primary" />
-                                  Quitado{row.paid_at ? ` em ${formatDate(row.paid_at)}` : ""}
+                              <div className="min-w-[250px]">
+                                <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                                  <span>
+                                    Total <strong className="ml-1">{money(total)}</strong>
+                                  </span>
+                                  <span>
+                                    Pago <strong className="ml-1">{money(paid)}</strong>
+                                  </span>
+                                  <span>
+                                    Restante <strong className="ml-1">{money(remaining)}</strong>
+                                  </span>
+                                  <Badge variant={row.status === "paid" ? "default" : "secondary"}>
+                                    {row.status === "paid"
+                                      ? "Pago"
+                                      : partial
+                                        ? "Parcial"
+                                        : "Pendente"}
+                                  </Badge>
                                 </div>
-                              ) : (
-                                <div className="mt-3 grid gap-2 sm:grid-cols-[auto_1fr_auto_auto]">
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="outline"
-                                    disabled={busy}
-                                    onClick={() => {
-                                      const half = Math.max(0.01, Math.round((remaining / 2) * 100) / 100);
-                                      void registerPayment(row, half);
-                                    }}
-                                  >
-                                    <HandCoins className="mr-1.5 size-4" /> Pagar metade
-                                  </Button>
-                                  <Input
-                                    inputMode="decimal"
-                                    placeholder="Valor já pago"
-                                    value={custom}
-                                    disabled={busy}
-                                    onChange={(event) =>
-                                      setAmounts((current) => ({ ...current, [row.id]: event.target.value }))
-                                    }
-                                  />
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="outline"
-                                    disabled={busy || !custom.trim()}
-                                    onClick={() => void registerPayment(row, parseMoney(custom))}
-                                  >
-                                    Registrar valor
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    disabled={busy}
-                                    onClick={() => void registerPayment(row, remaining)}
-                                  >
-                                    <CircleDollarSign className="mr-1.5 size-4" /> Quitar restante
-                                  </Button>
-                                </div>
-                              )}
+
+                                {row.status === "paid" || remaining <= 0 ? (
+                                  <div className="mt-3 flex items-center justify-end gap-2 text-xs text-muted-foreground">
+                                    <CheckCircle2 className="size-4 text-primary" />
+                                    Quitado{row.paid_at ? ` em ${formatDate(row.paid_at)}` : ""}
+                                  </div>
+                                ) : (
+                                  <div className="mt-3 grid gap-2 sm:grid-cols-[auto_1fr_auto_auto]">
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      disabled={busy}
+                                      onClick={() => {
+                                        const half = Math.max(
+                                          0.01,
+                                          Math.round((remaining / 2) * 100) / 100,
+                                        );
+                                        void registerPayment(row, half);
+                                      }}
+                                    >
+                                      <HandCoins className="mr-1.5 size-4" /> Pagar metade
+                                    </Button>
+                                    <Input
+                                      inputMode="decimal"
+                                      placeholder="Valor já pago"
+                                      value={custom}
+                                      disabled={busy}
+                                      onChange={(event) =>
+                                        setAmounts((current) => ({
+                                          ...current,
+                                          [row.id]: event.target.value,
+                                        }))
+                                      }
+                                    />
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      disabled={busy || !custom.trim()}
+                                      onClick={() => void registerPayment(row, parseMoney(custom))}
+                                    >
+                                      Registrar valor
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      disabled={busy}
+                                      onClick={() => void registerPayment(row, remaining)}
+                                    >
+                                      <CircleDollarSign className="mr-1.5 size-4" /> Quitar restante
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                        );
+                      })}
+                    </div>
+                  ) : null}
                 </article>
               );
             })
