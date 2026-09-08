@@ -471,6 +471,7 @@ function FullFinanceWorkspace({
     base: "net_after_fees",
     effective: fortalezaIso(),
   });
+  const [editingRuleId, setEditingRuleId] = useState("");
 
   const metricMap = useMemo(
     () => new Map((data?.dashboard ?? []).map((row: any) => [row.metric, Number(row.value ?? 0)])),
@@ -530,6 +531,33 @@ function FullFinanceWorkspace({
   };
 
   const methodId = (code: string) => methods.find((row: any) => row.code === code)?.id ?? null;
+
+  const resetRuleEditor = () => {
+    setEditingRuleId("");
+    setRule({
+      professional: "",
+      type: "percentage",
+      value: "",
+      base: "net_after_fees",
+      effective: fortalezaIso(),
+    });
+  };
+
+  const editCommissionRule = (currentRule: any) => {
+    setEditingRuleId(String(currentRule.id));
+    setRule({
+      professional: currentRule.professional_id ?? "",
+      type: currentRule.commission_type ?? "percentage",
+      value:
+        currentRule.commission_type === "percentage"
+          ? String(currentRule.percentage ?? "")
+          : currentRule.commission_type === "fixed_per_patient"
+            ? String(currentRule.fixed_amount ?? "")
+            : "",
+      base: currentRule.calculation_base ?? "net_after_fees",
+      effective: fortalezaIso(),
+    });
+  };
 
   if (loading)
     return (
@@ -1518,6 +1546,12 @@ function FullFinanceWorkspace({
               </div>
             </Panel>
             <Panel title="Regra de comissão">
+              {editingRuleId ? (
+                <div className="mb-4 rounded-2xl border border-primary/15 bg-primary-soft/50 px-4 py-3 text-xs text-primary">
+                  Editando uma regra existente. A alteração valerá a partir da data escolhida
+                  abaixo, preservando o histórico anterior de comissões.
+                </div>
+              ) : null}
               <div className="grid gap-3 sm:grid-cols-2">
                 <select
                   className={selectClass}
@@ -1560,45 +1594,73 @@ function FullFinanceWorkspace({
                   value={rule.effective}
                   onChange={(e) => setRule({ ...rule, effective: e.target.value })}
                 />
-                <Button
-                  disabled={busy === "rule"}
-                  onClick={() =>
-                    run(
-                      "rule",
-                      async () => {
-                        if (!rule.professional) throw new Error("Selecione o profissional.");
-                        const value = parseMoney(rule.value || "0");
-                        const result = await db.rpc("set_professional_commission_rule", {
-                          _professional_id: rule.professional,
-                          _commission_type: rule.type,
-                          _percentage: rule.type === "percentage" ? value : null,
-                          _fixed_amount: rule.type === "fixed_per_patient" ? value : null,
-                          _calculation_base: rule.base,
-                          _effective_from: rule.effective,
-                        });
-                        if (result.error) throw result.error;
-                      },
-                      "Regra de comissão atualizada.",
-                    )
-                  }
-                >
-                  Salvar regra
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    className="flex-1"
+                    disabled={busy === "rule"}
+                    onClick={() =>
+                      run(
+                        "rule",
+                        async () => {
+                          if (!rule.professional) throw new Error("Selecione o profissional.");
+                          const value = parseMoney(rule.value || "0");
+                          const result = await db.rpc("set_professional_commission_rule", {
+                            _professional_id: rule.professional,
+                            _commission_type: rule.type,
+                            _percentage: rule.type === "percentage" ? value : null,
+                            _fixed_amount: rule.type === "fixed_per_patient" ? value : null,
+                            _calculation_base: rule.base,
+                            _effective_from: rule.effective,
+                          });
+                          if (result.error) throw result.error;
+                          resetRuleEditor();
+                        },
+                        editingRuleId
+                          ? "Regra de comissão atualizada."
+                          : "Regra de comissão salva.",
+                      )
+                    }
+                  >
+                    {editingRuleId ? "Atualizar regra" : "Salvar regra"}
+                  </Button>
+                  {editingRuleId ? (
+                    <Button variant="outline" disabled={busy === "rule"} onClick={resetRuleEditor}>
+                      Cancelar
+                    </Button>
+                  ) : null}
+                </div>
               </div>
               <div className="mt-4 space-y-2">
                 {(data.rules ?? [])
                   .filter((r: any) => r.is_active && r.effective_to == null)
-                  .slice(0, 8)
                   .map((r: any) => (
-                    <div key={r.id} className="rounded-xl border border-border px-3 py-2 text-xs">
-                      {professionals.find((p: any) => p.id === r.professional_id)?.name ||
-                        String(r.professional_id).slice(0, 8)}{" "}
-                      ·{" "}
-                      {r.commission_type === "percentage"
-                        ? `${Number(r.percentage)}%`
-                        : r.commission_type === "fixed_per_patient"
-                          ? `${money(r.fixed_amount)} por paciente`
-                          : "Manual"}
+                    <div
+                      key={r.id}
+                      className="flex items-center justify-between gap-3 rounded-xl border border-border px-3 py-2 text-xs"
+                    >
+                      <div>
+                        <div>
+                          {professionals.find((p: any) => p.id === r.professional_id)?.name ||
+                            String(r.professional_id).slice(0, 8)}{" "}
+                          ·{" "}
+                          {r.commission_type === "percentage"
+                            ? `${Number(r.percentage)}%`
+                            : r.commission_type === "fixed_per_patient"
+                              ? `${money(r.fixed_amount)} por paciente`
+                              : "Manual"}
+                        </div>
+                        <div className="mt-1 text-[11px] text-muted-foreground">
+                          {r.calculation_base === "net_after_fees"
+                            ? "Líquido após taxas"
+                            : r.calculation_base === "after_discount"
+                              ? "Após desconto"
+                              : "Valor original"}{" "}
+                          · vigente desde {formatDate(r.effective_from)}
+                        </div>
+                      </div>
+                      <Button size="sm" variant="outline" onClick={() => editCommissionRule(r)}>
+                        Editar
+                      </Button>
                     </div>
                   ))}
               </div>
