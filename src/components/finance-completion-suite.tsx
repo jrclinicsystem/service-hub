@@ -180,7 +180,7 @@ function AlertList({ title, rows, kind }: { title: string; rows: any[]; kind: "p
     <section className="rounded-3xl border border-border bg-card p-5 shadow-soft">
       <div className="flex items-center gap-2">
         <AlertTriangle className="size-4 text-amber-600" />
-        <h3 className="font-semibold">{title}</h3>
+        <h3 className="text-xl font-bold tracking-tight text-foreground">{title}</h3>
       </div>
       <div className="mt-4 space-y-2">
         {active.length ? (
@@ -380,7 +380,7 @@ export function FinanceCompletionSuite() {
         <div>
           <div className="flex items-center gap-2">
             <Building2 className="size-4 text-primary" />
-            <h2 className="text-lg font-semibold">Complementos do financeiro</h2>
+            <h2 className="text-xl font-bold tracking-tight text-foreground">Complementos do financeiro</h2>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
             Alertas, relatórios completos, áreas da clínica e PDFs de fechamento.
@@ -415,7 +415,7 @@ export function FinanceCompletionSuite() {
       <section className="mt-5 rounded-3xl border border-border bg-card p-5 shadow-soft">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h3 className="font-semibold">Relatórios financeiros completos</h3>
+            <h3 className="text-xl font-bold tracking-tight text-foreground">Relatórios financeiros completos</h3>
             <p className="mt-1 text-sm text-muted-foreground">
               Use os filtros combinados e gere Excel ou PDF do resultado exibido.
             </p>
@@ -595,7 +595,7 @@ export function FinanceCompletionSuite() {
 
       <div className="mt-5 grid gap-5 xl:grid-cols-2">
         <section className="rounded-3xl border border-border bg-card p-5 shadow-soft">
-          <h3 className="font-semibold">Resultado por área da clínica</h3>
+          <h3 className="text-xl font-bold tracking-tight text-foreground">Resultado por área da clínica</h3>
           <p className="mt-1 text-sm text-muted-foreground">
             Receita, despesas e resultado de cada centro de custo no período filtrado.
           </p>
@@ -616,7 +616,7 @@ export function FinanceCompletionSuite() {
         </section>
 
         <section className="rounded-3xl border border-border bg-card p-5 shadow-soft">
-          <h3 className="font-semibold">Serviço → área da clínica</h3>
+          <h3 className="text-xl font-bold tracking-tight text-foreground">Serviço → área da clínica</h3>
           <p className="mt-1 text-sm text-muted-foreground">
             Define em qual centro de custo os próximos atendimentos do serviço serão contabilizados.
           </p>
@@ -650,7 +650,7 @@ export function FinanceCompletionSuite() {
         <section className="rounded-3xl border border-border bg-card p-5 shadow-soft">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <h3 className="font-semibold">Consultar fechamento de caixa</h3>
+              <h3 className="text-xl font-bold tracking-tight text-foreground">Consultar fechamento de caixa</h3>
               <p className="mt-1 text-sm text-muted-foreground">
                 Consulte qualquer dia e gere o relatório específico em PDF.
               </p>
@@ -700,7 +700,7 @@ export function FinanceCompletionSuite() {
         </section>
 
         <section className="rounded-3xl border border-border bg-card p-5 shadow-soft">
-          <h3 className="font-semibold">PDF dos fechamentos profissionais</h3>
+          <h3 className="text-xl font-bold tracking-tight text-foreground">PDF dos fechamentos profissionais</h3>
           <p className="mt-1 text-sm text-muted-foreground">
             Fechamentos quinzenais ou mensais já gerados no financeiro.
           </p>
