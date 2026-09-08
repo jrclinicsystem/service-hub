@@ -245,18 +245,25 @@ export function FinanceCommissionPaymentActions() {
                       <div className="min-w-0">
                         <h3 className="truncate font-semibold text-foreground">{group.name}</h3>
                         <p className="mt-0.5 text-xs text-muted-foreground">
-                          {group.rows.length} comissão(ões) · restante {money(groupRemaining)}
+                          {expanded
+                            ? `${group.rows.length} comissão(ões)`
+                            : "Clique para ver as comissões"}
                         </p>
                       </div>
                     </div>
-                    <div className="flex gap-4 pl-7 text-xs sm:pl-0">
-                      <span>
-                        <strong>{money(groupTotal)}</strong> total
-                      </span>
-                      <span>
-                        <strong>{money(groupPaid)}</strong> pago
-                      </span>
-                    </div>
+                    {expanded ? (
+                      <div className="flex gap-4 pl-7 text-xs sm:pl-0">
+                        <span>
+                          <strong>{money(groupTotal)}</strong> total
+                        </span>
+                        <span>
+                          <strong>{money(groupPaid)}</strong> pago
+                        </span>
+                        <span>
+                          <strong>{money(groupRemaining)}</strong> restante
+                        </span>
+                      </div>
+                    ) : null}
                   </button>
 
                   {expanded ? (
