@@ -138,10 +138,11 @@ export function FinanceAttendanceCompletion() {
       toast.error("Informe um desconto válido.");
       return;
     }
-    if (!Number.isInteger(parsedInstallments) || parsedInstallments < 1) {
-      toast.error("Informe uma quantidade de parcelas válida.");
+    if (!Number.isInteger(parsedInstallments) || parsedInstallments < 1 || parsedInstallments > 12) {
+      toast.error("Informe uma quantidade de parcelas entre 1 e 12.");
       return;
     }
+
     if (received === "yes" && !method) {
       toast.error("Selecione a forma de pagamento.");
       return;
