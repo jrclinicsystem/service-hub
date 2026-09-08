@@ -1132,14 +1132,36 @@ function FullFinanceWorkspace({
                   </div>
                   <div className="text-right">
                     <strong>{money(row.amount)}</strong>
-                    <div className="mt-2">
+                    <div className="mt-2 flex justify-end gap-2">
                       <Button
                         size="sm"
                         variant="outline"
-                        disabled={busy === `edit-expense-${row.expense_id}`}
+                        disabled={busy === `edit-expense-${row.expense_id}` || busy === `delete-expense-${row.expense_id}`}
                         onClick={() => editExpenseAmount(row)}
                       >
                         Editar valor
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-destructive hover:text-destructive"
+                        disabled={busy === `delete-expense-${row.expense_id}`}
+                        onClick={() => {
+                          if (!window.confirm(`Excluir a despesa "${row.description}" de ${money(row.amount)}? Esta ação remove a saída dos relatórios e do caixa vinculado.`)) return;
+                          run(
+                            `delete-expense-${row.expense_id}`,
+                            async () => {
+                              const result = await db.rpc("delete_financial_expense", {
+                                _expense_id: row.expense_id,
+                              });
+                              if (result.error) throw result.error;
+                              if (editingExpenseId === String(row.expense_id)) resetExpenseEditor();
+                            },
+                            "Despesa excluída.",
+                          );
+                        }}
+                      >
+                        Excluir
                       </Button>
                     </div>
                   </div>
