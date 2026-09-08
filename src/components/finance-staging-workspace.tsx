@@ -129,7 +129,7 @@ function historicalCommissionPreview(row: any, rules: any[]) {
       ),
     )[0];
 
-  if (!rule || rule.commission_type === "manual" || entryDate >= rule.effective_from) return null;
+  if (!rule || rule.commission_type === "manual") return null;
 
   const original = Number(entry.original_amount ?? 0);
   const charged = Number(entry.charged_amount ?? original);
@@ -157,7 +157,7 @@ function historicalCommissionPreview(row: any, rules: any[]) {
       ? `${Number(rule.percentage ?? 0).toLocaleString("pt-BR")}% sobre ${baseLabel}`
       : `${money(rule.fixed_amount)} por paciente`;
 
-  return { rule, amount, ruleLabel, net };
+  return { rule, amount, ruleLabel, net, isHistorical: entryDate < rule.effective_from };
 }
 
 function MetricCard({
@@ -1512,12 +1512,12 @@ function FullFinanceWorkspace({
             </div>
           </Panel>
           <Panel
-            title="Comissões de agendamentos antigos"
-            subtitle="Atendimentos anteriores à ativação das regras financeiras. A comissão é calculada com a regra atual da profissional, sem alterar o faturamento original."
+            title="Comissões zeradas e agendamentos antigos"
+            subtitle="Regularize atendimentos que ficaram com comissão zerada por falta de regra e também agendamentos antigos. A regra atual da profissional é aplicada sem alterar o faturamento original."
           >
             {historicalCommissionCandidates.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-                Nenhum agendamento antigo aguardando geração de comissão.
+                Nenhuma comissão zerada aguardando regularização.
               </div>
             ) : (
               <div className="space-y-2">
@@ -1534,7 +1534,7 @@ function FullFinanceWorkspace({
                           {context.professional} · {context.service} · {context.date}
                         </p>
                         <p className="mt-1 text-[11px] text-muted-foreground">
-                          Líquido {money(preview.net)} · Regra atual: {preview.ruleLabel} · Comissão prevista {money(preview.amount)}
+                          {preview.isHistorical ? "Agendamento antigo" : "Comissão zerada"} · Líquido {money(preview.net)} · Regra atual: {preview.ruleLabel} · Comissão prevista {money(preview.amount)}
                         </p>
                       </div>
                       <Button
@@ -1550,11 +1550,11 @@ function FullFinanceWorkspace({
                               });
                               if (result.error) throw result.error;
                             },
-                            "Comissão do agendamento antigo gerada.",
+                            "Comissão recalculada com a regra atual.",
                           )
                         }
                       >
-                        {busy === `historical-commission-${row.id}` ? "Gerando..." : "Gerar comissão"}
+                        {busy === `historical-commission-${row.id}` ? "Aplicando..." : "Aplicar regra atual"}
                       </Button>
                     </div>
                   );
