@@ -15,6 +15,13 @@
       "when": 1788220187181,
       "tag": "0001_create_professional_time_slots",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788868780556,
+      "tag": "0002_ensure_pix_machine_payment_method",
+      "breakpoints": true
     }
   ]
 }
