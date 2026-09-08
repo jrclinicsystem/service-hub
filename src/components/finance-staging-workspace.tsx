@@ -485,15 +485,18 @@ function FullFinanceWorkspace({
   const todayCash = (data?.cash ?? []).find((row: any) => row.business_date === fortalezaIso());
   const professionals = useMemo(() => {
     const map = new Map<string, string>();
+    for (const row of data?.professionalsDirectory ?? [])
+      if (row?.id) map.set(row.id, row.name || "Profissional");
     for (const row of data?.entries ?? [])
-      if (row.professional_id)
+      if (row.professional_id && !map.has(row.professional_id))
         map.set(
           row.professional_id,
           row.professional_name_snapshot ||
             `Profissional ${String(row.professional_id).slice(0, 8)}`,
         );
     return [...map.entries()].map(([id, name]) => ({ id, name }));
-  }, [data?.entries]);
+  }, [data?.professionalsDirectory, data?.entries]);
+
   const services = useMemo(() => {
     const map = new Map<string, string>();
     for (const row of data?.entries ?? [])
