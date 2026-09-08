@@ -472,6 +472,11 @@ function FullFinanceWorkspace({
     effective: fortalezaIso(),
   });
   const [editingRuleId, setEditingRuleId] = useState("");
+  const [editingFeeId, setEditingFeeId] = useState("");
+  const [editingPayableId, setEditingPayableId] = useState("");
+  const [payableEdit, setPayableEdit] = useState({ amount: "", due: "" });
+  const [editingReceivableId, setEditingReceivableId] = useState("");
+  const [receivableEdit, setReceivableEdit] = useState({ amount: "", due: "" });
 
   const metricMap = useMemo(
     () => new Map((data?.dashboard ?? []).map((row: any) => [row.metric, Number(row.value ?? 0)])),
@@ -557,6 +562,61 @@ function FullFinanceWorkspace({
       base: currentRule.calculation_base ?? "net_after_fees",
       effective: fortalezaIso(),
     });
+  };
+
+  const resetFeeEditor = () => {
+    setEditingFeeId("");
+    setFee({
+      method: "credit",
+      percent: "",
+      fixed: "0",
+      min: "1",
+      max: "1",
+      effective: fortalezaIso(),
+    });
+  };
+
+  const editPaymentFee = (currentFee: any) => {
+    const currentMethod = methods.find((method: any) => method.id === currentFee.payment_method_id);
+    const today = fortalezaIso();
+    setEditingFeeId(String(currentFee.id));
+    setFee({
+      method: currentMethod?.code ?? "credit",
+      percent: String(currentFee.fee_percent ?? ""),
+      fixed: String(currentFee.fixed_fee ?? "0"),
+      min: String(currentFee.installments_min ?? "1"),
+      max: String(currentFee.installments_max ?? "1"),
+      effective:
+        currentFee.effective_from && currentFee.effective_from > today
+          ? currentFee.effective_from
+          : today,
+    });
+  };
+
+  const editPendingPayable = (currentPayable: any) => {
+    setEditingPayableId(String(currentPayable.id));
+    setPayableEdit({
+      amount: String(currentPayable.amount ?? ""),
+      due: currentPayable.due_date ?? "",
+    });
+  };
+
+  const resetPayableEditor = () => {
+    setEditingPayableId("");
+    setPayableEdit({ amount: "", due: "" });
+  };
+
+  const editPendingReceivable = (currentReceivable: any) => {
+    setEditingReceivableId(String(currentReceivable.id));
+    setReceivableEdit({
+      amount: String(currentReceivable.original_amount ?? ""),
+      due: currentReceivable.due_date ?? "",
+    });
+  };
+
+  const resetReceivableEditor = () => {
+    setEditingReceivableId("");
+    setReceivableEdit({ amount: "", due: "" });
   };
 
   if (loading)
@@ -1058,7 +1118,10 @@ function FullFinanceWorkspace({
             </div>
           </Panel>
           <div className="grid gap-5 xl:grid-cols-2">
-            <Panel title="Contas a pagar" subtitle="Escolha a forma e marque como paga.">
+            <Panel
+              title="Contas a pagar"
+              subtitle="Valor e vencimento podem ser editados enquanto a conta estiver pendente."
+            >
               <select
                 className={`${selectClass} mb-3`}
                 value={payMethod}
@@ -1074,7 +1137,7 @@ function FullFinanceWorkspace({
                 {(data.payables ?? []).map((row: any) => (
                   <div
                     key={row.id}
-                    className="flex items-center justify-between gap-3 rounded-2xl border border-border p-4"
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border p-4"
                   >
                     <div>
                       <strong className="text-sm">{row.title}</strong>
@@ -1084,42 +1147,107 @@ function FullFinanceWorkspace({
                     </div>
                     <div className="text-right">
                       <strong>{money(row.amount)}</strong>
-                      <div className="mt-2 flex gap-2">
+                      <div className="mt-2 flex flex-wrap justify-end gap-2">
                         <Badge variant={statusVariant(row.display_status)}>
                           {statusLabel(row.display_status)}
                         </Badge>
                         {row.status === "pending" ? (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={busy === `pay-${row.id}`}
-                            onClick={() =>
-                              run(
-                                `pay-${row.id}`,
-                                async () => {
-                                  const result = await db.rpc("pay_account_payable", {
-                                    _account_id: row.id,
-                                    _payment_method_code: payMethod,
-                                    _paid_at: new Date().toISOString(),
-                                  });
-                                  if (result.error) throw result.error;
-                                },
-                                "Conta paga.",
-                              )
-                            }
-                          >
-                            Pagar
-                          </Button>
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={busy === `pay-${row.id}`}
+                              onClick={() => editPendingPayable(row)}
+                            >
+                              Editar
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={busy === `pay-${row.id}`}
+                              onClick={() =>
+                                run(
+                                  `pay-${row.id}`,
+                                  async () => {
+                                    const result = await db.rpc("pay_account_payable", {
+                                      _account_id: row.id,
+                                      _payment_method_code: payMethod,
+                                      _paid_at: new Date().toISOString(),
+                                    });
+                                    if (result.error) throw result.error;
+                                    if (editingPayableId === String(row.id)) resetPayableEditor();
+                                  },
+                                  "Conta paga.",
+                                )
+                              }
+                            >
+                              Pagar
+                            </Button>
+                          </>
                         ) : null}
                       </div>
                     </div>
+                    {editingPayableId === String(row.id) ? (
+                      <div className="grid w-full gap-3 border-t border-border pt-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+                        <div>
+                          <Label className="text-xs">Valor</Label>
+                          <Input
+                            value={payableEdit.amount}
+                            onChange={(e) =>
+                              setPayableEdit({ ...payableEdit, amount: e.target.value })
+                            }
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Vencimento</Label>
+                          <Input
+                            type="date"
+                            value={payableEdit.due}
+                            onChange={(e) =>
+                              setPayableEdit({ ...payableEdit, due: e.target.value })
+                            }
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            disabled={busy === `edit-payable-${row.id}`}
+                            onClick={() =>
+                              run(
+                                `edit-payable-${row.id}`,
+                                async () => {
+                                  const value = parseMoney(payableEdit.amount);
+                                  if (!Number.isFinite(value) || value <= 0)
+                                    throw new Error("Informe um valor maior que zero.");
+                                  if (!payableEdit.due)
+                                    throw new Error("Informe a data de vencimento.");
+                                  const result = await db.rpc("update_pending_account_payable", {
+                                    _account_id: row.id,
+                                    _amount: value,
+                                    _due_date: payableEdit.due,
+                                  });
+                                  if (result.error) throw result.error;
+                                  resetPayableEditor();
+                                },
+                                "Conta atualizada.",
+                              )
+                            }
+                          >
+                            Salvar
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={resetPayableEditor}>
+                            Cancelar
+                          </Button>
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 ))}
               </div>
             </Panel>
             <Panel
               title="Contas a receber / fiado"
-              subtitle="Recebimentos atualizam a receita sem duplicar faturamento."
+              subtitle="Valor e vencimento podem ser editados enquanto a conta estiver pendente e ainda não tiver recebido pagamento."
             >
               <select
                 className={`${selectClass} mb-3`}
@@ -1136,7 +1264,7 @@ function FullFinanceWorkspace({
                 {(data.receivables ?? []).map((row: any) => (
                   <div
                     key={row.id}
-                    className="flex items-center justify-between gap-3 rounded-2xl border border-border p-4"
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border p-4"
                   >
                     <div>
                       <strong className="text-sm">{row.client_name_snapshot}</strong>
@@ -1149,35 +1277,101 @@ function FullFinanceWorkspace({
                       <strong>
                         {money(Number(row.original_amount) - Number(row.amount_received))}
                       </strong>
-                      <div className="mt-2 flex gap-2">
+                      <div className="mt-2 flex flex-wrap justify-end gap-2">
                         <Badge variant={statusVariant(row.display_status)}>
                           {statusLabel(row.display_status)}
                         </Badge>
                         {row.status === "pending" ? (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={busy === `receive-${row.id}`}
-                            onClick={() =>
-                              run(
-                                `receive-${row.id}`,
-                                async () => {
-                                  const result = await db.rpc("receive_account_receivable", {
-                                    _receivable_id: row.id,
-                                    _payment_method_code: receiveMethod,
-                                    _received_at: new Date().toISOString(),
-                                  });
-                                  if (result.error) throw result.error;
-                                },
-                                "Recebimento registrado.",
-                              )
-                            }
-                          >
-                            Receber
-                          </Button>
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={busy === `receive-${row.id}`}
+                              onClick={() => editPendingReceivable(row)}
+                            >
+                              Editar
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={busy === `receive-${row.id}`}
+                              onClick={() =>
+                                run(
+                                  `receive-${row.id}`,
+                                  async () => {
+                                    const result = await db.rpc("receive_account_receivable", {
+                                      _receivable_id: row.id,
+                                      _payment_method_code: receiveMethod,
+                                      _received_at: new Date().toISOString(),
+                                    });
+                                    if (result.error) throw result.error;
+                                    if (editingReceivableId === String(row.id))
+                                      resetReceivableEditor();
+                                  },
+                                  "Recebimento registrado.",
+                                )
+                              }
+                            >
+                              Receber
+                            </Button>
+                          </>
                         ) : null}
                       </div>
                     </div>
+                    {editingReceivableId === String(row.id) ? (
+                      <div className="grid w-full gap-3 border-t border-border pt-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+                        <div>
+                          <Label className="text-xs">Valor total a receber</Label>
+                          <Input
+                            value={receivableEdit.amount}
+                            onChange={(e) =>
+                              setReceivableEdit({ ...receivableEdit, amount: e.target.value })
+                            }
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Vencimento</Label>
+                          <Input
+                            type="date"
+                            value={receivableEdit.due}
+                            onChange={(e) =>
+                              setReceivableEdit({ ...receivableEdit, due: e.target.value })
+                            }
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            disabled={busy === `edit-receivable-${row.id}`}
+                            onClick={() =>
+                              run(
+                                `edit-receivable-${row.id}`,
+                                async () => {
+                                  const value = parseMoney(receivableEdit.amount);
+                                  if (!Number.isFinite(value) || value <= 0)
+                                    throw new Error("Informe um valor maior que zero.");
+                                  if (!receivableEdit.due)
+                                    throw new Error("Informe a data de vencimento.");
+                                  const result = await db.rpc("update_pending_account_receivable", {
+                                    _receivable_id: row.id,
+                                    _original_amount: value,
+                                    _due_date: receivableEdit.due,
+                                  });
+                                  if (result.error) throw result.error;
+                                  resetReceivableEditor();
+                                },
+                                "Conta a receber atualizada.",
+                              )
+                            }
+                          >
+                            Salvar
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={resetReceivableEditor}>
+                            Cancelar
+                          </Button>
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 ))}
               </div>
@@ -1438,7 +1632,16 @@ function FullFinanceWorkspace({
 
         <TabsContent value="settings" className="mt-5 space-y-5">
           <div className="grid gap-5 xl:grid-cols-2">
-            <Panel title="Taxas das formas de pagamento">
+            <Panel
+              title="Taxas das formas de pagamento"
+              subtitle="A porcentagem cadastrada é a taxa total aplicada à transação nessa quantidade/faixa de parcelas; não é uma cobrança mensal repetida a cada parcela."
+            >
+              {editingFeeId ? (
+                <div className="mb-4 rounded-2xl border border-primary/15 bg-primary-soft/50 px-4 py-3 text-xs text-primary">
+                  Editando uma taxa. A nova configuração valerá a partir da data escolhida e o
+                  histórico financeiro já calculado será preservado.
+                </div>
+              ) : null}
               <div className="grid gap-3 sm:grid-cols-2">
                 <select
                   className={selectClass}
@@ -1454,7 +1657,7 @@ function FullFinanceWorkspace({
                     ))}
                 </select>
                 <Input
-                  placeholder="Taxa %"
+                  placeholder="Taxa total %"
                   value={fee.percent}
                   onChange={(e) => setFee({ ...fee, percent: e.target.value })}
                 />
@@ -1490,57 +1693,114 @@ function FullFinanceWorkspace({
                   value={fee.effective}
                   onChange={(e) => setFee({ ...fee, effective: e.target.value })}
                 />
-                <Button
-                  disabled={busy === "fee"}
-                  onClick={() =>
-                    run(
-                      "fee",
-                      async () => {
-                        const percent = parseMoney(fee.percent);
-                        const fixed = parseMoney(fee.fixed);
-                        if (
-                          !Number.isFinite(percent) ||
-                          percent < 0 ||
-                          !Number.isFinite(fixed) ||
-                          fixed < 0
-                        )
-                          throw new Error("Taxas inválidas.");
-                        const min = Number(fee.min);
-                        const max = Number(fee.max);
-                        if (!Number.isInteger(min) || min < 1 || min > 12)
-                          throw new Error("Parcela mínima deve ficar entre 1 e 12.");
-                        if (!Number.isInteger(max) || max < 1 || max > 12)
-                          throw new Error("Parcela máxima deve ficar entre 1 e 12.");
-                        if (max < min)
-                          throw new Error(
-                            "Parcela máxima deve ser maior ou igual à parcela mínima.",
-                          );
-                        const result = await db.rpc("set_payment_method_fee", {
-                          _payment_method_code: fee.method,
-                          _fee_percent: percent,
-                          _fixed_fee: fixed,
-                          _installments_min: min,
-                          _installments_max: max,
-                          _effective_from: fee.effective,
-                        });
-                        if (result.error) throw result.error;
-                      },
-                      "Taxa configurada.",
-                    )
-                  }
-                >
-                  Salvar taxa
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    className="flex-1"
+                    disabled={busy === "fee"}
+                    onClick={() =>
+                      run(
+                        "fee",
+                        async () => {
+                          const percent = parseMoney(fee.percent);
+                          const fixed = parseMoney(fee.fixed);
+                          if (
+                            !Number.isFinite(percent) ||
+                            percent < 0 ||
+                            !Number.isFinite(fixed) ||
+                            fixed < 0
+                          )
+                            throw new Error("Taxas inválidas.");
+                          const min = Number(fee.min);
+                          const max = Number(fee.max);
+                          if (!Number.isInteger(min) || min < 1 || min > 12)
+                            throw new Error("Parcela mínima deve ficar entre 1 e 12.");
+                          if (!Number.isInteger(max) || max < 1 || max > 12)
+                            throw new Error("Parcela máxima deve ficar entre 1 e 12.");
+                          if (max < min)
+                            throw new Error(
+                              "Parcela máxima deve ser maior ou igual à parcela mínima.",
+                            );
+                          const result = await db.rpc("set_payment_method_fee", {
+                            _payment_method_code: fee.method,
+                            _fee_percent: percent,
+                            _fixed_fee: fixed,
+                            _installments_min: min,
+                            _installments_max: max,
+                            _effective_from: fee.effective,
+                          });
+                          if (result.error) throw result.error;
+                          resetFeeEditor();
+                        },
+                        editingFeeId ? "Taxa atualizada." : "Taxa configurada.",
+                      )
+                    }
+                  >
+                    {editingFeeId ? "Atualizar taxa" : "Salvar taxa"}
+                  </Button>
+                  {editingFeeId ? (
+                    <Button variant="outline" disabled={busy === "fee"} onClick={resetFeeEditor}>
+                      Cancelar
+                    </Button>
+                  ) : null}
+                </div>
               </div>
               <div className="mt-4 space-y-2">
                 {(data.fees ?? [])
-                  .filter((f: any) => f.is_active)
-
+                  .filter(
+                    (f: any) =>
+                      f.is_active && (!f.effective_to || f.effective_to >= fortalezaIso()),
+                  )
                   .map((f: any) => (
-                    <div key={f.id} className="rounded-xl border border-border px-3 py-2 text-xs">
-                      {methodMap.get(f.payment_method_id) || "Pagamento"} · {Number(f.fee_percent)}%
-                      + {money(f.fixed_fee)} · {f.installments_min}–{f.installments_max}x · desde{" "}
-                      {formatDate(f.effective_from)}
+                    <div
+                      key={f.id}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border px-3 py-2 text-xs"
+                    >
+                      <div>
+                        <div>
+                          {methodMap.get(f.payment_method_id) || "Pagamento"} · taxa total{" "}
+                          {Number(f.fee_percent)}%
+                          {Number(f.fixed_fee) > 0 ? ` + ${money(f.fixed_fee)}` : ""} ·{" "}
+                          {Number(f.installments_min) === Number(f.installments_max)
+                            ? `${f.installments_min}x`
+                            : `${f.installments_min}x a ${f.installments_max}x`}{" "}
+                          · desde {formatDate(f.effective_from)}
+                        </div>
+                        <div className="mt-1 text-[11px] text-muted-foreground">
+                          Percentual aplicado uma única vez sobre o valor da transação.
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline" onClick={() => editPaymentFee(f)}>
+                          Editar
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-destructive hover:text-destructive"
+                          disabled={busy === `fee-disable-${f.id}`}
+                          onClick={() => {
+                            if (
+                              !window.confirm(
+                                "Excluir esta taxa da configuração atual? O histórico financeiro já calculado será preservado.",
+                              )
+                            )
+                              return;
+                            run(
+                              `fee-disable-${f.id}`,
+                              async () => {
+                                const result = await db.rpc("deactivate_payment_method_fee", {
+                                  _fee_id: f.id,
+                                });
+                                if (result.error) throw result.error;
+                                if (editingFeeId === String(f.id)) resetFeeEditor();
+                              },
+                              "Taxa removida da configuração atual.",
+                            );
+                          }}
+                        >
+                          Excluir
+                        </Button>
+                      </div>
                     </div>
                   ))}
               </div>
