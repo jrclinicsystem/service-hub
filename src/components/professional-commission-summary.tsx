@@ -33,7 +33,9 @@ function statusVariant(status?: string | null): "default" | "secondary" | "outli
 }
 
 function relatedEntry(row: any) {
-  return Array.isArray(row?.financial_entry) ? row.financial_entry[0] ?? null : row?.financial_entry ?? null;
+  return Array.isArray(row?.financial_entry)
+    ? (row.financial_entry[0] ?? null)
+    : (row?.financial_entry ?? null);
 }
 
 async function loadProfessionalCommissions(professionalId: string) {
@@ -109,7 +111,8 @@ export function ProfessionalCommissionSummary({ professionalId }: { professional
         </p>
         <h2 className="mt-2 text-xl font-semibold">Minhas comissões</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          Aqui aparecem somente os seus atendimentos e repasses. Dados financeiros gerais da clínica não são exibidos.
+          Aqui aparecem somente os seus atendimentos e repasses. Dados financeiros gerais da clínica
+          não são exibidos.
         </p>
       </div>
 
@@ -139,7 +142,8 @@ export function ProfessionalCommissionSummary({ professionalId }: { professional
                       {entry?.patient_name_snapshot || "Paciente não identificado"}
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {entry?.service_name_snapshot || "Serviço não identificado"} · {dateLabel(entry?.occurred_at)}
+                      {entry?.service_name_snapshot || "Serviço não identificado"} ·{" "}
+                      {dateLabel(entry?.occurred_at)}
                     </p>
                   </div>
                   <div className="flex items-center justify-between gap-3 sm:justify-end">

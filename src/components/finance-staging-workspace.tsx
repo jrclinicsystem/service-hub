@@ -84,6 +84,29 @@ function statusVariant(status: string): "default" | "secondary" | "destructive" 
   return "secondary";
 }
 
+function commissionEntry(row: any) {
+  const value = row?.financial_entry;
+  return Array.isArray(value) ? (value[0] ?? null) : (value ?? null);
+}
+
+function commissionContext(row: any, professionals: any[]) {
+  const entry = commissionEntry(row);
+  const professional =
+    entry?.professional_name_snapshot ||
+    professionals.find((item: any) => item.id === row?.professional_id)?.name ||
+    `Profissional ${String(row?.professional_id ?? "").slice(0, 8) || "não identificado"}`;
+  const patient = entry?.patient_name_snapshot || "Paciente não identificado";
+  const service = entry?.service_name_snapshot || "Serviço não identificado";
+  const date = entry?.occurred_at ? formatDate(entry.occurred_at) : "Data não informada";
+  return {
+    professional,
+    patient,
+    service,
+    date,
+    label: `${professional} · ${patient} · ${service} · ${date} · ${money(row?.commission_amount)}`,
+  };
+}
+
 function MetricCard({
   icon: Icon,
   label,
@@ -161,7 +184,9 @@ async function loadFullOverview(from: string, to: string) {
       .limit(200),
     db
       .from("professional_commissions")
-      .select("*")
+      .select(
+        "*,financial_entry:financial_entries(patient_name_snapshot,professional_name_snapshot,service_name_snapshot,occurred_at)",
+      )
       .order("created_at", { ascending: false })
       .limit(300),
     db
@@ -1438,7 +1463,7 @@ function FullFinanceWorkspace({
                   .filter((c: any) => c.status === "pending")
                   .map((c: any) => (
                     <option key={c.id} value={c.id}>
-                      {String(c.professional_id).slice(0, 8)} · {money(c.commission_amount)}
+                      {commissionContext(c, professionals).label}
                     </option>
                   ))}
               </select>
@@ -1491,10 +1516,14 @@ function FullFinanceWorkspace({
                   >
                     <div>
                       <strong className="text-sm">
-                        Profissional {String(row.professional_id).slice(0, 8)}
+                        {commissionContext(row, professionals).professional}
                       </strong>
-                      <p className="text-xs text-muted-foreground">
-                        {row.commission_type}
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {commissionContext(row, professionals).patient} ·{" "}
+                        {commissionContext(row, professionals).service}
+                      </p>
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        {commissionContext(row, professionals).date} · {row.commission_type}
                         {row.is_manual_override ? " · ajuste manual" : ""}
                       </p>
                     </div>
