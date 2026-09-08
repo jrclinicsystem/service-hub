@@ -4,19 +4,24 @@ from pathlib import Path
 professional_path = Path("src/routes/profissional.tsx")
 professional_text = professional_path.read_text()
 
-import_anchor = 'import { ProfessionalClientBookingTools } from "@/components/professional-client-booking-tools";\n'
-import_line = 'import { ProfessionalCommissionSummary } from "@/components/professional-commission-summary";\n'
+import_anchor = 'import { ProfessionalClientBookingTools } from "@/components/professional-client-booking-tools";'
+import_line = 'import { ProfessionalCommissionSummary } from "@/components/professional-commission-summary";'
 if import_line not in professional_text:
     if import_anchor not in professional_text:
         raise SystemExit("professional import anchor not found")
-    professional_text = professional_text.replace(import_anchor, import_anchor + import_line, 1)
+    professional_text = professional_text.replace(import_anchor, import_anchor + "\n" + import_line, 1)
 
-calendar_anchor = '        <div className="mt-7"><AppointmentCalendar appointments={data.appointments}'
 commission_render = '        <ProfessionalCommissionSummary professionalId={data.professional.id} />\n\n'
 if commission_render not in professional_text:
-    if calendar_anchor not in professional_text:
-        raise SystemExit("professional calendar anchor not found")
-    professional_text = professional_text.replace(calendar_anchor, commission_render + calendar_anchor, 1)
+    calendar_token = '<div className="mt-7"><AppointmentCalendar appointments={data.appointments}'
+    calendar_pos = professional_text.find(calendar_token)
+    if calendar_pos == -1:
+        calendar_token = '<AppointmentCalendar appointments={data.appointments}'
+        calendar_pos = professional_text.find(calendar_token)
+    if calendar_pos == -1:
+        raise SystemExit("professional calendar token not found")
+    line_start = professional_text.rfind("\n", 0, calendar_pos) + 1
+    professional_text = professional_text[:line_start] + commission_render + professional_text[line_start:]
 
 professional_path.write_text(professional_text)
 
