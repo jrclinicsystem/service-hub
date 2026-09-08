@@ -47,3 +47,5 @@ jobs:
           git add -A
           git commit -m "feat: expose professional commissions and clarify legacy adjustments"
           git push origin main
+
+# retry: robust professional portal insertion
