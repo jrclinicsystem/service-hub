@@ -39,6 +39,14 @@ function FinancePage() {
             display: block;
           }
 
+          .finance-page:has([role="tablist"] > [role="tab"]:nth-child(6)[data-state="active"]) [role="tabpanel"][data-state="active"] > div[class~="grid"][class~="gap-5"] > :first-child {
+            display: none;
+          }
+
+          .finance-page:has([role="tablist"] > [role="tab"]:nth-child(6)[data-state="active"]) [role="tabpanel"][data-state="active"] > div[class~="grid"][class~="gap-5"] {
+            grid-template-columns: minmax(0, 1fr) !important;
+          }
+
           @media (min-width: 1024px) {
             .finance-page:has([role="tablist"] > [role="tab"][data-state="active"]:not(:first-child)) > section:first-of-type {
               display: none;
