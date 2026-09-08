@@ -26,98 +26,64 @@ jobs:
           path = Path('src/components/finance-staging-workspace.tsx')
           text = path.read_text()
 
-          old_state = '''  const [rule, setRule] = useState({
-            professional: "",
-            type: "percentage",
-            value: "",
-            base: "net_after_fees",
-            effective: fortalezaIso(),
-          });
-          '''
-          new_state = old_state + '''  const [editingRuleId, setEditingRuleId] = useState("");
-          '''
-          if old_state not in text:
-              raise SystemExit('rule state block not found')
-          text = text.replace(old_state, new_state, 1)
+          state_start = text.index('  const [rule, setRule] = useState({')
+          state_end = text.index('\n  });', state_start) + len('\n  });')
+          text = (
+              text[:state_end]
+              + '\n  const [editingRuleId, setEditingRuleId] = useState("");'
+              + text[state_end:]
+          )
 
-          method_needle = '''  const methodId = (code: string) => methods.find((row: any) => row.code === code)?.id ?? null;
+          method_line = '  const methodId = (code: string) => methods.find((row: any) => row.code === code)?.id ?? null;\n'
+          helpers = '''
 
-          '''
-          helpers = '''  const methodId = (code: string) => methods.find((row: any) => row.code === code)?.id ?? null;
+  const resetRuleEditor = () => {
+    setEditingRuleId("");
+    setRule({
+      professional: "",
+      type: "percentage",
+      value: "",
+      base: "net_after_fees",
+      effective: fortalezaIso(),
+    });
+  };
 
-            const resetRuleEditor = () => {
-              setEditingRuleId("");
-              setRule({
-                professional: "",
-                type: "percentage",
-                value: "",
-                base: "net_after_fees",
-                effective: fortalezaIso(),
-              });
-            };
-
-            const editCommissionRule = (currentRule: any) => {
-              setEditingRuleId(String(currentRule.id));
-              setRule({
-                professional: currentRule.professional_id ?? "",
-                type: currentRule.commission_type ?? "percentage",
-                value:
-                  currentRule.commission_type === "percentage"
-                    ? String(currentRule.percentage ?? "")
-                    : currentRule.commission_type === "fixed_per_patient"
-                      ? String(currentRule.fixed_amount ?? "")
-                      : "",
-                base: currentRule.calculation_base ?? "net_after_fees",
-                effective: fortalezaIso(),
-              });
-            };
-
-          '''
-          if method_needle not in text:
+  const editCommissionRule = (currentRule: any) => {
+    setEditingRuleId(String(currentRule.id));
+    setRule({
+      professional: currentRule.professional_id ?? "",
+      type: currentRule.commission_type ?? "percentage",
+      value:
+        currentRule.commission_type === "percentage"
+          ? String(currentRule.percentage ?? "")
+          : currentRule.commission_type === "fixed_per_patient"
+            ? String(currentRule.fixed_amount ?? "")
+            : "",
+      base: currentRule.calculation_base ?? "net_after_fees",
+      effective: fortalezaIso(),
+    });
+  };
+'''
+          if method_line not in text:
               raise SystemExit('methodId insertion point not found')
-          text = text.replace(method_needle, helpers, 1)
+          text = text.replace(method_line, method_line + helpers, 1)
 
-          panel_needle = '''            <Panel title="Regra de comissão">
-              <div className="grid gap-3 sm:grid-cols-2">
-          '''
-          panel_new = '''            <Panel title="Regra de comissão">
-              {editingRuleId ? (
+          panel_line = '            <Panel title="Regra de comissão">\n'
+          notice = '''              {editingRuleId ? (
                 <div className="mb-4 rounded-2xl border border-primary/15 bg-primary-soft/50 px-4 py-3 text-xs text-primary">
                   Editando uma regra existente. A alteração valerá a partir da data escolhida abaixo,
                   preservando o histórico anterior de comissões.
                 </div>
               ) : null}
-              <div className="grid gap-3 sm:grid-cols-2">
-          '''
-          if panel_needle not in text:
+'''
+          if panel_line not in text:
               raise SystemExit('commission panel not found')
-          text = text.replace(panel_needle, panel_new, 1)
+          text = text.replace(panel_line, panel_line + notice, 1)
+          panel_pos = text.index(panel_line)
 
-          old_save = '''                <Button
-                  disabled={busy === "rule"}
-                  onClick={() =>
-                    run(
-                      "rule",
-                      async () => {
-                        if (!rule.professional) throw new Error("Selecione o profissional.");
-                        const value = parseMoney(rule.value || "0");
-                        const result = await db.rpc("set_professional_commission_rule", {
-                          _professional_id: rule.professional,
-                          _commission_type: rule.type,
-                          _percentage: rule.type === "percentage" ? value : null,
-                          _fixed_amount: rule.type === "fixed_per_patient" ? value : null,
-                          _calculation_base: rule.base,
-                          _effective_from: rule.effective,
-                        });
-                        if (result.error) throw result.error;
-                      },
-                      "Regra de comissão atualizada.",
-                    )
-                  }
-                >
-                  Salvar regra
-                </Button>
-          '''
+          save_marker = '                <Button\n                  disabled={busy === "rule"}'
+          save_start = text.index(save_marker, panel_pos)
+          save_end = text.index('                </Button>', save_start) + len('                </Button>')
           new_save = '''                <div className="flex gap-2">
                   <Button
                     className="flex-1"
@@ -156,34 +122,19 @@ jobs:
                       Cancelar
                     </Button>
                   ) : null}
-                </div>
-          '''
-          if old_save not in text:
-              raise SystemExit('save rule block not found')
-          text = text.replace(old_save, new_save, 1)
+                </div>'''
+          text = text[:save_start] + new_save + text[save_end:]
 
-          old_list = '''              <div className="mt-4 space-y-2">
-                {(data.rules ?? [])
-                  .filter((r: any) => r.is_active && r.effective_to == null)
-                  .slice(0, 8)
-                  .map((r: any) => (
-                    <div key={r.id} className="rounded-xl border border-border px-3 py-2 text-xs">
-                      {professionals.find((p: any) => p.id === r.professional_id)?.name ||
-                        String(r.professional_id).slice(0, 8)}{" "}
-                      ·{" "}
-                      {r.commission_type === "percentage"
-                        ? `${Number(r.percentage)}%`
-                        : r.commission_type === "fixed_per_patient"
-                          ? `${money(r.fixed_amount)} por paciente`
-                          : "Manual"}
-                    </div>
-                  ))}
-              </div>
-          '''
-          new_list = '''              <div className="mt-4 space-y-2">
-                {(data.rules ?? [])
-                  .filter((r: any) => r.is_active && r.effective_to == null)
-                  .map((r: any) => (
+          filter_marker = '.filter((r: any) => r.is_active && r.effective_to == null)'
+          filter_pos = text.index(filter_marker, panel_pos)
+          slice_marker = '\n                  .slice(0, 8)'
+          slice_pos = text.find(slice_marker, filter_pos, filter_pos + 500)
+          if slice_pos != -1:
+              text = text[:slice_pos] + text[slice_pos + len(slice_marker):]
+
+          map_start = text.index('                  .map((r: any) => (', filter_pos)
+          map_end = text.index('                  ))}', map_start) + len('                  ))}')
+          new_map = '''                  .map((r: any) => (
                     <div
                       key={r.id}
                       className="flex items-center justify-between gap-3 rounded-xl border border-border px-3 py-2 text-xs"
@@ -212,12 +163,8 @@ jobs:
                         Editar
                       </Button>
                     </div>
-                  ))}
-              </div>
-          '''
-          if old_list not in text:
-              raise SystemExit('active rule list block not found')
-          text = text.replace(old_list, new_list, 1)
+                  ))}'''
+          text = text[:map_start] + new_map + text[map_end:]
 
           path.write_text(text)
           PY
@@ -227,6 +174,9 @@ jobs:
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
+
+      - name: Format changed file
+        run: bunx prettier --write src/components/finance-staging-workspace.tsx
 
       - name: Lint changed file
         run: bunx eslint src/components/finance-staging-workspace.tsx
