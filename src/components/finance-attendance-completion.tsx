@@ -138,7 +138,11 @@ export function FinanceAttendanceCompletion() {
       toast.error("Informe um desconto válido.");
       return;
     }
-    if (!Number.isInteger(parsedInstallments) || parsedInstallments < 1 || parsedInstallments > 12) {
+    if (
+      !Number.isInteger(parsedInstallments) ||
+      parsedInstallments < 1 ||
+      parsedInstallments > 12
+    ) {
       toast.error("Informe uma quantidade de parcelas entre 1 e 12.");
       return;
     }
@@ -308,7 +312,6 @@ export function FinanceAttendanceCompletion() {
                 value={installments}
                 onChange={(event) => setInstallments(event.target.value)}
               />
-
             </div>
             <div>
               <Label>Desconto</Label>

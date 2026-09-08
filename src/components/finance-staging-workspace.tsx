@@ -223,7 +223,6 @@ async function loadFullOverview(from: string, to: string) {
     rules: rules.data ?? [],
     professionalsDirectory: professionalsDirectory.data ?? [],
   };
-
 }
 
 async function loadReceptionOverview() {
