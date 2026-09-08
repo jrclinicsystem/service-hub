@@ -555,6 +555,8 @@ function FullFinanceWorkspace({
   const [payableEdit, setPayableEdit] = useState({ amount: "", due: "" });
   const [editingReceivableId, setEditingReceivableId] = useState("");
   const [receivableEdit, setReceivableEdit] = useState({ amount: "", due: "" });
+  const [editingExpenseId, setEditingExpenseId] = useState("");
+  const [expenseEditAmount, setExpenseEditAmount] = useState("");
 
   const metricMap = useMemo(
     () => new Map((data?.dashboard ?? []).map((row: any) => [row.metric, Number(row.value ?? 0)])),
@@ -702,6 +704,16 @@ function FullFinanceWorkspace({
   const resetReceivableEditor = () => {
     setEditingReceivableId("");
     setReceivableEdit({ amount: "", due: "" });
+  };
+
+  const editExpenseAmount = (currentExpense: any) => {
+    setEditingExpenseId(String(currentExpense.expense_id));
+    setExpenseEditAmount(String(currentExpense.amount ?? ""));
+  };
+
+  const resetExpenseEditor = () => {
+    setEditingExpenseId("");
+    setExpenseEditAmount("");
   };
 
   if (loading)
@@ -1103,7 +1115,59 @@ function FullFinanceWorkspace({
                       {row.cost_center_name || "Sem centro"}
                     </p>
                   </div>
-                  <strong>{money(row.amount)}</strong>
+                  <div className="text-right">
+                    <strong>{money(row.amount)}</strong>
+                    <div className="mt-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busy === `edit-expense-${row.expense_id}`}
+                        onClick={() => editExpenseAmount(row)}
+                      >
+                        Editar valor
+                      </Button>
+                    </div>
+                  </div>
+                  {editingExpenseId === String(row.expense_id) ? (
+                    <div className="grid w-full gap-3 border-t border-border pt-3 sm:grid-cols-[1fr_auto] sm:items-end">
+                      <div>
+                        <Label className="text-xs">Novo valor da despesa</Label>
+                        <Input
+                          value={expenseEditAmount}
+                          onChange={(e) => setExpenseEditAmount(e.target.value)}
+                          placeholder="0,00"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          disabled={busy === `edit-expense-${row.expense_id}`}
+                          onClick={() =>
+                            run(
+                              `edit-expense-${row.expense_id}`,
+                              async () => {
+                                const value = parseMoney(expenseEditAmount);
+                                if (!Number.isFinite(value) || value <= 0)
+                                  throw new Error("Informe um valor maior que zero.");
+                                const result = await db.rpc("update_financial_expense_amount", {
+                                  _expense_id: row.expense_id,
+                                  _amount: value,
+                                });
+                                if (result.error) throw result.error;
+                                resetExpenseEditor();
+                              },
+                              "Valor da despesa atualizado.",
+                            )
+                          }
+                        >
+                          Salvar
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={resetExpenseEditor}>
+                          Cancelar
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               ))}
             </div>

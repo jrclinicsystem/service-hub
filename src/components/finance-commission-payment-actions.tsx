@@ -119,13 +119,14 @@ export function FinanceCommissionPaymentActions() {
   const groups = useMemo(() => {
     const grouped = new Map<string, { professionalId: string; name: string; rows: any[] }>();
     for (const row of query.data?.commissions ?? []) {
+      if (remainingAmount(row) <= 0) continue;
       const entry = relatedEntry(row);
       const professionalId = String(row.professional_id ?? "unknown");
       const name =
         entry?.professional_name_snapshot ||
         professionalMap.get(professionalId) ||
         `Profissional ${professionalId.slice(0, 8)}`;
-      const current = grouped.get(professionalId) ?? { professionalId, name, rows: [] };
+      const current = grouped.get(professionalId) ?? { professionalId, name, rows: [] as any[] };
       current.rows.push(row);
       grouped.set(professionalId, current);
     }
