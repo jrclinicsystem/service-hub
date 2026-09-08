@@ -299,14 +299,15 @@ export function FinanceAttendanceCompletion() {
               </div>
             )}
             <div>
-              <Label>Parcelas</Label>
+              <Label>Parcelas (1 a 12)</Label>
               <Input
                 type="number"
                 min="1"
-                max="24"
+                max="12"
                 value={installments}
                 onChange={(event) => setInstallments(event.target.value)}
               />
+
             </div>
             <div>
               <Label>Desconto</Label>
