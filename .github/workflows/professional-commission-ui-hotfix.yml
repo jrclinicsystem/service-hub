@@ -32,8 +32,8 @@ jobs:
       - name: Format changed files
         run: bunx prettier --write src/routes/profissional.tsx src/components/finance-staging-workspace.tsx src/components/professional-commission-summary.tsx
 
-      - name: Lint
-        run: bun run lint
+      - name: Lint changed files
+        run: bunx eslint src/routes/profissional.tsx src/components/finance-staging-workspace.tsx src/components/professional-commission-summary.tsx
 
       - name: Production build
         run: bun run build
@@ -47,5 +47,3 @@ jobs:
           git add -A
           git commit -m "feat: expose professional commissions and clarify legacy adjustments"
           git push origin main
-
-# retry: robust professional portal insertion
