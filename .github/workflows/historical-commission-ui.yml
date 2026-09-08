@@ -1,0 +1,47 @@
+name: Historical Commission UI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/historical-commission-ui.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Apply historical commission UI patch
+        run: python .github/scripts/historical_commission_ui_patch.py
+
+      - name: Check whitespace
+        run: git diff --check
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Production build
+        run: bun run build
+
+      - name: Commit feature and clean temporary files
+        run: |
+          rm -f .github/scripts/historical_commission_ui_patch.py .github/workflows/historical-commission-ui.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/finance-staging-workspace.tsx .github/scripts/historical_commission_ui_patch.py .github/workflows/historical-commission-ui.yml
+          git commit -m "finance: generate commissions for historical appointments"
+          git push origin HEAD:main
