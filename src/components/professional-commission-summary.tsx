@@ -19,16 +19,24 @@ function dateLabel(value?: string | null) {
   return new Date(value).toLocaleDateString("pt-BR", { timeZone: "America/Fortaleza" });
 }
 
-function statusLabel(status?: string | null) {
-  if (status === "paid") return "Pago";
-  if (status === "pending") return "Pendente";
-  if (status === "cancelled") return "Cancelado";
-  return status || "Pendente";
+function paidAmount(row: any) {
+  return Math.max(0, Number(row?.paid_amount ?? (row?.status === "paid" ? row?.commission_amount : 0) ?? 0));
 }
 
-function statusVariant(status?: string | null): "default" | "secondary" | "outline" {
-  if (status === "paid") return "default";
-  if (status === "cancelled") return "outline";
+function remainingAmount(row: any) {
+  return Math.max(0, Math.round((Number(row?.commission_amount ?? 0) - paidAmount(row)) * 100) / 100);
+}
+
+function statusLabel(row: any) {
+  if (row?.status === "paid") return "Pago";
+  if (row?.status === "cancelled") return "Cancelado";
+  if (paidAmount(row) > 0) return "Parcial";
+  return "Pendente";
+}
+
+function statusVariant(row: any): "default" | "secondary" | "outline" {
+  if (row?.status === "paid") return "default";
+  if (row?.status === "cancelled") return "outline";
   return "secondary";
 }
 
@@ -42,7 +50,7 @@ async function loadProfessionalCommissions(professionalId: string) {
   const result = await db
     .from("professional_commissions")
     .select(
-      "id,financial_entry_id,professional_id,commission_amount,status,paid_at,created_at,financial_entry:financial_entries(patient_name_snapshot,service_name_snapshot,occurred_at,professional_id)",
+      "id,financial_entry_id,professional_id,commission_amount,paid_amount,status,paid_at,created_at,financial_entry:financial_entries(patient_name_snapshot,service_name_snapshot,occurred_at,professional_id)",
     )
     .eq("professional_id", professionalId)
     .order("created_at", { ascending: false })
@@ -96,12 +104,8 @@ export function ProfessionalCommissionSummary({ professionalId }: { professional
 
   const rows = query.data ?? [];
   const total = rows.reduce((sum: number, row: any) => sum + Number(row.commission_amount || 0), 0);
-  const pending = rows
-    .filter((row: any) => row.status === "pending")
-    .reduce((sum: number, row: any) => sum + Number(row.commission_amount || 0), 0);
-  const paid = rows
-    .filter((row: any) => row.status === "paid")
-    .reduce((sum: number, row: any) => sum + Number(row.commission_amount || 0), 0);
+  const pending = rows.reduce((sum: number, row: any) => sum + remainingAmount(row), 0);
+  const paid = rows.reduce((sum: number, row: any) => sum + paidAmount(row), 0);
 
   return (
     <section className="mt-7 rounded-3xl border border-border bg-card p-5 shadow-soft sm:p-6">
@@ -118,8 +122,8 @@ export function ProfessionalCommissionSummary({ professionalId }: { professional
 
       <div className="mt-5 grid gap-3 sm:grid-cols-3">
         <SummaryCard icon={CircleDollarSign} label="Comissão total" value={money(total)} />
-        <SummaryCard icon={Clock3} label="Comissão pendente" value={money(pending)} />
-        <SummaryCard icon={CheckCircle2} label="Comissão paga" value={money(paid)} />
+        <SummaryCard icon={Clock3} label="Restante a receber" value={money(pending)} />
+        <SummaryCard icon={CheckCircle2} label="Já recebido" value={money(paid)} />
       </div>
 
       <div className="mt-6">
@@ -132,6 +136,8 @@ export function ProfessionalCommissionSummary({ professionalId }: { professional
           <div className="mt-3 space-y-2">
             {rows.map((row: any) => {
               const entry = relatedEntry(row);
+              const paid = paidAmount(row);
+              const remaining = remainingAmount(row);
               return (
                 <article
                   key={row.id}
@@ -145,10 +151,13 @@ export function ProfessionalCommissionSummary({ professionalId }: { professional
                       {entry?.service_name_snapshot || "Serviço não identificado"} ·{" "}
                       {dateLabel(entry?.occurred_at)}
                     </p>
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      Total {money(row.commission_amount)} · recebido {money(paid)} · restante {money(remaining)}
+                    </p>
                   </div>
                   <div className="flex items-center justify-between gap-3 sm:justify-end">
-                    <strong className="text-sm">{money(row.commission_amount)}</strong>
-                    <Badge variant={statusVariant(row.status)}>{statusLabel(row.status)}</Badge>
+                    <strong className="text-sm">{money(remaining)}</strong>
+                    <Badge variant={statusVariant(row)}>{statusLabel(row)}</Badge>
                   </div>
                 </article>
               );
