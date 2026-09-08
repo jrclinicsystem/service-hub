@@ -182,7 +182,14 @@ async function loadFullOverview(from: string, to: string) {
       .select("*")
       .order("effective_from", { ascending: false })
       .limit(100),
+    db
+      .from("professionals")
+      .select("id,name,sort_order,is_active")
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true })
+      .order("name", { ascending: true }),
   ]);
+
   for (const result of results) if (result.error) throw result.error;
   const [
     dashboard,
