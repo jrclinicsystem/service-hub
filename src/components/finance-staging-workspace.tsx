@@ -1419,7 +1419,7 @@ function FullFinanceWorkspace({
                   onChange={(e) => setFee({ ...fee, method: e.target.value })}
                 >
                   {methods
-                    .filter((m: any) => m.is_card)
+                    .filter((m: any) => m.code !== "pix" && (m.is_card || m.code === "pix_machine"))
                     .map((m: any) => (
                       <option key={m.id} value={m.code}>
                         {m.name}
@@ -1437,18 +1437,26 @@ function FullFinanceWorkspace({
                   onChange={(e) => setFee({ ...fee, fixed: e.target.value })}
                 />
                 <div className="grid grid-cols-2 gap-2">
-                  <Input
-                    type="number"
-                    min="1"
-                    value={fee.min}
-                    onChange={(e) => setFee({ ...fee, min: e.target.value })}
-                  />
-                  <Input
-                    type="number"
-                    min="1"
-                    value={fee.max}
-                    onChange={(e) => setFee({ ...fee, max: e.target.value })}
-                  />
+                  <div>
+                    <Label className="text-xs">Parcela mínima (1 a 12)</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      max="12"
+                      value={fee.min}
+                      onChange={(e) => setFee({ ...fee, min: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Parcela máxima (1 a 12)</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      max="12"
+                      value={fee.max}
+                      onChange={(e) => setFee({ ...fee, max: e.target.value })}
+                    />
+                  </div>
                 </div>
                 <Input
                   type="date"
@@ -1470,12 +1478,22 @@ function FullFinanceWorkspace({
                           fixed < 0
                         )
                           throw new Error("Taxas inválidas.");
+                        const min = Number(fee.min);
+                        const max = Number(fee.max);
+                        if (!Number.isInteger(min) || min < 1 || min > 12)
+                          throw new Error("Parcela mínima deve ficar entre 1 e 12.");
+                        if (!Number.isInteger(max) || max < 1 || max > 12)
+                          throw new Error("Parcela máxima deve ficar entre 1 e 12.");
+                        if (max < min)
+                          throw new Error(
+                            "Parcela máxima deve ser maior ou igual à parcela mínima.",
+                          );
                         const result = await db.rpc("set_payment_method_fee", {
                           _payment_method_code: fee.method,
                           _fee_percent: percent,
                           _fixed_fee: fixed,
-                          _installments_min: Number(fee.min),
-                          _installments_max: Number(fee.max),
+                          _installments_min: min,
+                          _installments_max: max,
                           _effective_from: fee.effective,
                         });
                         if (result.error) throw result.error;
@@ -1490,7 +1508,7 @@ function FullFinanceWorkspace({
               <div className="mt-4 space-y-2">
                 {(data.fees ?? [])
                   .filter((f: any) => f.is_active)
-                  .slice(0, 8)
+
                   .map((f: any) => (
                     <div key={f.id} className="rounded-xl border border-border px-3 py-2 text-xs">
                       {methodMap.get(f.payment_method_id) || "Pagamento"} · {Number(f.fee_percent)}%
