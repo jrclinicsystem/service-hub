@@ -205,6 +205,7 @@ async function loadFullOverview(from: string, to: string) {
     centers,
     categories,
     rules,
+    professionalsDirectory,
   ] = results;
   return {
     dashboard: dashboard.data ?? [],
@@ -220,7 +221,9 @@ async function loadFullOverview(from: string, to: string) {
     centers: centers.data ?? [],
     categories: categories.data ?? [],
     rules: rules.data ?? [],
+    professionalsDirectory: professionalsDirectory.data ?? [],
   };
+
 }
 
 async function loadReceptionOverview() {
