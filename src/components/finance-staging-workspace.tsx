@@ -2289,7 +2289,7 @@ function Panel({ title, subtitle, children }: { title: string; subtitle?: string
   return (
     <section className="rounded-3xl border border-border bg-card p-5 shadow-soft sm:p-6">
       <div>
-        <h2 className="text-lg font-semibold">{title}</h2>
+        <h2 className="text-xl font-bold tracking-tight text-foreground">{title}</h2>
         {subtitle ? <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p> : null}
       </div>
       <div className="mt-5">{children}</div>

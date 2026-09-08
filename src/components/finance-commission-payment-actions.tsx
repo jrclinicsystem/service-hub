@@ -132,6 +132,17 @@ export function FinanceCommissionPaymentActions() {
     return [...grouped.values()].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
   }, [professionalMap, query.data?.commissions]);
 
+  const commissionSummary = useMemo(() => {
+    const rows = query.data?.commissions ?? [];
+    const total = rows.reduce((sum: number, row: any) => sum + Number(row.commission_amount ?? 0), 0);
+    const paid = rows.reduce((sum: number, row: any) => sum + paidAmount(row), 0);
+    return {
+      total,
+      paid,
+      remaining: Math.max(0, Math.round((total - paid) * 100) / 100),
+    };
+  }, [query.data?.commissions]);
+
   if (!query.data?.allowed) return null;
 
   const refresh = async () => {
@@ -204,11 +215,26 @@ export function FinanceCommissionPaymentActions() {
             <UserRoundCheck className="size-5" />
           </span>
           <div>
-            <h2 className="text-lg font-semibold">Comissões por profissional</h2>
+            <h2 className="text-xl font-bold tracking-tight text-foreground">Comissões por profissional</h2>
             <p className="mt-1 text-sm text-muted-foreground">
               Clique no nome do profissional para visualizar as comissões. Registre pagamento total,
               metade ou um valor personalizado. Todo valor pago entra automaticamente em Despesas.
             </p>
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-2xl border border-border bg-primary-soft/30 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Total de comissões</p>
+            <p className="mt-1 text-xl font-bold text-foreground">{money(commissionSummary.total)}</p>
+          </div>
+          <div className="rounded-2xl border border-border bg-background/60 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Total pago</p>
+            <p className="mt-1 text-xl font-bold text-foreground">{money(commissionSummary.paid)}</p>
+          </div>
+          <div className="rounded-2xl border border-border bg-background/60 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Total restante</p>
+            <p className="mt-1 text-xl font-bold text-foreground">{money(commissionSummary.remaining)}</p>
           </div>
         </div>
 
@@ -251,19 +277,21 @@ export function FinanceCommissionPaymentActions() {
                         </p>
                       </div>
                     </div>
-                    {expanded ? (
-                      <div className="flex gap-4 pl-7 text-xs sm:pl-0">
-                        <span>
-                          <strong>{money(groupTotal)}</strong> total
-                        </span>
-                        <span>
-                          <strong>{money(groupPaid)}</strong> pago
-                        </span>
-                        <span>
-                          <strong>{money(groupRemaining)}</strong> restante
-                        </span>
-                      </div>
-                    ) : null}
+                    <div className="flex flex-wrap items-center gap-3 pl-7 text-xs sm:justify-end sm:pl-0">
+                      <span className="rounded-full bg-background/80 px-3 py-1.5">
+                        Total <strong className="ml-1 text-sm">{money(groupTotal)}</strong>
+                      </span>
+                      {expanded ? (
+                        <>
+                          <span>
+                            Pago <strong className="ml-1">{money(groupPaid)}</strong>
+                          </span>
+                          <span>
+                            Restante <strong className="ml-1">{money(groupRemaining)}</strong>
+                          </span>
+                        </>
+                      ) : null}
+                    </div>
                   </button>
 
                   {expanded ? (
