@@ -508,7 +508,7 @@ function FullFinanceWorkspace({
   const [professionalFilter, setProfessionalFilter] = useState("all");
   const [serviceFilter, setServiceFilter] = useState("all");
   const [methodFilter, setMethodFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("received");
   const [expense, setExpense] = useState({
     date: fortalezaIso(),
     description: "",
@@ -1002,14 +1002,29 @@ function FullFinanceWorkspace({
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
               >
-                <option value="all">Todos os status</option>
+                <option value="all">Todos os status (inclui pendentes)</option>
                 <option value="received">Recebido</option>
                 <option value="pending">Pendente</option>
                 <option value="refunded">Estornado</option>
               </select>
             </div>
           </Panel>
-          <Panel title={`Entradas (${filteredEntries.length})`}>
+          <Panel
+            title={
+              statusFilter === "received"
+                ? `Entradas recebidas (${filteredEntries.length})`
+                : statusFilter === "pending"
+                  ? `Entradas pendentes / a receber (${filteredEntries.length})`
+                  : `Entradas (${filteredEntries.length})`
+            }
+            subtitle={
+              statusFilter === "received"
+                ? "Somente valores efetivamente recebidos entram como receita, líquido e resultado."
+                : statusFilter === "pending"
+                  ? "Valores pendentes ficam em contas a receber e só entram na receita quando forem pagos."
+                  : undefined
+            }
+          >
             <EntryList rows={filteredEntries} />
           </Panel>
         </TabsContent>
