@@ -7,6 +7,7 @@ import {
   CreditCard,
   Mail,
   MessageCircle,
+  Pencil,
   Phone,
   Plus,
   Search,
@@ -172,6 +173,7 @@ export function AdminAppointmentsWorkspace({ appointments, onStatusChange, onRef
   const [selected, setSelected] = useState<any | null>(null);
   const [incoming, setIncoming] = useState<any | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [editingAppointment, setEditingAppointment] = useState<any | null>(null);
   const [busyAction, setBusyAction] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const audioRef = useRef<AudioContext | null>(null);
@@ -266,14 +268,15 @@ export function AdminAppointmentsWorkspace({ appointments, onStatusChange, onRef
   };
 
   const removeAppointment = async (appointment: any) => {
-    if (!window.confirm(`Apagar o agendamento de ${appointment.patient_name}? Esta ação não pode ser desfeita.`)) return;
+    if (!window.confirm(`Cancelar e arquivar o agendamento de ${appointment.patient_name}? Ele continuará no histórico e poderá ser reagendado depois.`)) return;
     setDeletingId(appointment.id);
-    const { error } = await db.from("appointments").delete().eq("id", appointment.id);
+    const { error } = await db.from("appointments").update({ status: "cancelado", status_updated_at: new Date().toISOString() }).eq("id", appointment.id);
     setDeletingId(null);
     if (error) { toast.error(error.message); return; }
-    if (selected?.id === appointment.id) setSelected(null);
+    if (selected?.id === appointment.id) setSelected((current: any) => current ? { ...current, status: "cancelado" } : current);
     if (incoming?.id === appointment.id) setIncoming(null);
-    toast.success("Agendamento apagado.");
+    toast.success("Agendamento cancelado e arquivado.", { description: "Ele pode ser editado e reagendado pelo Histórico." });
+    setScope("history");
     onRefresh();
   };
 
@@ -303,10 +306,11 @@ export function AdminAppointmentsWorkspace({ appointments, onStatusChange, onRef
       </div>
 
       <div className="mt-3 grid w-full min-w-0 grid-cols-[minmax(0,1fr)] gap-3 lg:grid-cols-2 2xl:grid-cols-3">
-        {filtered.length === 0 ? <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center lg:col-span-2 2xl:col-span-3"><CalendarDays className="mx-auto size-5 text-muted-foreground" /><p className="mt-3 text-sm text-muted-foreground">Nenhum agendamento nesta seleção.</p></div> : filtered.map((appointment) => <AdminAppointmentCard key={appointment.id} appointment={appointment} onOpen={() => setSelected(appointment)} onDelete={() => removeAppointment(appointment)} onAttended={() => completeAttendance(appointment)} deleting={deletingId === appointment.id} />)}
+        {filtered.length === 0 ? <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center lg:col-span-2 2xl:col-span-3"><CalendarDays className="mx-auto size-5 text-muted-foreground" /><p className="mt-3 text-sm text-muted-foreground">Nenhum agendamento nesta seleção.</p></div> : filtered.map((appointment) => <AdminAppointmentCard key={appointment.id} appointment={appointment} onOpen={() => setSelected(appointment)} onEdit={() => { setSelected(null); setEditingAppointment(appointment); }} onDelete={() => removeAppointment(appointment)} onAttended={() => completeAttendance(appointment)} deleting={deletingId === appointment.id} />)}
       </div>
 
       <CreateAppointmentDialog open={createOpen} onOpenChange={setCreateOpen} onCreated={() => { setCreateOpen(false); setScope("pending"); onRefresh(); }} />
+      <CreateAppointmentDialog open={Boolean(editingAppointment)} onOpenChange={(open) => { if (!open) setEditingAppointment(null); }} editing={editingAppointment} onCreated={() => { setEditingAppointment(null); setScope("pending"); onRefresh(); }} />
       <CalendarDayDialog date={calendarDayOpen} appointments={appointments} open={Boolean(calendarDayOpen)} onOpenChange={(open) => { if (!open) setCalendarDayOpen(null); }} />
       <AppointmentAdminDialog appointment={selected} open={Boolean(selected)} onOpenChange={(open: boolean) => !open && setSelected(null)} onConfirm={() => selected && act(selected, "confirmado")} onCancel={() => selected && act(selected, "cancelado")} onAttended={() => selected && completeAttendance(selected)} onPriceSaved={(value: number) => { setSelected((current: any) => current ? { ...current, service_price_snapshot: value, balance_amount: value } : current); onRefresh(); }} busy={busyAction} />
       <NewAppointmentAlert appointment={incoming} open={Boolean(incoming)} onLater={() => setIncoming(null)} onConfirm={() => incoming && act(incoming, "confirmado")} onCancel={() => incoming && act(incoming, "cancelado")} busy={busyAction} />
@@ -314,7 +318,7 @@ export function AdminAppointmentsWorkspace({ appointments, onStatusChange, onRef
   );
 }
 
-function AdminAppointmentCard({ appointment, onOpen, onDelete, onAttended, deleting }: any) {
+function AdminAppointmentCard({ appointment, onOpen, onEdit, onDelete, onAttended, deleting }: any) {
   const [attendanceBusy, setAttendanceBusy] = useState(false);
   const proximity = appointment.status === "cancelado" ? "past" : appointmentProximity(appointment.scheduled_date);
   const days = daysUntilAppointment(appointment.scheduled_date);
@@ -332,11 +336,11 @@ function AdminAppointmentCard({ appointment, onOpen, onDelete, onAttended, delet
     {hasWhatsApp && appointment.status !== "cancelado" ? <div className="mt-3">{appointment.status === "confirmado" ? <Button type="button" size="sm" className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => openAppointmentWhatsApp(appointment, "chat")}><MessageCircle className="size-4" /> Falar com cliente</Button> : proximity === "urgent" ? <Button type="button" size="sm" className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => openAppointmentWhatsApp(appointment, "reminder")}><MessageCircle className="size-4" /> {days === 0 ? "Falar com cliente" : "Enviar lembrete no WhatsApp"}</Button> : <Button type="button" size="sm" variant="outline" className="rounded-xl border-emerald-600/40 text-emerald-700 hover:bg-emerald-50" onClick={() => openAppointmentWhatsApp(appointment, "confirmation")}><MessageCircle className="size-4" /> Confirmar pelo WhatsApp</Button>}</div> : null}
     {canMarkAttended ? <div className="mt-3"><Button type="button" size="sm" className="w-full rounded-xl bg-emerald-600 text-white hover:bg-emerald-700" disabled={attendanceBusy} onClick={async () => { setAttendanceBusy(true); await onAttended?.(); setAttendanceBusy(false); }}><Check className="size-4" /> {attendanceBusy ? "Confirmando atendimento..." : "Confirmar atendimento"}</Button></div> : null}
     {appointment.status === "atendido" ? <div className="mt-3 rounded-xl bg-emerald-50 px-3 py-2 text-center text-[11px] font-semibold text-emerald-800">Atendido · valor já contabilizado na receita</div> : null}
-    <div className="mt-3 flex min-w-0 flex-wrap items-center gap-2 border-t border-border/70 pt-3"><p className="min-w-0 flex-1 basis-[120px] truncate text-xs text-muted-foreground">{appointment.patient_phone || "Sem telefone"}</p><Button type="button" variant="ghost" size="icon" className="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive" onClick={onDelete} disabled={deleting} title="Apagar agendamento"><Trash2 className="size-3.5" /></Button><button type="button" onClick={onOpen} className="ml-auto max-w-full shrink-0 text-right text-xs font-semibold text-primary hover:underline">{formatPrice(Number(appointment.service_price_snapshot ?? appointment.service?.price ?? 0))} · Detalhes →</button></div>
+    <div className="mt-3 flex min-w-0 flex-wrap items-center gap-2 border-t border-border/70 pt-3"><p className="min-w-0 flex-1 basis-[120px] truncate text-xs text-muted-foreground">{appointment.patient_phone || "Sem telefone"}</p>{appointment.status !== "atendido" ? <Button type="button" variant="ghost" size="icon" className="size-8 shrink-0 rounded-lg text-primary hover:bg-primary/10" onClick={onEdit} title={appointment.status === "cancelado" ? "Reagendar" : "Editar agendamento"}><Pencil className="size-3.5" /></Button> : null}<Button type="button" variant="ghost" size="icon" className="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive" onClick={onDelete} disabled={deleting || appointment.status === "atendido"} title="Cancelar e arquivar agendamento"><Trash2 className="size-3.5" /></Button><button type="button" onClick={onOpen} className="ml-auto max-w-full shrink-0 text-right text-xs font-semibold text-primary hover:underline">{formatPrice(Number(appointment.service_price_snapshot ?? appointment.service?.price ?? 0))} · Detalhes →</button></div>
   </article>;
 }
 
-function CreateAppointmentDialog({ open, onOpenChange, onCreated }: { open: boolean; onOpenChange: (open: boolean) => void; onCreated: () => void }) {
+function CreateAppointmentDialog({ open, onOpenChange, onCreated, editing = null }: { open: boolean; onOpenChange: (open: boolean) => void; onCreated: () => void; editing?: any | null }) {
   const [loadingCatalog, setLoadingCatalog] = useState(false);
   const [saving, setSaving] = useState(false);
   const [services, setServices] = useState<any[]>([]);
@@ -378,8 +382,28 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated }: { open: bool
   }, [open]);
 
   useEffect(() => {
+    if (!open || !editing) return;
+    const linkedIds = [...(editing.appointment_services ?? [])]
+      .sort((a: any, b: any) => Number(a.position ?? 0) - Number(b.position ?? 0))
+      .map((item: any) => item.service_id ?? item.service?.id)
+      .filter(Boolean);
+    setSelectedClientId(editing.client_id ?? "");
+    setPatientName(editing.patient_name ?? "");
+    setPatientEmail(editing.patient_email ?? "");
+    setPatientPhone(editing.patient_phone ?? "");
+    setServiceIds(linkedIds.length ? linkedIds : [editing.service_id].filter(Boolean));
+    setServiceSearch("");
+    setAppointmentValue(String(Number(editing.service_price_snapshot ?? editing.service?.price ?? 0)));
+    setProfessionalId(editing.professional_id ?? editing.professional?.id ?? "");
+    setScheduledDate(editing.scheduled_date ?? todayIso());
+    setScheduledTime(editing.scheduled_time ?? "");
+    setNotes(editing.notes ?? "");
+  }, [open, editing]);
+
+  useEffect(() => {
     let cancelled = false;
-    setScheduledTime("");
+    const currentEditingSlot = editing && (editing.professional_id ?? editing.professional?.id) === professionalId && editing.scheduled_date === scheduledDate ? editing.scheduled_time : "";
+    setScheduledTime(currentEditingSlot);
 
     if (!open || !professionalId || !scheduledDate) {
       setBookingSlots([]);
@@ -397,13 +421,17 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated }: { open: bool
           setBookingSlots([]);
           toast.error("Não foi possível carregar os horários disponíveis desta data.");
         } else {
-          setBookingSlots((data ?? []).filter((slot: any) => slot.is_available));
+          const available = (data ?? []).filter((slot: any) => slot.is_available);
+          if (currentEditingSlot && !available.some((slot: any) => slot.slot === currentEditingSlot)) {
+            available.unshift({ slot: currentEditingSlot, source: "current" });
+          }
+          setBookingSlots(available);
         }
         setBookingSlotsLoading(false);
       });
 
     return () => { cancelled = true; };
-  }, [open, professionalId, scheduledDate, bookingSlotsRefreshKey]);
+  }, [open, professionalId, scheduledDate, bookingSlotsRefreshKey, editing]);
 
   useEffect(() => {
     if (!open || !professionalId) return;
@@ -471,7 +499,7 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated }: { open: bool
   const reset = () => { setSelectedClientId(""); setPatientName(""); setPatientEmail(""); setPatientPhone(""); setServiceIds([]); setServiceSearch(""); setAppointmentValue(""); setProfessionalId(""); setScheduledDate(todayIso()); setScheduledTime(""); setNotes(""); };
   const handleOpenChange = (next: boolean) => { if (!next && !saving) reset(); onOpenChange(next); };
 
-  const createAppointment = async () => {
+  const saveAppointment = async () => {
     if (!patientName.trim()) { toast.error("Informe o nome do cliente."); return; }
     if (!serviceIds.length) { toast.error("Selecione ao menos um serviço."); return; }
     if (!professionalId) { toast.error("Selecione o profissional."); return; }
@@ -483,29 +511,48 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated }: { open: bool
     if (!Number.isFinite(parsedValue) || parsedValue < 0) { toast.error("Informe um valor válido para o atendimento."); return; }
     const total = Math.round((parsedValue + Number.EPSILON) * 100) / 100;
     setSaving(true);
-    const conflict = await db.from("appointments").select("id").eq("professional_id", professionalId).eq("scheduled_date", scheduledDate).eq("scheduled_time", scheduledTime).neq("status", "cancelado").limit(1).maybeSingle();
-    if (conflict.error) { setSaving(false); toast.error(conflict.error.message); return; }
-    if (conflict.data) { setSaving(false); toast.error("Este profissional já possui um agendamento nesse horário."); return; }
-    const { error } = await db.rpc("create_admin_multi_service_appointment", {
-      _client_id: selectedClientId || null,
-      _patient_name: patientName.trim(),
-      _patient_email: patientEmail.trim(),
-      _patient_phone: patientPhone.trim(),
-      _service_ids: serviceIds,
-      _professional_id: professionalId,
-      _scheduled_date: scheduledDate,
-      _scheduled_time: scheduledTime,
-      _notes: notes.trim(),
-      _total: total,
-    });
+    let error: any = null;
+    if (editing) {
+      const result = await db.rpc("update_admin_multi_service_appointment", {
+        _appointment_id: editing.id,
+        _client_id: selectedClientId || null,
+        _patient_name: patientName.trim(),
+        _patient_email: patientEmail.trim(),
+        _patient_phone: patientPhone.trim(),
+        _service_ids: serviceIds,
+        _professional_id: professionalId,
+        _scheduled_date: scheduledDate,
+        _scheduled_time: scheduledTime,
+        _notes: notes.trim(),
+        _total: total,
+      });
+      error = result.error;
+    } else {
+      const conflict = await db.from("appointments").select("id").eq("professional_id", professionalId).eq("scheduled_date", scheduledDate).eq("scheduled_time", scheduledTime).neq("status", "cancelado").limit(1).maybeSingle();
+      if (conflict.error) { setSaving(false); toast.error(conflict.error.message); return; }
+      if (conflict.data) { setSaving(false); toast.error("Este profissional já possui um agendamento nesse horário."); return; }
+      const result = await db.rpc("create_admin_multi_service_appointment", {
+        _client_id: selectedClientId || null,
+        _patient_name: patientName.trim(),
+        _patient_email: patientEmail.trim(),
+        _patient_phone: patientPhone.trim(),
+        _service_ids: serviceIds,
+        _professional_id: professionalId,
+        _scheduled_date: scheduledDate,
+        _scheduled_time: scheduledTime,
+        _notes: notes.trim(),
+        _total: total,
+      });
+      error = result.error;
+    }
     setSaving(false);
     if (error) { toast.error(error.message); return; }
     setBookingSlotsRefreshKey((current) => current + 1);
-    toast.success("Agendamento enviado para confirmação da profissional.", { description: `${patientName.trim()} · ${selectedServices.map((service: any) => service.name).join(" + ")} · ${formatDate(scheduledDate)} às ${scheduledTime}` });
+    toast.success(editing ? "Agendamento atualizado e reenviado para confirmação." : "Agendamento enviado para confirmação da profissional.", { description: `${patientName.trim()} · ${selectedServices.map((service: any) => service.name).join(" + ")} · ${formatDate(scheduledDate)} às ${scheduledTime}` });
     reset(); onCreated();
   };
 
-  return <Dialog open={open} onOpenChange={handleOpenChange}><DialogContent className="!left-2 !right-2 !top-2 !bottom-[5.4rem] !w-auto !max-w-none !translate-x-0 !translate-y-0 min-w-0 max-h-none overflow-x-hidden overflow-y-auto rounded-2xl p-4 sm:!left-1/2 sm:!right-auto sm:!top-1/2 sm:!bottom-auto sm:!w-[calc(100%-2rem)] sm:!max-w-2xl sm:!translate-x-[-50%] sm:!translate-y-[-50%] sm:max-h-[92dvh] sm:rounded-3xl sm:p-6"><DialogHeader className="min-w-0 pr-6 text-left"><DialogTitle className="text-base sm:text-lg">Novo agendamento</DialogTitle><DialogDescription className="text-xs leading-relaxed sm:text-sm">O agendamento será criado como aguardando confirmação da profissional e com pagamento presencial.</DialogDescription></DialogHeader><div className="mt-1 grid min-w-0 gap-3 sm:mt-2 sm:grid-cols-2 sm:gap-4">
+  return <Dialog open={open} onOpenChange={handleOpenChange}><DialogContent className="!left-2 !right-2 !top-2 !bottom-[5.4rem] !w-auto !max-w-none !translate-x-0 !translate-y-0 min-w-0 max-h-none overflow-x-hidden overflow-y-auto rounded-2xl p-4 sm:!left-1/2 sm:!right-auto sm:!top-1/2 sm:!bottom-auto sm:!w-[calc(100%-2rem)] sm:!max-w-2xl sm:!translate-x-[-50%] sm:!translate-y-[-50%] sm:max-h-[92dvh] sm:rounded-3xl sm:p-6"><DialogHeader className="min-w-0 pr-6 text-left"><DialogTitle className="text-base sm:text-lg">{editing ? (editing.status === "cancelado" ? "Reagendar atendimento" : "Editar agendamento") : "Novo agendamento"}</DialogTitle><DialogDescription className="text-xs leading-relaxed sm:text-sm">{editing ? "Altere data, horário, serviços, profissional ou dados do cliente. Ao salvar, o agendamento volta para confirmação da profissional." : "O agendamento será criado como aguardando confirmação da profissional e com pagamento presencial."}</DialogDescription></DialogHeader><div className="mt-1 grid min-w-0 gap-3 sm:mt-2 sm:grid-cols-2 sm:gap-4">
     <div className="min-w-0 space-y-1.5 sm:col-span-2">
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
         <Label>Selecionar cliente cadastrado</Label>
@@ -540,7 +587,7 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated }: { open: bool
     <div className="space-y-1.5"><Label htmlFor="admin-scheduled-date">Data *</Label><Input id="admin-scheduled-date" type="date" min={todayIso()} value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} disabled={saving} /></div>
     <div className="space-y-1.5"><Label>Horário *</Label><Select value={scheduledTime} onValueChange={setScheduledTime} disabled={saving || loadingCatalog || bookingSlotsLoading || !professionalId || !scheduledDate}><SelectTrigger><SelectValue placeholder={bookingSlotsLoading ? "Carregando horários..." : bookingSlots.length ? "Selecione o horário" : "Sem horários disponíveis"} /></SelectTrigger><SelectContent>{bookingSlots.map((slot) => <SelectItem key={`${slot.slot}-${slot.source ?? "slot"}`} value={slot.slot}>{slot.slot}</SelectItem>)}</SelectContent></Select></div>
     <div className="space-y-1.5 sm:col-span-2"><Label htmlFor="admin-notes">Observações</Label><Textarea id="admin-notes" value={notes} onChange={(e) => setNotes(e.target.value)} className="min-h-24" disabled={saving} /></div>
-  </div><div className="mt-4 rounded-2xl bg-primary-soft/60 p-3 text-xs text-muted-foreground">Depois de criado, o card ficará em <strong className="text-foreground">Aguardando profissional</strong> até a colaboradora confirmar ou recusar.</div><DialogFooter className="sticky bottom-0 -mx-4 mt-4 gap-2 border-t border-border bg-background/95 px-4 pb-1 pt-3 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none sm:gap-0"><Button variant="outline" onClick={() => handleOpenChange(false)} disabled={saving}>Cancelar</Button><Button onClick={createAppointment} disabled={saving || loadingCatalog}>{saving ? "Salvando..." : "Criar agendamento"}</Button></DialogFooter></DialogContent></Dialog>;
+  </div><div className="mt-4 rounded-2xl bg-primary-soft/60 p-3 text-xs text-muted-foreground">{editing ? "Ao salvar as alterações, o agendamento volta para " : "Depois de criado, o card ficará em "}<strong className="text-foreground">Aguardando profissional</strong> até a colaboradora confirmar ou recusar.</div><DialogFooter className="sticky bottom-0 -mx-4 mt-4 gap-2 border-t border-border bg-background/95 px-4 pb-1 pt-3 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none sm:gap-0"><Button variant="outline" onClick={() => handleOpenChange(false)} disabled={saving}>Cancelar</Button><Button onClick={saveAppointment} disabled={saving || loadingCatalog}>{saving ? "Salvando..." : editing ? "Salvar e reagendar" : "Criar agendamento"}</Button></DialogFooter></DialogContent></Dialog>;
 }
 
 function CategoryButton({ active, label, count, onClick }: { active: boolean; label: string; count: number; onClick: () => void }) { return <button type="button" onClick={onClick} className={`flex min-h-[54px] items-center justify-between rounded-xl border px-3 text-left transition ${active ? "border-primary bg-primary-soft/70 text-primary" : "border-border bg-background hover:bg-secondary/40"}`}><span className="text-xs font-semibold sm:text-sm">{label}</span><span className={`grid min-w-7 place-items-center rounded-full px-2 py-1 text-[10px] font-semibold ${active ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>{count}</span></button>; }
