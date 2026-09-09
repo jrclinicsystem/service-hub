@@ -1611,7 +1611,9 @@ function FullFinanceWorkspace({
                     </div>
                     <div className="text-right">
                       <strong>
-                        {money(Number(row.original_amount) - Number(row.amount_received))}
+                        {row.status === "paid"
+                          ? money(Number(row.amount_received || row.original_amount))
+                          : money(Number(row.original_amount) - Number(row.amount_received))}
                       </strong>
                       <div className="mt-2 flex flex-wrap justify-end gap-2">
                         <Badge variant={statusVariant(row.display_status)}>
