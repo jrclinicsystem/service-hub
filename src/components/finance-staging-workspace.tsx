@@ -46,6 +46,26 @@ function monthStartIso() {
   return `${fortalezaIso().slice(0, 7)}-01`;
 }
 
+function addDaysIso(baseIso: string, days: number) {
+  const date = new Date(`${baseIso}T12:00:00`);
+  date.setDate(date.getDate() + days);
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+}
+
+function periodPreset(preset: string) {
+  const today = fortalezaIso();
+  const current = new Date(`${today}T12:00:00`);
+  if (preset === 'today') return [today, today];
+  if (preset === 'yesterday') { const d=addDaysIso(today,-1); return [d,d]; }
+  if (preset === '7d') return [addDaysIso(today,-6), today];
+  if (preset === 'week') { const dow=current.getDay(); const back=dow===0?6:dow-1; return [addDaysIso(today,-back), today]; }
+  if (preset === 'month') return [monthStartIso(), today];
+  if (preset === 'prevmonth') { const first=new Date(current.getFullYear(), current.getMonth()-1,1,12); const last=new Date(current.getFullYear(), current.getMonth(),0,12); const iso=(d:Date)=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; return [iso(first),iso(last)]; }
+  if (preset === '3m' || preset === '6m') { const months=preset==='3m'?2:5; const d=new Date(current.getFullYear(), current.getMonth()-months,1,12); const start=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`; return [start,today]; }
+  if (preset === 'year') return [`${today.slice(0,4)}-01-01`, today];
+  return [monthStartIso(), today];
+}
+
 function money(value: unknown) {
   return Number(value ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
@@ -502,6 +522,8 @@ function FullFinanceWorkspace({
   refresh,
 }: any) {
   const [busy, setBusy] = useState("");
+  const [activeTab, setActiveTab] = useState("overview");
+  const [periodChoice, setPeriodChoice] = useState("month");
   const [openingCash, setOpeningCash] = useState("200,00");
   const [countedCash, setCountedCash] = useState("");
   const [closingNote, setClosingNote] = useState("");
@@ -599,6 +621,23 @@ function FullFinanceWorkspace({
       ),
     [data?.entries, professionalFilter, serviceFilter, methodFilter, statusFilter],
   );
+  const groupedEntries = useMemo(() => {
+    const map = new Map<string, any[]>();
+    for (const row of filteredEntries) {
+      const key = row.business_date || fortalezaIso(new Date(row.occurred_at));
+      map.set(key, [...(map.get(key) ?? []), row]);
+    }
+    return [...map.entries()].sort((a,b)=>b[0].localeCompare(a[0]));
+  }, [filteredEntries]);
+  const groupedExpenses = useMemo(() => {
+    const map = new Map<string, any[]>();
+    for (const row of data?.expenses ?? []) {
+      const key = row.expense_date || fortalezaIso(new Date(row.created_at));
+      map.set(key, [...(map.get(key) ?? []), row]);
+    }
+    return [...map.entries()].sort((a,b)=>b[0].localeCompare(a[0]));
+  }, [data?.expenses]);
+
   const historicalCommissionCandidates = useMemo(
     () =>
       (data?.commissions ?? [])
@@ -742,19 +781,18 @@ function FullFinanceWorkspace({
             Operações, caixa, comissões, contas e relatórios em ambiente isolado.
           </p>
         </div>
-        <div className="grid gap-2 sm:grid-cols-2">
-          <div>
-            <Label>De</Label>
-            <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-          </div>
-          <div>
-            <Label>Até</Label>
-            <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+        <div className="space-y-2">
+          <select className={selectClass} value={periodChoice} onChange={(e) => { const value=e.target.value; setPeriodChoice(value); if(value!=="custom"){ const [start,end]=periodPreset(value); setFrom(start); setTo(end); } }}>
+            <option value="today">Hoje</option><option value="yesterday">Ontem</option><option value="week">Esta semana</option><option value="7d">Últimos 7 dias</option><option value="month">Este mês</option><option value="prevmonth">Mês anterior</option><option value="3m">Últimos 3 meses</option><option value="6m">Últimos 6 meses</option><option value="year">Este ano</option><option value="custom">Personalizado</option>
+          </select>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <div><Label>De</Label><Input type="date" value={from} onChange={(e) => { setPeriodChoice("custom"); setFrom(e.target.value); }} /></div>
+            <div><Label>Até</Label><Input type="date" value={to} onChange={(e) => { setPeriodChoice("custom"); setTo(e.target.value); }} /></div>
           </div>
         </div>
       </header>
 
-      <section className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {activeTab === "overview" ? <section className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           icon={TrendingUp}
           label="Faturamento do dia"
@@ -787,9 +825,9 @@ function FullFinanceWorkspace({
           label="Contas atrasadas"
           value={money(metricMap.get("payable_overdue"))}
         />
-      </section>
+      </section> : null}
 
-      <Tabs defaultValue="overview" className="mt-8">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-8">
         <TabsList className="h-auto w-full flex-wrap justify-start gap-1 rounded-2xl bg-muted/60 p-1.5">
           {(
             [
@@ -1025,7 +1063,18 @@ function FullFinanceWorkspace({
                   : undefined
             }
           >
-            <EntryList rows={filteredEntries} />
+            <div className="space-y-3">
+              {groupedEntries.map(([date, rows]) => { const total=(rows as any[]).reduce((sum,row)=>sum+Number(row.net_amount ?? row.charged_amount ?? 0),0); return (
+                <details key={date} className="group rounded-2xl border border-border bg-card" open>
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-3">
+                    <div><strong className="text-sm">{formatDate(date)}</strong><p className="text-[11px] text-muted-foreground">{(rows as any[]).length} lançamento(s)</p></div>
+                    <strong className="text-primary">{money(total)}</strong>
+                  </summary>
+                  <div className="border-t border-border p-3"><EntryList rows={rows as any[]} /></div>
+                </details>
+              ); })}
+              {!groupedEntries.length ? <p className="py-8 text-center text-sm text-muted-foreground">Nenhuma entrada no período selecionado.</p> : null}
+            </div>
           </Panel>
         </TabsContent>
 
@@ -1117,8 +1166,15 @@ function FullFinanceWorkspace({
             </div>
           </Panel>
           <Panel title="Despesas do período">
-            <div className="space-y-2">
-              {(data.expenses ?? []).map((row: any) => (
+            <div className="space-y-3">
+              {groupedExpenses.map(([date, dayRows]) => { const dayTotal=(dayRows as any[]).reduce((sum,row)=>sum+Number(row.amount ?? 0),0); return (
+              <details key={date} className="group rounded-2xl border border-border bg-card" open>
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-3">
+                  <div><strong className="text-sm">{formatDate(date)}</strong><p className="text-[11px] text-muted-foreground">{(dayRows as any[]).length} saída(s)</p></div>
+                  <strong className="text-destructive">{money(dayTotal)}</strong>
+                </summary>
+                <div className="space-y-2 border-t border-border p-3">
+              {(dayRows as any[]).map((row: any) => (
                 <div
                   key={row.expense_id}
                   className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border p-4"
@@ -1207,6 +1263,10 @@ function FullFinanceWorkspace({
                   ) : null}
                 </div>
               ))}
+                </div>
+              </details>
+              ); })}
+              {!groupedExpenses.length ? <p className="py-8 text-center text-sm text-muted-foreground">Nenhuma saída no período selecionado.</p> : null}
             </div>
           </Panel>
         </TabsContent>
