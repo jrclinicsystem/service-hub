@@ -80,6 +80,15 @@ function paymentLabel(item: any) {
   return "Aguardando pagamento";
 }
 
+function appointmentServiceLabel(item: any) {
+  const linked = [...(item?.appointment_services ?? [])]
+    .sort((a: any, b: any) => Number(a.position ?? 0) - Number(b.position ?? 0))
+    .map((entry: any) => entry?.service?.name)
+    .filter(Boolean);
+  if (linked.length) return linked.join(" + ");
+  return item?.service?.name ?? "Atendimento";
+}
+
 function statusLabel(status: string) {
   if (status === "atendido") return "Atendido";
   if (status === "confirmado") return "Confirmado";
@@ -141,7 +150,7 @@ function playNotificationSound(audioRef: { current: AudioContext | null }) {
 }
 
 async function fetchAppointment(id: string) {
-  const { data, error } = await db.from("appointments").select("id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status, created_at, status_updated_at, payment_choice, service_price_snapshot, deposit_percent, deposit_amount, balance_amount, service:services(name, price, duration_min), professional:professionals(name, specialty), payments(status, amount, kind, payment_method_id, provider, paid_at, created_at, status_detail)").eq("id", id).maybeSingle();
+  const { data, error } = await db.from("appointments").select("id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status, created_at, status_updated_at, payment_choice, service_price_snapshot, deposit_percent, deposit_amount, balance_amount, service:services(name, price, duration_min), appointment_services(position, service:services(name, price, duration_min)), professional:professionals(name, specialty), payments(status, amount, kind, payment_method_id, provider, paid_at, created_at, status_detail)").eq("id", id).maybeSingle();
   if (error) return null;
   return data;
 }
@@ -190,7 +199,7 @@ export function AdminAppointmentsWorkspace({ appointments, onStatusChange, onRef
       if (!detail) return;
       playNotificationSound(audioRef);
       setIncoming(detail);
-      toast.success("Novo agendamento realizado", { description: `${detail.patient_name} · ${detail.service?.name ?? "Atendimento"} · ${formatDate(detail.scheduled_date)} às ${detail.scheduled_time}` });
+      toast.success("Novo agendamento realizado", { description: `${detail.patient_name} · ${appointmentServiceLabel(detail)} · ${formatDate(detail.scheduled_date)} às ${detail.scheduled_time}` });
     };
     const channel = supabase.channel("jrclinic-admin-appointments").on("postgres_changes", { event: "INSERT", schema: "public", table: "appointments" }, notify).on("postgres_changes", { event: "UPDATE", schema: "public", table: "appointments" }, notify).subscribe();
     return () => { void supabase.removeChannel(channel); };
@@ -315,7 +324,7 @@ function AdminAppointmentCard({ appointment, onOpen, onDelete, onAttended, delet
     {proximity === "urgent" && appointment.status !== "cancelado" ? <div className="mb-3 flex items-center gap-2 rounded-xl bg-amber-100 px-3 py-2 text-xs font-semibold text-amber-900"><AlertTriangle className="size-4" /> {days === 0 ? "Atendimento hoje" : "Atendimento amanhã — recontato recomendado"}</div> : proximity === "soon" ? <div className="mb-3 rounded-xl bg-amber-100/60 px-3 py-2 text-[11px] font-medium text-amber-900">Faltam {days} dias para este atendimento.</div> : null}
     <button type="button" onClick={onOpen} className="block w-full min-w-0 max-w-full overflow-hidden text-left">
       <div className="flex min-w-0 flex-wrap items-start justify-between gap-2"><div className="min-w-0 flex-1 basis-[150px]"><p className="truncate text-base font-semibold">{appointment.patient_name}</p><p className="mt-0.5 truncate text-xs text-muted-foreground">{appointment.patient_email || "Sem e-mail"}</p></div><div className="max-w-full shrink-0"><AdminStatusBadge status={appointment.status} /></div></div>
-      <div className="mt-3 rounded-xl bg-secondary/45 p-3"><p className="truncate text-sm font-medium">{appointment.service?.name ?? "Atendimento"}</p><p className="mt-1 truncate text-xs text-muted-foreground">{appointment.professional?.name ?? "Profissional não definido"} · {appointment.professional?.specialty ?? "Equipe"}</p></div>
+      <div className="mt-3 rounded-xl bg-secondary/45 p-3"><p className="truncate text-sm font-medium">{appointmentServiceLabel(appointment)}</p><p className="mt-1 truncate text-xs text-muted-foreground">{appointment.professional?.name ?? "Profissional não definido"} · {appointment.professional?.specialty ?? "Equipe"}</p></div>
       <div className="mt-3 grid min-w-0 grid-cols-2 gap-2 min-[390px]:grid-cols-3"><SmallInfo label="Data" value={formatDate(appointment.scheduled_date)} /><SmallInfo label="Horário" value={appointment.scheduled_time} /><SmallInfo label="Pagamento" value={paymentLabel(appointment)} accent /></div>
     </button>
     {hasWhatsApp && appointment.status !== "cancelado" ? <div className="mt-3">{appointment.status === "confirmado" ? <Button type="button" size="sm" className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => openAppointmentWhatsApp(appointment, "chat")}><MessageCircle className="size-4" /> Falar com cliente</Button> : proximity === "urgent" ? <Button type="button" size="sm" className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => openAppointmentWhatsApp(appointment, "reminder")}><MessageCircle className="size-4" /> {days === 0 ? "Falar com cliente" : "Enviar lembrete no WhatsApp"}</Button> : <Button type="button" size="sm" variant="outline" className="rounded-xl border-emerald-600/40 text-emerald-700 hover:bg-emerald-50" onClick={() => openAppointmentWhatsApp(appointment, "confirmation")}><MessageCircle className="size-4" /> Confirmar pelo WhatsApp</Button>}</div> : null}
@@ -339,7 +348,7 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated }: { open: bool
   const [patientName, setPatientName] = useState("");
   const [patientEmail, setPatientEmail] = useState("");
   const [patientPhone, setPatientPhone] = useState("");
-  const [serviceId, setServiceId] = useState("");
+  const [serviceIds, setServiceIds] = useState<string[]>([]);
   const [appointmentValue, setAppointmentValue] = useState("");
   const [professionalId, setProfessionalId] = useState("");
   const [scheduledDate, setScheduledDate] = useState(todayIso());
@@ -412,10 +421,26 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated }: { open: bool
   }, [open, professionalId]);
 
   const availableProfessionals = useMemo(() => {
-    if (!serviceId) return [];
-    const allowed = new Set(links.filter((link) => link.service_id === serviceId).map((link) => link.professional_id));
-    return professionals.filter((professional) => allowed.has(professional.id));
-  }, [serviceId, links, professionals]);
+    if (!serviceIds.length) return [];
+    return professionals.filter((professional) =>
+      serviceIds.every((serviceId) => links.some((link) => link.service_id === serviceId && link.professional_id === professional.id)),
+    );
+  }, [serviceIds, links, professionals]);
+
+  const selectedServices = useMemo(
+    () => serviceIds.map((id) => services.find((service) => service.id === id)).filter(Boolean),
+    [serviceIds, services],
+  );
+
+  const toggleService = (id: string) => {
+    setProfessionalId("");
+    setServiceIds((current) => {
+      const next = current.includes(id) ? current.filter((item) => item !== id) : [...current, id];
+      const total = next.reduce((sum, serviceId) => sum + Number(services.find((service) => service.id === serviceId)?.price ?? 0), 0);
+      setAppointmentValue(total.toFixed(2));
+      return next;
+    });
+  };
 
 
   const selectSavedClient = (clientId: string) => {
@@ -434,19 +459,17 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated }: { open: bool
     setPatientEmail("");
   };
 
-  const reset = () => { setSelectedClientId(""); setPatientName(""); setPatientEmail(""); setPatientPhone(""); setServiceId(""); setAppointmentValue(""); setProfessionalId(""); setScheduledDate(todayIso()); setScheduledTime(""); setNotes(""); };
+  const reset = () => { setSelectedClientId(""); setPatientName(""); setPatientEmail(""); setPatientPhone(""); setServiceIds([]); setAppointmentValue(""); setProfessionalId(""); setScheduledDate(todayIso()); setScheduledTime(""); setNotes(""); };
   const handleOpenChange = (next: boolean) => { if (!next && !saving) reset(); onOpenChange(next); };
 
   const createAppointment = async () => {
     if (!patientName.trim()) { toast.error("Informe o nome do cliente."); return; }
-    if (!serviceId) { toast.error("Selecione o serviço."); return; }
+    if (!serviceIds.length) { toast.error("Selecione ao menos um serviço."); return; }
     if (!professionalId) { toast.error("Selecione o profissional."); return; }
     if (!scheduledDate || scheduledDate < todayIso()) { toast.error("Selecione uma data válida."); return; }
     if (!scheduledTime) { toast.error("Selecione o horário."); return; }
-    const validLink = links.some((link) => link.service_id === serviceId && link.professional_id === professionalId);
-    if (!validLink) { toast.error("Esse profissional não atende o serviço selecionado."); return; }
-    const service = services.find((item) => item.id === serviceId);
-    if (!service) { toast.error("Serviço não encontrado."); return; }
+    const invalidLink = serviceIds.some((serviceId) => !links.some((link) => link.service_id === serviceId && link.professional_id === professionalId));
+    if (invalidLink) { toast.error("Esse profissional não atende todos os serviços selecionados."); return; }
     const parsedValue = Number(appointmentValue.replace(",", "."));
     if (!Number.isFinite(parsedValue) || parsedValue < 0) { toast.error("Informe um valor válido para o atendimento."); return; }
     const total = Math.round((parsedValue + Number.EPSILON) * 100) / 100;
@@ -454,11 +477,22 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated }: { open: bool
     const conflict = await db.from("appointments").select("id").eq("professional_id", professionalId).eq("scheduled_date", scheduledDate).eq("scheduled_time", scheduledTime).neq("status", "cancelado").limit(1).maybeSingle();
     if (conflict.error) { setSaving(false); toast.error(conflict.error.message); return; }
     if (conflict.data) { setSaving(false); toast.error("Este profissional já possui um agendamento nesse horário."); return; }
-    const { error } = await db.from("appointments").insert({ user_id: null, client_id: selectedClientId || null, service_id: serviceId, professional_id: professionalId, patient_name: patientName.trim(), patient_email: patientEmail.trim(), patient_phone: patientPhone.trim(), notes: notes.trim(), scheduled_date: scheduledDate, scheduled_time: scheduledTime, status: "pendente", payment_choice: "onsite", service_price_snapshot: total, deposit_percent: 0, deposit_amount: 0, balance_amount: total });
+    const { error } = await db.rpc("create_admin_multi_service_appointment", {
+      _client_id: selectedClientId || null,
+      _patient_name: patientName.trim(),
+      _patient_email: patientEmail.trim(),
+      _patient_phone: patientPhone.trim(),
+      _service_ids: serviceIds,
+      _professional_id: professionalId,
+      _scheduled_date: scheduledDate,
+      _scheduled_time: scheduledTime,
+      _notes: notes.trim(),
+      _total: total,
+    });
     setSaving(false);
     if (error) { toast.error(error.message); return; }
     setBookingSlotsRefreshKey((current) => current + 1);
-    toast.success("Agendamento enviado para confirmação da profissional.", { description: `${patientName.trim()} · ${service.name} · ${formatDate(scheduledDate)} às ${scheduledTime}` });
+    toast.success("Agendamento enviado para confirmação da profissional.", { description: `${patientName.trim()} · ${selectedServices.map((service: any) => service.name).join(" + ")} · ${formatDate(scheduledDate)} às ${scheduledTime}` });
     reset(); onCreated();
   };
 
@@ -477,9 +511,15 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated }: { open: bool
     <div className="space-y-1.5 sm:col-span-2"><Label htmlFor="admin-patient-name">Nome do cliente *</Label><Input id="admin-patient-name" value={patientName} onChange={(e) => setPatientName(e.target.value)} disabled={saving} /></div>
     <div className="space-y-1.5"><Label htmlFor="admin-patient-phone">WhatsApp</Label><Input id="admin-patient-phone" inputMode="tel" value={patientPhone} onChange={(e) => setPatientPhone(e.target.value)} placeholder="(85) 99999-9999" disabled={saving} /></div>
     <div className="space-y-1.5"><Label htmlFor="admin-patient-email">E-mail</Label><Input id="admin-patient-email" type="email" value={patientEmail} onChange={(e) => setPatientEmail(e.target.value)} disabled={saving} /></div>
-    <div className="space-y-1.5 sm:col-span-2"><Label>Serviço *</Label><Select value={serviceId} onValueChange={(value) => { setServiceId(value); setProfessionalId(""); const service = services.find((item) => item.id === value); setAppointmentValue(service ? String(Number(service.price ?? 0).toFixed(2)) : ""); }} disabled={saving || loadingCatalog}><SelectTrigger><SelectValue placeholder="Selecione o serviço" /></SelectTrigger><SelectContent>{services.map((service) => <SelectItem key={service.id} value={service.id}>{service.name} · {formatPrice(Number(service.price ?? 0))}</SelectItem>)}</SelectContent></Select></div>
-    <div className="space-y-1.5 sm:col-span-2"><Label htmlFor="admin-appointment-value">Valor do atendimento *</Label><Input id="admin-appointment-value" type="number" min="0" step="0.01" inputMode="decimal" value={appointmentValue} onChange={(e) => setAppointmentValue(e.target.value)} disabled={saving || !serviceId} /><p className="text-[11px] text-muted-foreground">O valor padrão do serviço é preenchido automaticamente. Altere aqui para aplicar qualquer desconto ou valor combinado sem mudar o catálogo.</p></div>
-    <div className="space-y-1.5 sm:col-span-2"><Label>Profissional *</Label><Select value={professionalId} onValueChange={setProfessionalId} disabled={saving || !serviceId || availableProfessionals.length === 0}><SelectTrigger><SelectValue placeholder={!serviceId ? "Escolha primeiro o serviço" : "Selecione o profissional"} /></SelectTrigger><SelectContent>{availableProfessionals.map((professional) => <SelectItem key={professional.id} value={professional.id}>{professional.name}{professional.specialty ? ` · ${professional.specialty}` : ""}</SelectItem>)}</SelectContent></Select></div>
+    <div className="space-y-2 sm:col-span-2">
+      <div className="flex items-center justify-between gap-3"><Label>Serviços *</Label><span className="text-[11px] text-muted-foreground">{serviceIds.length ? `${serviceIds.length} selecionado(s)` : "Selecione um ou mais"}</span></div>
+      <div className="grid max-h-52 gap-2 overflow-y-auto rounded-2xl border border-border bg-background p-2 sm:grid-cols-2">
+        {services.map((service) => { const checked = serviceIds.includes(service.id); return <button key={service.id} type="button" disabled={saving || loadingCatalog} onClick={() => toggleService(service.id)} className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left transition ${checked ? "border-primary bg-primary-soft/70 text-primary" : "border-border bg-card hover:bg-secondary/40"}`}><span className="min-w-0"><span className="block truncate text-sm font-medium">{service.name}</span><span className="mt-0.5 block text-[11px] text-muted-foreground">{formatPrice(Number(service.price ?? 0))}</span></span><span className={`grid size-6 shrink-0 place-items-center rounded-lg border ${checked ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background"}`}>{checked ? <Check className="size-3.5" /> : null}</span></button>; })}
+      </div>
+      <p className="text-[11px] text-muted-foreground">Você pode marcar vários procedimentos no mesmo agendamento. O profissional precisa atender todos os serviços escolhidos.</p>
+    </div>
+    <div className="space-y-1.5 sm:col-span-2"><Label htmlFor="admin-appointment-value">Valor total do atendimento *</Label><Input id="admin-appointment-value" type="number" min="0" step="0.01" inputMode="decimal" value={appointmentValue} onChange={(e) => setAppointmentValue(e.target.value)} disabled={saving || !serviceIds.length} /><p className="text-[11px] text-muted-foreground">A soma dos serviços é preenchida automaticamente. Altere aqui para aplicar desconto ou valor combinado sem mudar o catálogo.</p></div>
+    <div className="space-y-1.5 sm:col-span-2"><Label>Profissional *</Label><Select value={professionalId} onValueChange={setProfessionalId} disabled={saving || !serviceIds.length || availableProfessionals.length === 0}><SelectTrigger><SelectValue placeholder={!serviceIds.length ? "Escolha primeiro os serviços" : availableProfessionals.length ? "Selecione o profissional" : "Nenhum profissional atende todos os serviços"} /></SelectTrigger><SelectContent>{availableProfessionals.map((professional) => <SelectItem key={professional.id} value={professional.id}>{professional.name}{professional.specialty ? ` · ${professional.specialty}` : ""}</SelectItem>)}</SelectContent></Select></div>
     <div className="space-y-1.5"><Label htmlFor="admin-scheduled-date">Data *</Label><Input id="admin-scheduled-date" type="date" min={todayIso()} value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} disabled={saving} /></div>
     <div className="space-y-1.5"><Label>Horário *</Label><Select value={scheduledTime} onValueChange={setScheduledTime} disabled={saving || loadingCatalog || bookingSlotsLoading || !professionalId || !scheduledDate}><SelectTrigger><SelectValue placeholder={bookingSlotsLoading ? "Carregando horários..." : bookingSlots.length ? "Selecione o horário" : "Sem horários disponíveis"} /></SelectTrigger><SelectContent>{bookingSlots.map((slot) => <SelectItem key={`${slot.slot}-${slot.source ?? "slot"}`} value={slot.slot}>{slot.slot}</SelectItem>)}</SelectContent></Select></div>
     <div className="space-y-1.5 sm:col-span-2"><Label htmlFor="admin-notes">Observações</Label><Textarea id="admin-notes" value={notes} onChange={(e) => setNotes(e.target.value)} className="min-h-24" disabled={saving} /></div>
@@ -523,7 +563,7 @@ function AppointmentAdminDialog({ appointment, open, onOpenChange, onConfirm, on
   const days = daysUntilAppointment(appointment.scheduled_date);
   const proximity = appointmentProximity(appointment.scheduled_date);
   const hasWhatsApp = normalizeWhatsAppPhone(appointment.patient_phone).length > 0;
-  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="max-h-[92dvh] w-[calc(100%-1rem)] overflow-y-auto rounded-3xl p-5 sm:max-w-2xl sm:p-6"><DialogHeader><div className="flex flex-wrap items-center gap-2"><DialogTitle>{appointment.patient_name}</DialogTitle><AdminStatusBadge status={appointment.status} /></div><DialogDescription>{appointment.service?.name ?? "Atendimento"} · {formatDate(appointment.scheduled_date)} às {appointment.scheduled_time}</DialogDescription></DialogHeader>
+  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="max-h-[92dvh] w-[calc(100%-1rem)] overflow-y-auto rounded-3xl p-5 sm:max-w-2xl sm:p-6"><DialogHeader><div className="flex flex-wrap items-center gap-2"><DialogTitle>{appointment.patient_name}</DialogTitle><AdminStatusBadge status={appointment.status} /></div><DialogDescription>{appointmentServiceLabel(appointment)} · {formatDate(appointment.scheduled_date)} às {appointment.scheduled_time}</DialogDescription></DialogHeader>
     {proximity === "urgent" && appointment.status !== "cancelado" ? <div className="mt-2 flex items-center gap-2 rounded-xl bg-amber-100 p-3 text-xs font-semibold text-amber-900"><AlertTriangle className="size-4" /> {days === 0 ? "Atendimento hoje" : "Atendimento amanhã — faça o recontato"}</div> : null}
     <div className="mt-2 rounded-2xl bg-primary-soft/60 p-4"><div className="flex items-center gap-2 text-primary"><CreditCard className="size-4" /><p className="text-sm font-semibold">{paymentLabel(appointment)}</p></div><div className="mt-3 grid grid-cols-3 gap-2"><SmallInfo label="Total" value={formatPrice(total)} /><SmallInfo label="Pago" value={formatPrice(paid)} /><SmallInfo label="Restante" value={formatPrice(Number(appointment.balance_amount ?? Math.max(0, total - paid)))} /></div>{approved?.paid_at ? <p className="mt-3 text-[11px] text-muted-foreground">Pagamento confirmado em {formatDateTime(approved.paid_at)}</p> : null}</div>
     <AppointmentPriceEditor appointment={appointment} onSaved={onPriceSaved} />
@@ -539,5 +579,5 @@ function AppointmentAdminDialog({ appointment, open, onOpenChange, onConfirm, on
 function NewAppointmentAlert({ appointment, open, onLater, onConfirm, onCancel, busy }: any) {
   if (!appointment) return null;
   const hasWhatsApp = normalizeWhatsAppPhone(appointment.patient_phone).length > 0;
-  return <Dialog open={open} onOpenChange={(next) => !next && onLater()}><DialogContent className="w-[calc(100%-1rem)] rounded-3xl p-5 sm:max-w-md sm:p-6"><DialogHeader><span className="mb-2 grid size-12 place-items-center rounded-2xl bg-primary-soft text-primary"><BellRing className="size-5" /></span><DialogTitle>Novo agendamento realizado</DialogTitle><DialogDescription>A profissional ainda precisa confirmar este atendimento.</DialogDescription></DialogHeader><div className="mt-2 rounded-2xl border border-border bg-secondary/40 p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate font-semibold">{appointment.patient_name}</p><p className="mt-1 truncate text-xs text-muted-foreground">{appointment.service?.name ?? "Atendimento"}</p></div><AdminStatusBadge status={appointment.status} /></div><div className="mt-3 grid grid-cols-2 gap-2"><SmallInfo label="Data" value={formatDate(appointment.scheduled_date)} /><SmallInfo label="Horário" value={appointment.scheduled_time} /><SmallInfo label="Profissional" value={appointment.professional?.name ?? "—"} /><SmallInfo label="Pagamento" value={paymentLabel(appointment)} accent /></div></div>{hasWhatsApp ? <Button variant="outline" className="mt-3 w-full rounded-xl border-emerald-600/40 text-emerald-700" onClick={() => openAppointmentWhatsApp(appointment, "confirmation")}><MessageCircle className="size-4" /> Confirmar pelo WhatsApp</Button> : null}<DialogFooter className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3 sm:space-x-0"><Button variant="outline" disabled={busy} onClick={onLater}>Depois</Button><Button variant="destructive" disabled={busy} onClick={onCancel}>Cancelar</Button><Button disabled={busy} onClick={onConfirm}>Confirmar</Button></DialogFooter></DialogContent></Dialog>;
+  return <Dialog open={open} onOpenChange={(next) => !next && onLater()}><DialogContent className="w-[calc(100%-1rem)] rounded-3xl p-5 sm:max-w-md sm:p-6"><DialogHeader><span className="mb-2 grid size-12 place-items-center rounded-2xl bg-primary-soft text-primary"><BellRing className="size-5" /></span><DialogTitle>Novo agendamento realizado</DialogTitle><DialogDescription>A profissional ainda precisa confirmar este atendimento.</DialogDescription></DialogHeader><div className="mt-2 rounded-2xl border border-border bg-secondary/40 p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate font-semibold">{appointment.patient_name}</p><p className="mt-1 truncate text-xs text-muted-foreground">{appointmentServiceLabel(appointment)}</p></div><AdminStatusBadge status={appointment.status} /></div><div className="mt-3 grid grid-cols-2 gap-2"><SmallInfo label="Data" value={formatDate(appointment.scheduled_date)} /><SmallInfo label="Horário" value={appointment.scheduled_time} /><SmallInfo label="Profissional" value={appointment.professional?.name ?? "—"} /><SmallInfo label="Pagamento" value={paymentLabel(appointment)} accent /></div></div>{hasWhatsApp ? <Button variant="outline" className="mt-3 w-full rounded-xl border-emerald-600/40 text-emerald-700" onClick={() => openAppointmentWhatsApp(appointment, "confirmation")}><MessageCircle className="size-4" /> Confirmar pelo WhatsApp</Button> : null}<DialogFooter className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3 sm:space-x-0"><Button variant="outline" disabled={busy} onClick={onLater}>Depois</Button><Button variant="destructive" disabled={busy} onClick={onCancel}>Cancelar</Button><Button disabled={busy} onClick={onConfirm}>Confirmar</Button></DialogFooter></DialogContent></Dialog>;
 }
