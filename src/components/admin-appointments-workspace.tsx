@@ -505,9 +505,9 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated }: { open: bool
     reset(); onCreated();
   };
 
-  return <Dialog open={open} onOpenChange={handleOpenChange}><DialogContent className="max-h-[92dvh] w-[calc(100%-1rem)] overflow-y-auto rounded-3xl p-5 sm:max-w-2xl sm:p-6"><DialogHeader><DialogTitle>Novo agendamento</DialogTitle><DialogDescription>O agendamento será criado como aguardando confirmação da profissional e com pagamento presencial.</DialogDescription></DialogHeader><div className="mt-2 grid gap-4 sm:grid-cols-2">
-    <div className="space-y-1.5 sm:col-span-2">
-      <div className="flex items-center justify-between gap-3">
+  return <Dialog open={open} onOpenChange={handleOpenChange}><DialogContent className="!left-2 !right-2 !top-2 !bottom-[5.4rem] !w-auto !max-w-none !translate-x-0 !translate-y-0 min-w-0 max-h-none overflow-x-hidden overflow-y-auto rounded-2xl p-4 sm:!left-1/2 sm:!right-auto sm:!top-1/2 sm:!bottom-auto sm:!w-[calc(100%-2rem)] sm:!max-w-2xl sm:!translate-x-[-50%] sm:!translate-y-[-50%] sm:max-h-[92dvh] sm:rounded-3xl sm:p-6"><DialogHeader className="min-w-0 pr-6 text-left"><DialogTitle className="text-base sm:text-lg">Novo agendamento</DialogTitle><DialogDescription className="text-xs leading-relaxed sm:text-sm">O agendamento será criado como aguardando confirmação da profissional e com pagamento presencial.</DialogDescription></DialogHeader><div className="mt-1 grid min-w-0 gap-3 sm:mt-2 sm:grid-cols-2 sm:gap-4">
+    <div className="min-w-0 space-y-1.5 sm:col-span-2">
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
         <Label>Selecionar cliente cadastrado</Label>
         {selectedClientId ? <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={clearSavedClient} disabled={saving}>Preencher manualmente</Button> : null}
       </div>
@@ -520,8 +520,8 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated }: { open: bool
     <div className="space-y-1.5 sm:col-span-2"><Label htmlFor="admin-patient-name">Nome do cliente *</Label><Input id="admin-patient-name" value={patientName} onChange={(e) => setPatientName(e.target.value)} disabled={saving} /></div>
     <div className="space-y-1.5"><Label htmlFor="admin-patient-phone">WhatsApp</Label><Input id="admin-patient-phone" inputMode="tel" value={patientPhone} onChange={(e) => setPatientPhone(e.target.value)} placeholder="(85) 99999-9999" disabled={saving} /></div>
     <div className="space-y-1.5"><Label htmlFor="admin-patient-email">E-mail</Label><Input id="admin-patient-email" type="email" value={patientEmail} onChange={(e) => setPatientEmail(e.target.value)} disabled={saving} /></div>
-    <div className="space-y-2 sm:col-span-2">
-      <div className="flex items-center justify-between gap-3"><Label>Serviços *</Label><span className="text-[11px] text-muted-foreground">{serviceIds.length ? `${serviceIds.length} selecionado(s)` : "Selecione um ou mais"}</span></div>
+    <div className="min-w-0 space-y-2 sm:col-span-2">
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2"><Label>Serviços *</Label><span className="text-[11px] text-muted-foreground">{serviceIds.length ? `${serviceIds.length} selecionado(s)` : "Selecione um ou mais"}</span></div>
       <div className="rounded-2xl border border-border bg-background p-2">
         <div className="sticky top-0 z-10 mb-2 bg-background pb-1">
           <div className="relative">
@@ -529,7 +529,7 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated }: { open: bool
             <Input value={serviceSearch} onChange={(event) => setServiceSearch(event.target.value)} placeholder="Pesquisar procedimento..." className="h-10 rounded-xl border-primary/25 bg-card pl-9 pr-3 text-sm shadow-sm focus-visible:ring-primary/25" disabled={saving || loadingCatalog} />
           </div>
         </div>
-        <div className="grid max-h-52 gap-2 overflow-y-auto sm:grid-cols-2">
+        <div className="grid max-h-56 min-w-0 grid-cols-1 gap-2 overflow-y-auto sm:max-h-52 sm:grid-cols-2">
           {filteredServices.length ? filteredServices.map((service) => { const checked = serviceIds.includes(service.id); return <button key={service.id} type="button" disabled={saving || loadingCatalog} onClick={() => toggleService(service.id)} className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left transition ${checked ? "border-primary bg-primary-soft/70 text-primary" : "border-border bg-card hover:bg-secondary/40"}`}><span className="min-w-0"><span className="block truncate text-sm font-medium">{service.name}</span><span className="mt-0.5 block text-[11px] text-muted-foreground">{formatPrice(Number(service.price ?? 0))}</span></span><span className={`grid size-6 shrink-0 place-items-center rounded-lg border ${checked ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background"}`}>{checked ? <Check className="size-3.5" /> : null}</span></button>; }) : <div className="py-5 text-center text-xs text-muted-foreground sm:col-span-2">Nenhum serviço encontrado.</div>}
         </div>
       </div>
@@ -540,7 +540,7 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated }: { open: bool
     <div className="space-y-1.5"><Label htmlFor="admin-scheduled-date">Data *</Label><Input id="admin-scheduled-date" type="date" min={todayIso()} value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} disabled={saving} /></div>
     <div className="space-y-1.5"><Label>Horário *</Label><Select value={scheduledTime} onValueChange={setScheduledTime} disabled={saving || loadingCatalog || bookingSlotsLoading || !professionalId || !scheduledDate}><SelectTrigger><SelectValue placeholder={bookingSlotsLoading ? "Carregando horários..." : bookingSlots.length ? "Selecione o horário" : "Sem horários disponíveis"} /></SelectTrigger><SelectContent>{bookingSlots.map((slot) => <SelectItem key={`${slot.slot}-${slot.source ?? "slot"}`} value={slot.slot}>{slot.slot}</SelectItem>)}</SelectContent></Select></div>
     <div className="space-y-1.5 sm:col-span-2"><Label htmlFor="admin-notes">Observações</Label><Textarea id="admin-notes" value={notes} onChange={(e) => setNotes(e.target.value)} className="min-h-24" disabled={saving} /></div>
-  </div><div className="mt-4 rounded-2xl bg-primary-soft/60 p-3 text-xs text-muted-foreground">Depois de criado, o card ficará em <strong className="text-foreground">Aguardando profissional</strong> até a colaboradora confirmar ou recusar.</div><DialogFooter className="mt-4 gap-2 sm:gap-0"><Button variant="outline" onClick={() => handleOpenChange(false)} disabled={saving}>Cancelar</Button><Button onClick={createAppointment} disabled={saving || loadingCatalog}>{saving ? "Salvando..." : "Criar agendamento"}</Button></DialogFooter></DialogContent></Dialog>;
+  </div><div className="mt-4 rounded-2xl bg-primary-soft/60 p-3 text-xs text-muted-foreground">Depois de criado, o card ficará em <strong className="text-foreground">Aguardando profissional</strong> até a colaboradora confirmar ou recusar.</div><DialogFooter className="sticky bottom-0 -mx-4 mt-4 gap-2 border-t border-border bg-background/95 px-4 pb-1 pt-3 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none sm:gap-0"><Button variant="outline" onClick={() => handleOpenChange(false)} disabled={saving}>Cancelar</Button><Button onClick={createAppointment} disabled={saving || loadingCatalog}>{saving ? "Salvando..." : "Criar agendamento"}</Button></DialogFooter></DialogContent></Dialog>;
 }
 
 function CategoryButton({ active, label, count, onClick }: { active: boolean; label: string; count: number; onClick: () => void }) { return <button type="button" onClick={onClick} className={`flex min-h-[54px] items-center justify-between rounded-xl border px-3 text-left transition ${active ? "border-primary bg-primary-soft/70 text-primary" : "border-border bg-background hover:bg-secondary/40"}`}><span className="text-xs font-semibold sm:text-sm">{label}</span><span className={`grid min-w-7 place-items-center rounded-full px-2 py-1 text-[10px] font-semibold ${active ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>{count}</span></button>; }
@@ -596,7 +596,7 @@ function AppointmentAdminDialog({ appointment, open, onOpenChange, onConfirm, on
 function NewAppointmentAlert({ appointment, open, onLater, onConfirm, onCancel, busy }: any) {
   if (!appointment) return null;
   const hasWhatsApp = normalizeWhatsAppPhone(appointment.patient_phone).length > 0;
-  const servicesLabel = appointmentServicesLabel(appointment);
+  const servicesLabel = appointmentServiceLabel(appointment);
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onLater()}>
       <DialogContent className="w-[calc(100vw-1.5rem)] max-w-[460px] min-w-0 overflow-hidden rounded-3xl p-5 sm:p-6">
