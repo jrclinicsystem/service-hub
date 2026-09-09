@@ -29,3 +29,4 @@ jobs:
           git add src/components/admin-appointments-workspace.tsx src/components/ui/dialog.tsx .github/scripts/fix_notification_and_search_visibility.py .github/workflows/fix-alert-and-service-search.yml
           git commit -m "fix: stabilize appointment alert and expose service search"
           git push
+# rerun 2
