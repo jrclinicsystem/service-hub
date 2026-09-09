@@ -57,6 +57,11 @@ function FinancePage() {
             grid-template-columns: minmax(0, 1fr) !important;
           }
 
+          /* FinanceCompletionSuite belongs exclusively to the Visão geral tab. */
+          .finance-page:has([role="tablist"] > [role="tab"][data-state="active"]:not(:first-child)) > section:last-child {
+            display: none !important;
+          }
+
           @media (min-width: 1024px) {
             .finance-page:has([role="tablist"] > [role="tab"][data-state="active"]:not(:first-child)) > section:first-of-type {
               display: none;
