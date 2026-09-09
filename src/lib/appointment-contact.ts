@@ -53,8 +53,12 @@ function formatAppointmentDate(value?: string | null) {
   return `${weekday}, ${dateLabel}`;
 }
 
-export function appointmentWhatsAppMessage(appointment: AppointmentContactData, kind: "confirmation" | "reminder") {
+export function appointmentWhatsAppMessage(appointment: AppointmentContactData, kind: "confirmation" | "reminder" | "chat") {
   const total = Number(appointment.service_price_snapshot ?? appointment.service?.price ?? 0);
+  if (kind === "chat") {
+    return `Olá, ${appointment.patient_name ?? "cliente"}! Tudo bem?`;
+  }
+
   const lines = kind === "reminder"
     ? [
         `Olá, ${appointment.patient_name ?? "cliente"}! Tudo bem?`,
@@ -81,7 +85,7 @@ export function appointmentWhatsAppMessage(appointment: AppointmentContactData, 
   return lines.join("\n");
 }
 
-export function appointmentWhatsAppUrl(appointment: AppointmentContactData, kind: "confirmation" | "reminder") {
+export function appointmentWhatsAppUrl(appointment: AppointmentContactData, kind: "confirmation" | "reminder" | "chat") {
   const phone = normalizeWhatsAppPhone(appointment.patient_phone);
   if (!phone) return null;
   return `https://wa.me/${phone}?text=${encodeURIComponent(appointmentWhatsAppMessage(appointment, kind))}`;
