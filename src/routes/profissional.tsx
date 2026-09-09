@@ -668,7 +668,7 @@ function ProfessionalAppointmentCard({ appointment, onSaved }: any) {
     onSaved?.();
   };
 
-  const openWhatsApp = (kind: "confirmation" | "reminder") => {
+  const openWhatsApp = (kind: "confirmation" | "reminder" | "chat") => {
     const url = appointmentWhatsAppUrl(appointment, kind);
     if (!url) {
       toast.error("Este cliente não possui WhatsApp cadastrado.");
@@ -818,7 +818,16 @@ function ProfessionalAppointmentCard({ appointment, onSaved }: any) {
       ) : null}
       {appointment.status !== "cancelado" && hasWhatsApp ? (
         <div className="mt-3 flex flex-wrap gap-2">
-          {proximity === "urgent" ? (
+          {confirmed ? (
+            <Button
+              type="button"
+              className="h-auto max-w-full whitespace-normal rounded-xl bg-emerald-600 py-2 text-white hover:bg-emerald-700"
+              onClick={() => openWhatsApp("chat")}
+            >
+              <MessageCircle className="size-4" />{" "}
+              Falar com cliente
+            </Button>
+          ) : proximity === "urgent" ? (
             <Button
               type="button"
               className="h-auto max-w-full whitespace-normal rounded-xl bg-emerald-600 py-2 text-white hover:bg-emerald-700"
@@ -835,7 +844,7 @@ function ProfessionalAppointmentCard({ appointment, onSaved }: any) {
               onClick={() => openWhatsApp("confirmation")}
             >
               <MessageCircle className="size-4" />{" "}
-              {waiting ? "Confirmar pelo WhatsApp" : "Enviar mensagem no WhatsApp"}
+              Confirmar pelo WhatsApp
             </Button>
           )}
         </div>
