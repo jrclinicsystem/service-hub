@@ -579,6 +579,7 @@ function FullFinanceWorkspace({
   });
   const [payMethod, setPayMethod] = useState("pix");
   const [receiveMethod, setReceiveMethod] = useState("pix");
+  const [showPaidReceivables, setShowPaidReceivables] = useState(false);
   const [settlement, setSettlement] = useState({
     professional: "",
     start: monthStartIso(),
@@ -1426,6 +1427,28 @@ function FullFinanceWorkspace({
                         <Badge variant={statusVariant(row.display_status)}>
                           {statusLabel(row.display_status)}
                         </Badge>
+                        {row.status === "paid" ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={busy === `reverse-receivable-${row.id}`}
+                            onClick={() => {
+                              if (!window.confirm(`Reverter a baixa de ${row.client_name_snapshot}? O valor sairá das entradas e esta conta voltará para Pendente.`)) return;
+                              run(
+                                `reverse-receivable-${row.id}`,
+                                async () => {
+                                  const result = await db.rpc("reverse_account_receivable_payment", {
+                                    _receivable_id: row.id,
+                                  });
+                                  if (result.error) throw result.error;
+                                },
+                                "Baixa revertida. A conta voltou para Pendente.",
+                              );
+                            }}
+                          >
+                            Reverter baixa
+                          </Button>
+                        ) : null}
                         {row.status === "pending" ? (
                           <>
                             <Button
@@ -1535,8 +1558,17 @@ function FullFinanceWorkspace({
                   </option>
                 ))}
               </select>
+              <div className="mb-3 flex justify-end">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setShowPaidReceivables((current) => !current)}
+                >
+                  {showPaidReceivables ? "Ocultar baixadas" : "Mostrar baixadas"}
+                </Button>
+              </div>
               <div className="space-y-2">
-                {(data.receivables ?? []).map((row: any) => (
+                {(data.receivables ?? []).filter((row: any) => showPaidReceivables || row.status === "pending").map((row: any) => (
                   <div
                     key={row.id}
                     className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border p-4"
