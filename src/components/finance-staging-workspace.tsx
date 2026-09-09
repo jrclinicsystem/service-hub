@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   Banknote,
   CalendarClock,
+  ChevronDown,
   CheckCircle2,
   CircleDollarSign,
   CreditCard,
@@ -1121,13 +1122,17 @@ function FullFinanceWorkspace({
                   ? "Valores pendentes ficam em contas a receber e só entram na receita quando forem pagos."
                   : undefined
             }
+            collapsible
           >
             <div className="space-y-3">
               {groupedEntries.map(([date, rows]) => { const total=(rows as any[]).reduce((sum,row)=>sum+Number(row.net_amount ?? row.charged_amount ?? 0),0); return (
-                <details key={date} className="group rounded-2xl border border-border bg-card" open>
+                <details key={date} className="group rounded-2xl border border-border bg-card">
                   <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-3">
                     <div><strong className="text-sm">{formatDate(date)}</strong><p className="text-[11px] text-muted-foreground">{(rows as any[]).length} lançamento(s)</p></div>
-                    <strong className="text-primary">{money(total)}</strong>
+                    <div className="flex items-center gap-2">
+                      <strong className="text-primary">{money(total)}</strong>
+                      <ChevronDown className="size-4 text-muted-foreground transition-transform duration-200 group-open:rotate-180" />
+                    </div>
                   </summary>
                   <div className="border-t border-border p-3"><EntryList rows={rows as any[]} /></div>
                 </details>
@@ -1224,13 +1229,16 @@ function FullFinanceWorkspace({
               </select>
             </div>
           </Panel>
-          <Panel title="Despesas do período">
+          <Panel title="Despesas do período" collapsible>
             <div className="space-y-3">
               {groupedExpenses.map(([date, dayRows]) => { const dayTotal=(dayRows as any[]).reduce((sum,row)=>sum+Number(row.amount ?? 0),0); return (
-              <details key={date} className="group rounded-2xl border border-border bg-card" open>
+              <details key={date} className="group rounded-2xl border border-border bg-card">
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-3">
                   <div><strong className="text-sm">{formatDate(date)}</strong><p className="text-[11px] text-muted-foreground">{(dayRows as any[]).length} saída(s)</p></div>
-                  <strong className="text-destructive">{money(dayTotal)}</strong>
+                  <div className="flex items-center gap-2">
+                    <strong className="text-destructive">{money(dayTotal)}</strong>
+                    <ChevronDown className="size-4 text-muted-foreground transition-transform duration-200 group-open:rotate-180" />
+                  </div>
                 </summary>
                 <div className="space-y-2 border-t border-border p-3">
               {(dayRows as any[]).map((row: any) => (
@@ -2558,7 +2566,34 @@ function ProfessionalWorkspace({ data, loading, error }: any) {
   );
 }
 
-function Panel({ title, subtitle, children }: { title: string; subtitle?: string; children: any }) {
+function Panel({
+  title,
+  subtitle,
+  children,
+  collapsible = false,
+}: {
+  title: string;
+  subtitle?: string | undefined;
+  children: any;
+  collapsible?: boolean;
+}) {
+  if (collapsible) {
+    return (
+      <details className="group rounded-3xl border border-border bg-card shadow-soft">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 rounded-3xl p-5 transition-colors hover:bg-secondary/30 sm:p-6">
+          <div className="min-w-0">
+            <h2 className="text-xl font-bold tracking-tight text-foreground">{title}</h2>
+            {subtitle ? <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p> : null}
+          </div>
+          <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-secondary text-muted-foreground transition-colors group-open:bg-primary-soft group-open:text-primary">
+            <ChevronDown className="size-4 transition-transform duration-200 group-open:rotate-180" />
+          </span>
+        </summary>
+        <div className="border-t border-border p-5 sm:p-6">{children}</div>
+      </details>
+    );
+  }
+
   return (
     <section className="rounded-3xl border border-border bg-card p-5 shadow-soft sm:p-6">
       <div>

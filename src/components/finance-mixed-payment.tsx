@@ -160,6 +160,7 @@ export function FinanceMixedPayment() {
     } finally {
       setBusy(false);
     }
+    return undefined;
   };
 
   return (
