@@ -150,7 +150,7 @@ function playNotificationSound(audioRef: { current: AudioContext | null }) {
 }
 
 async function fetchAppointment(id: string) {
-  const { data, error } = await db.from("appointments").select("id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status, created_at, status_updated_at, payment_choice, service_price_snapshot, deposit_percent, deposit_amount, balance_amount, service:services!appointments_service_id_fkey(name, price, duration_min), appointment_services(position, service:services!appointments_service_id_fkey(name, price, duration_min)), professional:professionals(name, specialty), payments(status, amount, kind, payment_method_id, provider, paid_at, created_at, status_detail)").eq("id", id).maybeSingle();
+  const { data, error } = await db.from("appointments").select("id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status, created_at, status_updated_at, payment_choice, service_price_snapshot, deposit_percent, deposit_amount, balance_amount, service:services!appointments_service_id_fkey(name, price, duration_min), appointment_services(position, service:services!appointment_services_service_id_fkey(name, price, duration_min)), professional:professionals(name, specialty), payments(status, amount, kind, payment_method_id, provider, paid_at, created_at, status_detail)").eq("id", id).maybeSingle();
   if (error) return null;
   return data;
 }
