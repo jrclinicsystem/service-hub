@@ -416,9 +416,9 @@ function ProfessionalAgenda() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-background">
       <SimpleHeader onSignOut={signOut} />
-      <main className="mx-auto max-w-5xl px-4 pb-16 pt-6 sm:px-8 sm:pt-10">
+      <main className="mx-auto w-full min-w-0 max-w-5xl overflow-x-hidden px-4 pb-16 pt-6 sm:px-8 sm:pt-10">
         <section className="rounded-3xl border border-border bg-card p-5 shadow-soft sm:p-7">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex items-center gap-4">
@@ -525,8 +525,8 @@ function ProfessionalAgenda() {
           }}
         />
 
-        <section className="mt-7">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <section className="mt-7 w-full min-w-0 max-w-full overflow-x-hidden">
+          <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h2 className="text-lg font-semibold">Meus atendimentos</h2>
               <p className="mt-1 text-xs text-muted-foreground">
@@ -534,8 +534,8 @@ function ProfessionalAgenda() {
                 o recontato pelo WhatsApp aparece.
               </p>
             </div>
-            <div className="flex gap-2">
-              <div className="grid grid-cols-2 rounded-xl bg-secondary/70 p-1">
+            <div className="flex w-full min-w-0 flex-col gap-2 min-[390px]:flex-row sm:w-auto">
+              <div className="grid min-w-0 flex-1 grid-cols-2 rounded-xl bg-secondary/70 p-1 sm:flex-none">
                 <button
                   type="button"
                   onClick={() => setScope("upcoming")}
@@ -555,11 +555,11 @@ function ProfessionalAgenda() {
                 type="date"
                 value={dateFilter}
                 onChange={(e) => setDateFilter(e.target.value)}
-                className="w-[160px]"
+                className="w-full min-w-0 min-[390px]:w-[160px]"
               />
             </div>
           </div>
-          <div className="mt-4 space-y-3">
+          <div className="mt-4 w-full min-w-0 max-w-full space-y-3">
             {filteredAppointments.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center text-sm text-muted-foreground">
                 Nenhum atendimento encontrado.
