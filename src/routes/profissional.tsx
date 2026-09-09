@@ -121,53 +121,98 @@ async function loadProfessionalAgenda() {
   const email = (userData.user.email ?? "").trim().toLowerCase();
   if (!email) return { authorized: false as const, email: "" };
 
+  // Keep access lookup intentionally flat. Embedded PostgREST relationships can become
+  // temporarily unavailable after schema migrations and used to take the entire agenda down.
   const access = await db
     .from("professional_access")
-    .select(
-      "professional_id, email, enabled, professional:professionals(id, name, specialty, avatar_url, is_active, deleted_at)",
-    )
+    .select("professional_id, email, enabled")
     .eq("email", email)
     .eq("enabled", true)
     .maybeSingle();
-  if (access.error) throw access.error;
-  if (
-    !access.data?.professional_id ||
-    !access.data.professional?.is_active ||
-    access.data.professional?.deleted_at
-  )
-    return { authorized: false as const, email };
+  if (access.error) throw new Error(`Falha ao validar o acesso da agenda: ${access.error.message}`);
+  if (!access.data?.professional_id) return { authorized: false as const, email };
 
-  const [appointments, slots, availability] = await Promise.all([
+  const professionalId = access.data.professional_id;
+  const [professional, appointments, slots, availability] = await Promise.all([
+    db
+      .from("professionals")
+      .select("id, name, specialty, avatar_url, is_active, deleted_at")
+      .eq("id", professionalId)
+      .maybeSingle(),
     db
       .from("appointments")
       .select(
-        "id, professional_id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status, payment_choice, service_price_snapshot, balance_amount, service:services(name, price, duration_min), professional_response:appointment_professional_responses(response, responded_at)",
+        "id, service_id, professional_id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status, payment_choice, service_price_snapshot, balance_amount",
       )
-      .eq("professional_id", access.data.professional_id)
+      .eq("professional_id", professionalId)
       .order("scheduled_date")
       .order("scheduled_time"),
     db
       .from("professional_time_slots")
       .select("id, professional_id, slot, is_available, sort_order")
-      .eq("professional_id", access.data.professional_id)
+      .eq("professional_id", professionalId)
       .order("sort_order")
       .order("slot"),
     db
       .from("professional_availability_periods")
       .select("id, professional_id, weekday, period, is_available")
-      .eq("professional_id", access.data.professional_id)
+      .eq("professional_id", professionalId)
       .order("weekday")
       .order("period"),
   ]);
-  if (appointments.error) throw appointments.error;
-  if (slots.error) throw slots.error;
-  if (availability.error) throw availability.error;
+
+  if (professional.error)
+    throw new Error(`Falha ao carregar o perfil profissional: ${professional.error.message}`);
+  if (!professional.data?.is_active || professional.data?.deleted_at)
+    return { authorized: false as const, email };
+  if (appointments.error)
+    throw new Error(`Falha ao carregar os agendamentos: ${appointments.error.message}`);
+  if (slots.error) throw new Error(`Falha ao carregar os horários: ${slots.error.message}`);
+  if (availability.error)
+    throw new Error(`Falha ao carregar a disponibilidade: ${availability.error.message}`);
+
+  const appointmentRows = appointments.data ?? [];
+  const serviceIds = [
+    ...new Set(appointmentRows.map((row: any) => row.service_id).filter(Boolean)),
+  ] as string[];
+  const appointmentIds = appointmentRows.map((row: any) => row.id).filter(Boolean) as string[];
+
+  const [servicesResult, responsesResult] = await Promise.all([
+    serviceIds.length
+      ? db.from("services").select("id, name, price, duration_min").in("id", serviceIds)
+      : Promise.resolve({ data: [], error: null }),
+    appointmentIds.length
+      ? db
+          .from("appointment_professional_responses")
+          .select("appointment_id, response, responded_at")
+          .in("appointment_id", appointmentIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  if (servicesResult.error)
+    throw new Error(`Falha ao carregar os serviços da agenda: ${servicesResult.error.message}`);
+  if (responsesResult.error)
+    throw new Error(`Falha ao carregar as confirmações da agenda: ${responsesResult.error.message}`);
+
+  const servicesById = new Map<string, any>(
+    (servicesResult.data ?? []).map((row: any) => [row.id, row]),
+  );
+  const responsesByAppointment = new Map<string, any[]>();
+  for (const row of responsesResult.data ?? []) {
+    const current = responsesByAppointment.get(row.appointment_id) ?? [];
+    current.push({ response: row.response, responded_at: row.responded_at });
+    responsesByAppointment.set(row.appointment_id, current);
+  }
 
   return {
     authorized: true as const,
     email,
-    professional: access.data.professional,
-    appointments: appointments.data ?? [],
+    professional: professional.data,
+    appointments: appointmentRows.map((row: any) => ({
+      ...row,
+      service: servicesById.get(row.service_id) ?? null,
+      professional_response: responsesByAppointment.get(row.id) ?? [],
+    })),
     slots: slots.data ?? [],
     availability: availability.data ?? [],
   };
