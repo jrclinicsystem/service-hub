@@ -825,18 +825,19 @@ function ProfessionalAppointmentCard({ appointment, onSaved }: any) {
               onClick={() => openWhatsApp("reminder")}
             >
               <MessageCircle className="size-4" />{" "}
-              {days === 0 ? "Falar com cliente" : "Recontatar cliente"}
+              {days === 0 ? "Falar com cliente" : "Enviar lembrete no WhatsApp"}
             </Button>
-          ) : waiting ? (
+          ) : (
             <Button
               type="button"
               variant="outline"
               className="rounded-xl border-emerald-600/40 text-emerald-700 hover:bg-emerald-50"
               onClick={() => openWhatsApp("confirmation")}
             >
-              <MessageCircle className="size-4" /> Confirmar pelo WhatsApp
+              <MessageCircle className="size-4" />{" "}
+              {waiting ? "Confirmar pelo WhatsApp" : "Enviar mensagem no WhatsApp"}
             </Button>
-          ) : null}
+          )}
         </div>
       ) : null}
       {waiting ? (
