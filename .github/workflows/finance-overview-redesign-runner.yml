@@ -1,0 +1,30 @@
+name: Finance overview redesign runner
+on:
+  push:
+    paths:
+      - '.github/workflows/finance-overview-redesign-runner.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - name: Apply overview redesign
+        run: python .github/scripts/finance_overview_cards_redesign.py
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: TypeScript diagnostics
+        run: bunx tsc --noEmit
+      - name: Production build
+        run: bun run build
+      - name: Cleanup temporary files
+        run: rm .github/scripts/finance_overview_cards_redesign.py .github/workflows/finance-overview-redesign-runner.yml
+      - name: Commit changes
+        run: |
+          git config user.name 'jrclinicsystem'
+          git config user.email 'jrclinic.system@gmail.com'
+          git add src/components/finance-staging-workspace.tsx .github
+          git commit -m 'design: reorganize finance overview metrics'
+          git push
