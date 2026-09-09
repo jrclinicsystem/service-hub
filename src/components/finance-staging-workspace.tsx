@@ -1651,6 +1651,26 @@ function FullFinanceWorkspace({
                               Receber
                             </Button>
                           </>
+                        ) : row.status === "paid" ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={busy === `reverse-receivable-${row.id}`}
+                            onClick={() =>
+                              run(
+                                `reverse-receivable-${row.id}`,
+                                async () => {
+                                  const result = await db.rpc("reverse_account_receivable_payment", {
+                                    _receivable_id: row.id,
+                                  });
+                                  if (result.error) throw result.error;
+                                },
+                                "Baixa desfeita. A conta voltou para pendente e a entrada correspondente foi revertida.",
+                              )
+                            }
+                          >
+                            Desfazer pagamento
+                          </Button>
                         ) : null}
                       </div>
                     </div>
