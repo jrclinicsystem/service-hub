@@ -267,8 +267,8 @@ export function AdminAppointmentsWorkspace({ appointments, onStatusChange, onRef
   };
 
   return (
-    <section>
-      <div className="grid items-stretch gap-4 lg:grid-cols-[minmax(360px,560px)_minmax(0,1fr)]">
+    <section className="w-full min-w-0 max-w-full overflow-x-hidden">
+      <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)] items-stretch gap-4 lg:grid-cols-[minmax(360px,560px)_minmax(0,1fr)]">
         <AppointmentCalendar
           appointments={appointments}
           selectedDate={calendarDate}
@@ -280,7 +280,7 @@ export function AdminAppointmentsWorkspace({ appointments, onStatusChange, onRef
         <AdminOperationSummary appointments={appointments} />
       </div>
 
-      <div className="mt-4 rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-5">
+      <div className="mt-4 w-full min-w-0 max-w-full rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-5">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div><h2 className="text-lg font-semibold">Agendamentos</h2><p className="mt-1 text-xs text-muted-foreground">Pendências, confirmações e recontatos ficam centralizados aqui.</p></div>
           <div className="flex w-full flex-col gap-2 sm:flex-row xl:w-auto">
@@ -291,7 +291,7 @@ export function AdminAppointmentsWorkspace({ appointments, onStatusChange, onRef
         <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4"><CategoryButton active={scope === "pending"} label="Pendentes" count={counts.pending} onClick={() => setScope("pending")} /><CategoryButton active={scope === "accepted"} label="Confirmados" count={counts.accepted} onClick={() => setScope("accepted")} /><CategoryButton active={scope === "history"} label="Histórico" count={counts.history} onClick={() => setScope("history")} /><CategoryButton active={scope === "all"} label="Todos" count={counts.all} onClick={() => setScope("all")} /></div>
       </div>
 
-      <div className="mt-3 grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
+      <div className="mt-3 grid w-full min-w-0 grid-cols-[minmax(0,1fr)] gap-3 lg:grid-cols-2 2xl:grid-cols-3">
         {filtered.length === 0 ? <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center lg:col-span-2 2xl:col-span-3"><CalendarDays className="mx-auto size-5 text-muted-foreground" /><p className="mt-3 text-sm text-muted-foreground">Nenhum agendamento nesta seleção.</p></div> : filtered.map((appointment) => <AdminAppointmentCard key={appointment.id} appointment={appointment} onOpen={() => setSelected(appointment)} onDelete={() => removeAppointment(appointment)} onAttended={() => completeAttendance(appointment)} deleting={deletingId === appointment.id} />)}
       </div>
 
@@ -313,7 +313,7 @@ function AdminAppointmentCard({ appointment, onOpen, onDelete, onAttended, delet
   const cardClass = proximity === "urgent" ? "border-amber-500/60 bg-amber-50/70 shadow-md" : proximity === "soon" ? "border-amber-300/60 bg-amber-50/35" : "border-border bg-card";
   return <article className={`w-full min-w-0 overflow-hidden rounded-2xl border p-4 text-left shadow-soft transition hover:shadow-md ${cardClass}`}>
     {proximity === "urgent" && appointment.status !== "cancelado" ? <div className="mb-3 flex items-center gap-2 rounded-xl bg-amber-100 px-3 py-2 text-xs font-semibold text-amber-900"><AlertTriangle className="size-4" /> {days === 0 ? "Atendimento hoje" : "Atendimento amanhã — recontato recomendado"}</div> : proximity === "soon" ? <div className="mb-3 rounded-xl bg-amber-100/60 px-3 py-2 text-[11px] font-medium text-amber-900">Faltam {days} dias para este atendimento.</div> : null}
-    <button type="button" onClick={onOpen} className="block w-full text-left">
+    <button type="button" onClick={onOpen} className="block w-full min-w-0 max-w-full overflow-hidden text-left">
       <div className="flex min-w-0 flex-wrap items-start justify-between gap-2"><div className="min-w-0 flex-1 basis-[150px]"><p className="truncate text-base font-semibold">{appointment.patient_name}</p><p className="mt-0.5 truncate text-xs text-muted-foreground">{appointment.patient_email || "Sem e-mail"}</p></div><div className="max-w-full shrink-0"><AdminStatusBadge status={appointment.status} /></div></div>
       <div className="mt-3 rounded-xl bg-secondary/45 p-3"><p className="truncate text-sm font-medium">{appointment.service?.name ?? "Atendimento"}</p><p className="mt-1 truncate text-xs text-muted-foreground">{appointment.professional?.name ?? "Profissional não definido"} · {appointment.professional?.specialty ?? "Equipe"}</p></div>
       <div className="mt-3 grid min-w-0 grid-cols-2 gap-2 min-[390px]:grid-cols-3"><SmallInfo label="Data" value={formatDate(appointment.scheduled_date)} /><SmallInfo label="Horário" value={appointment.scheduled_time} /><SmallInfo label="Pagamento" value={paymentLabel(appointment)} accent /></div>
