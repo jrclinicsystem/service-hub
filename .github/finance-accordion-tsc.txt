@@ -1,0 +1,10 @@
+src/components/finance-manual-entry.tsx(24,20): error TS4111: Property 'year' comes from an index signature, so it must be accessed with ['year'].
+src/components/finance-manual-entry.tsx(24,35): error TS4111: Property 'month' comes from an index signature, so it must be accessed with ['month'].
+src/components/finance-manual-entry.tsx(24,51): error TS4111: Property 'day' comes from an index signature, so it must be accessed with ['day'].
+src/components/finance-manual-entry.tsx(67,16): error TS7030: Not all code paths return a value.
+src/components/finance-mixed-payment.tsx(105,20): error TS7030: Not all code paths return a value.
+src/components/finance-staging-workspace.tsx(1110,12): error TS2375: Type '{ children: Element; title: string; subtitle: string | undefined; collapsible: true; }' is not assignable to type '{ title: string; subtitle?: string; children: any; collapsible?: boolean; }' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Types of property 'subtitle' are incompatible.
+    Type 'string | undefined' is not assignable to type 'string'.
+      Type 'undefined' is not assignable to type 'string'.
+exit_code=2
