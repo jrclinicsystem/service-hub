@@ -1,0 +1,40 @@
+name: Fix team agenda access
+
+on:
+  push:
+    paths:
+      - '.github/scripts/fix_team_agenda_access.py'
+      - '.github/workflows/fix-team-agenda-access.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+      - name: Apply agenda access patch
+        run: python .github/scripts/fix_team_agenda_access.py
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Typecheck
+        run: bunx tsc --noEmit
+      - name: Production build
+        run: bun run build
+      - name: Commit agenda fixes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/routes/profissional.tsx src/routes/admin_.equipe.tsx
+          if git diff --cached --quiet; then
+            echo "No agenda changes to commit"
+            exit 0
+          fi
+          git commit -m "fix: restore professional and team agenda access"
+          git push origin main
