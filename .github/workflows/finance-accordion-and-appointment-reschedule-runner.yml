@@ -24,7 +24,7 @@ jobs:
       - name: Production build
         run: bun run build
       - name: Cleanup temporary files
-        run: rm -f .github/scripts/finance_accordion_and_appointment_reschedule_patch.py .github/workflows/finance-accordion-and-appointment-reschedule-runner.yml
+        run: rm -f .github/scripts/finance_accordion_and_appointment_reschedule_patch.py .github/workflows/finance-accordion-and-appointment-reschedule-runner.yml .github/finance-accordion-tsc.txt
       - name: Commit changes
         run: |
           git config user.name "jrclinicsystem"
