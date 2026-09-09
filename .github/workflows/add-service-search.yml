@@ -1,0 +1,31 @@
+name: Add Service Search
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/add-service-search.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - name: Apply patch
+        run: python .github/scripts/add_service_search_patch.py
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: TypeScript diagnostics
+        run: bunx tsc --noEmit || true
+      - name: Production build
+        run: bun run build
+      - name: Cleanup temp patch files
+        run: rm .github/scripts/add_service_search_patch.py .github/workflows/add-service-search.yml
+      - name: Commit changes
+        run: |
+          git config user.name "jrclinicsystem"
+          git config user.email "jrclinic.system@gmail.com"
+          git add src/components/admin-appointments-workspace.tsx .github/scripts/add_service_search_patch.py .github/workflows/add-service-search.yml
+          git commit -m "feat: add service search to multi-service booking"
+          git push
