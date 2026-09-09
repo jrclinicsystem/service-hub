@@ -197,6 +197,8 @@ export function AdminAppointmentsWorkspace({ appointments, onStatusChange, onRef
       onRefresh();
       const detail = await fetchAppointment(next.id);
       if (!detail) return;
+      // Avoid stacking two dialogs/overlays when a manual appointment triggers realtime.
+      setCreateOpen(false);
       playNotificationSound(audioRef);
       setIncoming(detail);
       toast.success("Novo agendamento realizado", { description: `${detail.patient_name} · ${appointmentServiceLabel(detail)} · ${formatDate(detail.scheduled_date)} às ${detail.scheduled_time}` });
@@ -521,9 +523,11 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated }: { open: bool
     <div className="space-y-2 sm:col-span-2">
       <div className="flex items-center justify-between gap-3"><Label>Serviços *</Label><span className="text-[11px] text-muted-foreground">{serviceIds.length ? `${serviceIds.length} selecionado(s)` : "Selecione um ou mais"}</span></div>
       <div className="rounded-2xl border border-border bg-background p-2">
-        <div className="relative mb-2">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input value={serviceSearch} onChange={(event) => setServiceSearch(event.target.value)} placeholder="Buscar serviço..." className="h-9 rounded-xl pl-9 text-sm" disabled={saving || loadingCatalog} />
+        <div className="sticky top-0 z-10 mb-2 bg-background pb-1">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-primary/70" />
+            <Input value={serviceSearch} onChange={(event) => setServiceSearch(event.target.value)} placeholder="Pesquisar procedimento..." className="h-10 rounded-xl border-primary/25 bg-card pl-9 pr-3 text-sm shadow-sm focus-visible:ring-primary/25" disabled={saving || loadingCatalog} />
+          </div>
         </div>
         <div className="grid max-h-52 gap-2 overflow-y-auto sm:grid-cols-2">
           {filteredServices.length ? filteredServices.map((service) => { const checked = serviceIds.includes(service.id); return <button key={service.id} type="button" disabled={saving || loadingCatalog} onClick={() => toggleService(service.id)} className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left transition ${checked ? "border-primary bg-primary-soft/70 text-primary" : "border-border bg-card hover:bg-secondary/40"}`}><span className="min-w-0"><span className="block truncate text-sm font-medium">{service.name}</span><span className="mt-0.5 block text-[11px] text-muted-foreground">{formatPrice(Number(service.price ?? 0))}</span></span><span className={`grid size-6 shrink-0 place-items-center rounded-lg border ${checked ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background"}`}>{checked ? <Check className="size-3.5" /> : null}</span></button>; }) : <div className="py-5 text-center text-xs text-muted-foreground sm:col-span-2">Nenhum serviço encontrado.</div>}
@@ -592,5 +596,37 @@ function AppointmentAdminDialog({ appointment, open, onOpenChange, onConfirm, on
 function NewAppointmentAlert({ appointment, open, onLater, onConfirm, onCancel, busy }: any) {
   if (!appointment) return null;
   const hasWhatsApp = normalizeWhatsAppPhone(appointment.patient_phone).length > 0;
-  return <Dialog open={open} onOpenChange={(next) => !next && onLater()}><DialogContent className="w-[calc(100%-1rem)] rounded-3xl p-5 sm:max-w-md sm:p-6"><DialogHeader><span className="mb-2 grid size-12 place-items-center rounded-2xl bg-primary-soft text-primary"><BellRing className="size-5" /></span><DialogTitle>Novo agendamento realizado</DialogTitle><DialogDescription>A profissional ainda precisa confirmar este atendimento.</DialogDescription></DialogHeader><div className="mt-2 rounded-2xl border border-border bg-secondary/40 p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate font-semibold">{appointment.patient_name}</p><p className="mt-1 truncate text-xs text-muted-foreground">{appointmentServiceLabel(appointment)}</p></div><AdminStatusBadge status={appointment.status} /></div><div className="mt-3 grid grid-cols-2 gap-2"><SmallInfo label="Data" value={formatDate(appointment.scheduled_date)} /><SmallInfo label="Horário" value={appointment.scheduled_time} /><SmallInfo label="Profissional" value={appointment.professional?.name ?? "—"} /><SmallInfo label="Pagamento" value={paymentLabel(appointment)} accent /></div></div>{hasWhatsApp ? <Button variant="outline" className="mt-3 w-full rounded-xl border-emerald-600/40 text-emerald-700" onClick={() => openAppointmentWhatsApp(appointment, "confirmation")}><MessageCircle className="size-4" /> Confirmar pelo WhatsApp</Button> : null}<DialogFooter className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3 sm:space-x-0"><Button variant="outline" disabled={busy} onClick={onLater}>Depois</Button><Button variant="destructive" disabled={busy} onClick={onCancel}>Cancelar</Button><Button disabled={busy} onClick={onConfirm}>Confirmar</Button></DialogFooter></DialogContent></Dialog>;
+  const servicesLabel = appointmentServicesLabel(appointment);
+  return (
+    <Dialog open={open} onOpenChange={(next) => !next && onLater()}>
+      <DialogContent className="w-[calc(100vw-1.5rem)] max-w-[460px] min-w-0 overflow-hidden rounded-3xl p-5 sm:p-6">
+        <DialogHeader className="min-w-0 pr-7">
+          <span className="mb-2 grid size-11 place-items-center rounded-2xl bg-primary-soft text-primary"><BellRing className="size-5" /></span>
+          <DialogTitle>Novo agendamento realizado</DialogTitle>
+          <DialogDescription>A profissional ainda precisa confirmar este atendimento.</DialogDescription>
+        </DialogHeader>
+        <div className="mt-1 min-w-0 max-w-full overflow-hidden rounded-2xl border border-border bg-secondary/40 p-4">
+          <div className="flex min-w-0 items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-semibold">{appointment.patient_name}</p>
+              <p className="mt-1 line-clamp-2 break-words text-xs leading-relaxed text-muted-foreground">{servicesLabel}</p>
+            </div>
+            <AdminStatusBadge status={appointment.status} />
+          </div>
+          <div className="mt-3 grid min-w-0 grid-cols-2 gap-3">
+            <SmallInfo label="Data" value={formatDate(appointment.scheduled_date)} />
+            <SmallInfo label="Horário" value={appointment.scheduled_time} />
+            <SmallInfo label="Profissional" value={appointment.professional?.name ?? "—"} />
+            <SmallInfo label="Pagamento" value={paymentLabel(appointment)} accent />
+          </div>
+        </div>
+        {hasWhatsApp ? <Button variant="outline" className="mt-1 w-full max-w-full rounded-xl border-emerald-600/40 text-emerald-700" onClick={() => openAppointmentWhatsApp(appointment, "confirmation")}><MessageCircle className="size-4" /> Confirmar pelo WhatsApp</Button> : null}
+        <DialogFooter className="mt-1 grid w-full min-w-0 grid-cols-1 gap-2 sm:grid-cols-3 sm:space-x-0">
+          <Button className="w-full" variant="outline" disabled={busy} onClick={onLater}>Depois</Button>
+          <Button className="w-full" variant="destructive" disabled={busy} onClick={onCancel}>Cancelar</Button>
+          <Button className="w-full" disabled={busy} onClick={onConfirm}>Confirmar</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
