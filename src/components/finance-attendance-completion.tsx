@@ -54,7 +54,7 @@ async function loadConfirmedAppointments() {
     db
       .from("appointments")
       .select(
-        "id,patient_name,scheduled_date,scheduled_time,status,professional_id,professional_name_snapshot,custom_price,service_price_snapshot,service_id,service:services(name,price),professional:professionals(name)",
+        "id,patient_name,scheduled_date,scheduled_time,status,professional_id,professional_name_snapshot,custom_price,service_price_snapshot,service_id,service:services!appointments_service_id_fkey(name,price),professional:professionals(name)",
       )
       .eq("status", "confirmado")
       .order("scheduled_date", { ascending: true })
