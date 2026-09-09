@@ -297,7 +297,7 @@ function Admin() {
     data.categories.find((category: any) => category.id === service.category_id)?.name ?? "Sem categoria";
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-background">
       <header className="sticky top-0 z-40 border-b border-border/80 bg-card/95 backdrop-blur-xl">
         <div className="mx-auto flex h-14 max-w-[1480px] items-center justify-between px-4 sm:h-17 sm:px-8">
           <div className="flex min-w-0 items-center gap-3 sm:gap-4">
@@ -320,7 +320,7 @@ function Admin() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1480px] px-4 pb-10 pt-5 sm:px-8 sm:py-10">
+      <main className="mx-auto w-full min-w-0 max-w-[1480px] overflow-x-hidden px-4 pb-10 pt-5 sm:px-8 sm:py-10">
         <div className="sm:hidden">
           <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Administração</p>
           <div className="mt-1 flex items-end justify-between gap-3">
@@ -347,7 +347,7 @@ function Admin() {
           <Metric icon={Users} label="Pacientes" value={String(uniquePatients)} hint="e-mails únicos" />
         </div>
 
-        <Tabs defaultValue="agendamentos" className="mt-5 sm:mt-10">
+        <Tabs defaultValue="agendamentos" className="mt-5 w-full min-w-0 max-w-full sm:mt-10">
           <div className="sticky top-14 z-30 -mx-4 border-y border-border/70 bg-background/95 px-3 py-2 backdrop-blur-xl sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
             <TabsList className="grid h-auto w-full grid-cols-5 gap-1 rounded-2xl bg-secondary/70 p-1 sm:inline-flex sm:w-auto sm:justify-start sm:rounded-xl">
               <MobileTab value="agendamentos" icon={CalendarDays} label="Agenda" desktopLabel="Agendamentos" />
@@ -358,7 +358,7 @@ function Admin() {
             </TabsList>
           </div>
 
-          <TabsContent value="agendamentos" className="mt-4 sm:mt-5">
+          <TabsContent value="agendamentos" className="mt-4 w-full min-w-0 max-w-full overflow-x-hidden sm:mt-5">
             <AdminAppointmentsWorkspace
               appointments={data.appointments}
               onStatusChange={updateAppointmentStatus}
