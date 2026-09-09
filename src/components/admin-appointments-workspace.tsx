@@ -349,6 +349,7 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated }: { open: bool
   const [patientEmail, setPatientEmail] = useState("");
   const [patientPhone, setPatientPhone] = useState("");
   const [serviceIds, setServiceIds] = useState<string[]>([]);
+  const [serviceSearch, setServiceSearch] = useState("");
   const [appointmentValue, setAppointmentValue] = useState("");
   const [professionalId, setProfessionalId] = useState("");
   const [scheduledDate, setScheduledDate] = useState(todayIso());
@@ -432,6 +433,12 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated }: { open: bool
     [serviceIds, services],
   );
 
+  const filteredServices = useMemo(() => {
+    const term = serviceSearch.trim().toLocaleLowerCase("pt-BR");
+    if (!term) return services;
+    return services.filter((service) => String(service.name ?? "").toLocaleLowerCase("pt-BR").includes(term));
+  }, [services, serviceSearch]);
+
   const toggleService = (id: string) => {
     setProfessionalId("");
     setServiceIds((current) => {
@@ -459,7 +466,7 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated }: { open: bool
     setPatientEmail("");
   };
 
-  const reset = () => { setSelectedClientId(""); setPatientName(""); setPatientEmail(""); setPatientPhone(""); setServiceIds([]); setAppointmentValue(""); setProfessionalId(""); setScheduledDate(todayIso()); setScheduledTime(""); setNotes(""); };
+  const reset = () => { setSelectedClientId(""); setPatientName(""); setPatientEmail(""); setPatientPhone(""); setServiceIds([]); setServiceSearch(""); setAppointmentValue(""); setProfessionalId(""); setScheduledDate(todayIso()); setScheduledTime(""); setNotes(""); };
   const handleOpenChange = (next: boolean) => { if (!next && !saving) reset(); onOpenChange(next); };
 
   const createAppointment = async () => {
@@ -513,8 +520,14 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated }: { open: bool
     <div className="space-y-1.5"><Label htmlFor="admin-patient-email">E-mail</Label><Input id="admin-patient-email" type="email" value={patientEmail} onChange={(e) => setPatientEmail(e.target.value)} disabled={saving} /></div>
     <div className="space-y-2 sm:col-span-2">
       <div className="flex items-center justify-between gap-3"><Label>Serviços *</Label><span className="text-[11px] text-muted-foreground">{serviceIds.length ? `${serviceIds.length} selecionado(s)` : "Selecione um ou mais"}</span></div>
-      <div className="grid max-h-52 gap-2 overflow-y-auto rounded-2xl border border-border bg-background p-2 sm:grid-cols-2">
-        {services.map((service) => { const checked = serviceIds.includes(service.id); return <button key={service.id} type="button" disabled={saving || loadingCatalog} onClick={() => toggleService(service.id)} className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left transition ${checked ? "border-primary bg-primary-soft/70 text-primary" : "border-border bg-card hover:bg-secondary/40"}`}><span className="min-w-0"><span className="block truncate text-sm font-medium">{service.name}</span><span className="mt-0.5 block text-[11px] text-muted-foreground">{formatPrice(Number(service.price ?? 0))}</span></span><span className={`grid size-6 shrink-0 place-items-center rounded-lg border ${checked ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background"}`}>{checked ? <Check className="size-3.5" /> : null}</span></button>; })}
+      <div className="rounded-2xl border border-border bg-background p-2">
+        <div className="relative mb-2">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input value={serviceSearch} onChange={(event) => setServiceSearch(event.target.value)} placeholder="Buscar serviço..." className="h-9 rounded-xl pl-9 text-sm" disabled={saving || loadingCatalog} />
+        </div>
+        <div className="grid max-h-52 gap-2 overflow-y-auto sm:grid-cols-2">
+          {filteredServices.length ? filteredServices.map((service) => { const checked = serviceIds.includes(service.id); return <button key={service.id} type="button" disabled={saving || loadingCatalog} onClick={() => toggleService(service.id)} className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left transition ${checked ? "border-primary bg-primary-soft/70 text-primary" : "border-border bg-card hover:bg-secondary/40"}`}><span className="min-w-0"><span className="block truncate text-sm font-medium">{service.name}</span><span className="mt-0.5 block text-[11px] text-muted-foreground">{formatPrice(Number(service.price ?? 0))}</span></span><span className={`grid size-6 shrink-0 place-items-center rounded-lg border ${checked ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background"}`}>{checked ? <Check className="size-3.5" /> : null}</span></button>; }) : <div className="py-5 text-center text-xs text-muted-foreground sm:col-span-2">Nenhum serviço encontrado.</div>}
+        </div>
       </div>
       <p className="text-[11px] text-muted-foreground">Você pode marcar vários procedimentos no mesmo agendamento. O profissional precisa atender todos os serviços escolhidos.</p>
     </div>
