@@ -1,0 +1,39 @@
+name: Finance accordion patch diagnostics
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/finance-accordion-diagnostics.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - name: Apply patch in working tree
+        run: python .github/scripts/finance_accordion_and_appointment_reschedule_patch.py
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Capture TypeScript diagnostics
+        run: |
+          set +e
+          bunx tsc --noEmit > .github/finance-accordion-tsc.txt 2>&1
+          code=$?
+          echo "exit_code=$code" >> .github/finance-accordion-tsc.txt
+          exit 0
+      - name: Revert patched source and cleanup workflow
+        run: |
+          git checkout -- src/components/finance-staging-workspace.tsx src/components/admin-appointments-workspace.tsx
+          rm -f .github/workflows/finance-accordion-diagnostics.yml
+      - name: Commit diagnostics
+        run: |
+          git config user.name "jrclinicsystem"
+          git config user.email "jrclinic.system@gmail.com"
+          git add .github/finance-accordion-tsc.txt .github/workflows/finance-accordion-diagnostics.yml
+          git commit -m "chore: capture finance accordion typecheck diagnostics"
+          git push
