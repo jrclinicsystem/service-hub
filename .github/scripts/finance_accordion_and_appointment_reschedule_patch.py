@@ -47,11 +47,10 @@ if old not in finance:
 finance = finance.replace(old, new, 1)
 
 old = '''function Panel({ title, subtitle, children }: { title: string; subtitle?: string; children: any }) {\n  return (\n    <section className="rounded-3xl border border-border bg-card p-5 shadow-soft sm:p-6">\n      <div>\n        <h2 className="text-xl font-bold tracking-tight text-foreground">{title}</h2>\n        {subtitle ? <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p> : null}\n      </div>\n      <div className="mt-5">{children}</div>\n    </section>\n  );\n}'''
-new = '''function Panel({\n  title,\n  subtitle,\n  children,\n  collapsible = false,\n}: {\n  title: string;\n  subtitle?: string;\n  children: any;\n  collapsible?: boolean;\n}) {\n  if (collapsible) {\n    return (\n      <details className="group rounded-3xl border border-border bg-card shadow-soft">\n        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 rounded-3xl p-5 transition-colors hover:bg-secondary/30 sm:p-6">\n          <div className="min-w-0">\n            <h2 className="text-xl font-bold tracking-tight text-foreground">{title}</h2>\n            {subtitle ? <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p> : null}\n          </div>\n          <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-secondary text-muted-foreground transition-colors group-open:bg-primary-soft group-open:text-primary">\n            <ChevronDown className="size-4 transition-transform duration-200 group-open:rotate-180" />\n          </span>\n        </summary>\n        <div className="border-t border-border p-5 sm:p-6">{children}</div>\n      </details>\n    );\n  }\n\n  return (\n    <section className="rounded-3xl border border-border bg-card p-5 shadow-soft sm:p-6">\n      <div>\n        <h2 className="text-xl font-bold tracking-tight text-foreground">{title}</h2>\n        {subtitle ? <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p> : null}\n      </div>\n      <div className="mt-5">{children}</div>\n    </section>\n  );\n}'''
+new = '''function Panel({\n  title,\n  subtitle,\n  children,\n  collapsible = false,\n}: {\n  title: string;\n  subtitle?: string | undefined;\n  children: any;\n  collapsible?: boolean;\n}) {\n  if (collapsible) {\n    return (\n      <details className="group rounded-3xl border border-border bg-card shadow-soft">\n        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 rounded-3xl p-5 transition-colors hover:bg-secondary/30 sm:p-6">\n          <div className="min-w-0">\n            <h2 className="text-xl font-bold tracking-tight text-foreground">{title}</h2>\n            {subtitle ? <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p> : null}\n          </div>\n          <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-secondary text-muted-foreground transition-colors group-open:bg-primary-soft group-open:text-primary">\n            <ChevronDown className="size-4 transition-transform duration-200 group-open:rotate-180" />\n          </span>\n        </summary>\n        <div className="border-t border-border p-5 sm:p-6">{children}</div>\n      </details>\n    );\n  }\n\n  return (\n    <section className="rounded-3xl border border-border bg-card p-5 shadow-soft sm:p-6">\n      <div>\n        <h2 className="text-xl font-bold tracking-tight text-foreground">{title}</h2>\n        {subtitle ? <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p> : null}\n      </div>\n      <div className="mt-5">{children}</div>\n    </section>\n  );\n}'''
 if old not in finance:
     raise SystemExit('Panel component anchor not found')
 finance = finance.replace(old, new, 1)
-
 finance_path.write_text(finance)
 
 # --- Admin appointments: expose edit/reschedule for confirmed and cancelled ---
@@ -81,5 +80,28 @@ new = '''    <div className="mt-4 rounded-2xl border border-border p-4"><div cla
 if old not in appointments:
     raise SystemExit('appointment details edit insertion anchor not found')
 appointments = appointments.replace(old, new, 1)
-
 appointments_path.write_text(appointments)
+
+# --- Existing TypeScript strictness issues in finance helpers (behavior unchanged) ---
+manual_path = Path('src/components/finance-manual-entry.tsx')
+manual = manual_path.read_text()
+old = '''  return `${values.year}-${values.month}-${values.day}`;'''
+new = '''  return `${values["year"]}-${values["month"]}-${values["day"]}`;'''
+if old not in manual:
+    raise SystemExit('manual entry date accessor anchor not found')
+manual = manual.replace(old, new, 1)
+old = '''    } finally {\n      setBusy(false);\n    }\n  };'''
+new = '''    } finally {\n      setBusy(false);\n    }\n    return undefined;\n  };'''
+if old not in manual:
+    raise SystemExit('manual entry save return anchor not found')
+manual = manual.replace(old, new, 1)
+manual_path.write_text(manual)
+
+mixed_path = Path('src/components/finance-mixed-payment.tsx')
+mixed = mixed_path.read_text()
+old = '''    } finally {\n      setBusy(false);\n    }\n  };'''
+new = '''    } finally {\n      setBusy(false);\n    }\n    return undefined;\n  };'''
+if old not in mixed:
+    raise SystemExit('mixed payment finalize return anchor not found')
+mixed = mixed.replace(old, new, 1)
+mixed_path.write_text(mixed)
