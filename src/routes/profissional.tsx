@@ -698,11 +698,11 @@ function ProfessionalAppointmentCard({ appointment, onSaved }: any) {
 
   return (
     <article
-      className={`rounded-2xl border p-4 shadow-soft transition ${cardClass} ${appointment.status === "cancelado" ? "opacity-60" : ""}`}
+      className={`w-full min-w-0 overflow-hidden rounded-2xl border p-4 shadow-soft transition ${cardClass} ${appointment.status === "cancelado" ? "opacity-60" : ""}`}
     >
       {proximity === "urgent" && appointment.status !== "cancelado" ? (
-        <div className="mb-3 flex items-center gap-2 rounded-xl bg-amber-100 px-3 py-2 text-xs font-semibold text-amber-900">
-          <AlertTriangle className="size-4" />{" "}
+        <div className="mb-3 flex min-w-0 items-start gap-2 rounded-xl bg-amber-100 px-3 py-2 text-xs font-semibold text-amber-900">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0" />{" "}
           {days === 0
             ? "Atendimento hoje — confira com a cliente."
             : "Atendimento amanhã — recontato recomendado."}
@@ -712,10 +712,10 @@ function ProfessionalAppointmentCard({ appointment, onSaved }: any) {
           Atendimento se aproximando: faltam {days} dias.
         </div>
       ) : null}
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
+      <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1 basis-[170px]">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="font-semibold">{appointment.patient_name}</p>
+            <p className="break-words font-semibold">{appointment.patient_name}</p>
             <Badge variant={confirmed ? "default" : "outline"} className="rounded-full text-[10px]">
               {label}
             </Badge>
@@ -725,11 +725,11 @@ function ProfessionalAppointmentCard({ appointment, onSaved }: any) {
               </Badge>
             ) : null}
           </div>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1 break-words text-xs text-muted-foreground">
             {appointment.service?.name || "Procedimento"} · {formatPrice(total)}
           </p>
         </div>
-        <div className="text-right">
+        <div className="shrink-0 text-right">
           <p className="font-semibold">{appointment.scheduled_time}</p>
           <p className="text-[10px] text-muted-foreground">
             {formatDate(appointment.scheduled_date)}
@@ -739,13 +739,13 @@ function ProfessionalAppointmentCard({ appointment, onSaved }: any) {
       <div className="mt-3 grid gap-2 border-t border-border/70 pt-3 sm:grid-cols-2">
         <a
           href={appointment.patient_phone ? `tel:${appointment.patient_phone}` : undefined}
-          className="flex items-center gap-2 text-xs text-muted-foreground"
+          className="flex min-w-0 items-center gap-2 break-all text-xs text-muted-foreground"
         >
           <Phone className="size-3.5" /> {appointment.patient_phone || "Telefone não informado"}
         </a>
         <a
           href={appointment.patient_email ? `mailto:${appointment.patient_email}` : undefined}
-          className="flex items-center gap-2 text-xs text-muted-foreground sm:justify-end"
+          className="flex min-w-0 items-center gap-2 break-all text-xs text-muted-foreground sm:justify-end"
         >
           <Mail className="size-3.5" /> {appointment.patient_email || "E-mail não informado"}
         </a>
@@ -757,8 +757,8 @@ function ProfessionalAppointmentCard({ appointment, onSaved }: any) {
       ) : null}
       {(appointment.payment_choice ?? "onsite") === "onsite" ? (
         <div className="mt-3 rounded-xl border border-border bg-card/80 p-3">
-          <div className="flex items-center justify-between gap-3">
-            <div>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
               <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
                 Valor do atendimento
               </p>
@@ -821,7 +821,7 @@ function ProfessionalAppointmentCard({ appointment, onSaved }: any) {
           {proximity === "urgent" ? (
             <Button
               type="button"
-              className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-700"
+              className="h-auto max-w-full whitespace-normal rounded-xl bg-emerald-600 py-2 text-white hover:bg-emerald-700"
               onClick={() => openWhatsApp("reminder")}
             >
               <MessageCircle className="size-4" />{" "}
@@ -831,7 +831,7 @@ function ProfessionalAppointmentCard({ appointment, onSaved }: any) {
             <Button
               type="button"
               variant="outline"
-              className="rounded-xl border-emerald-600/40 text-emerald-700 hover:bg-emerald-50"
+              className="h-auto max-w-full whitespace-normal rounded-xl border-emerald-600/40 py-2 text-emerald-700 hover:bg-emerald-50"
               onClick={() => openWhatsApp("confirmation")}
             >
               <MessageCircle className="size-4" />{" "}
@@ -877,7 +877,7 @@ function ProfessionalAppointmentCard({ appointment, onSaved }: any) {
         </div>
       ) : null}
       {attended ? (
-        <div className="mt-3 flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800">
+        <div className="mt-3 flex min-w-0 items-start gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800">
           <CheckCircle2 className="size-4" /> Atendimento concluído · valor contabilizado na receita
         </div>
       ) : null}
