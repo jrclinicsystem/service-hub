@@ -1,0 +1,41 @@
+name: Finance cash opening correction hotfix
+
+on:
+  push:
+    paths:
+      - '.github/scripts/finance_cash_opening_correction_patch.py'
+      - '.github/workflows/finance-cash-opening-correction-hotfix.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+      - name: Apply cash opening correction UI patch
+        run: python .github/scripts/finance_cash_opening_correction_patch.py
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Typecheck diagnostics
+        continue-on-error: true
+        run: bunx tsc --noEmit
+      - name: Production build
+        run: bun run build
+      - name: Commit UI changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/finance-staging-workspace.tsx
+          if git diff --cached --quiet; then
+            echo "No UI changes to commit"
+            exit 0
+          fi
+          git commit -m "finance: allow correcting open cash balance"
+          git push origin main
