@@ -84,6 +84,7 @@ export function AdminRoomReservations() {
   const [savingRoom, setSavingRoom] = useState(false);
 
   const [reservationOpen, setReservationOpen] = useState(false);
+  const [editingReservationId, setEditingReservationId] = useState<string | null>(null);
   const [roomId, setRoomId] = useState("");
   const [renterMode, setRenterMode] = useState<"professional" | "external">("professional");
   const [renterProfessionalId, setRenterProfessionalId] = useState("");
@@ -204,6 +205,7 @@ export function AdminRoomReservations() {
   };
 
   const resetReservation = () => {
+    setEditingReservationId(null);
     setRoomId("");
     setRenterMode("professional");
     setRenterProfessionalId("");
@@ -216,6 +218,35 @@ export function AdminRoomReservations() {
     setAmount("");
     setNotes("");
     setReservationOpen(false);
+  };
+
+  const openNewReservation = () => {
+    resetReservation();
+    setReservationOpen(true);
+  };
+
+  const editReservation = (reservation: any) => {
+    const professionalId = reservation.renter_professional_id ?? "";
+    const matchedShift = (Object.entries(shiftTimes).find(
+      ([, times]) =>
+        times[0] === String(reservation.start_time).slice(0, 5) &&
+        times[1] === String(reservation.end_time).slice(0, 5),
+    )?.[0] ?? "morning") as ShiftType;
+
+    setEditingReservationId(reservation.id);
+    setRoomId(reservation.room_id ?? "");
+    setRenterMode(professionalId && professionalMap.has(professionalId) ? "professional" : "external");
+    setRenterProfessionalId(professionalId && professionalMap.has(professionalId) ? professionalId : "");
+    setExternalRenterName(professionalId && professionalMap.has(professionalId) ? "" : reservation.renter_name ?? "");
+    setReservationDate(reservation.reservation_date ?? today);
+    setRentalType((reservation.rental_type ?? "hour") as RentalType);
+    setShift(matchedShift);
+    setStartTime(String(reservation.start_time ?? "08:00").slice(0, 5));
+    setEndTime(String(reservation.end_time ?? "09:00").slice(0, 5));
+    setAmount(reservation.amount === null || reservation.amount === undefined ? "" : String(reservation.amount));
+    setNotes(reservation.notes ?? "");
+    setReservationOpen(true);
+    window.requestAnimationFrame(() => document.getElementById("room-reservation-form")?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
 
   const saveReservation = async () => {
@@ -233,7 +264,7 @@ export function AdminRoomReservations() {
     setSavingReservation(true);
     try {
       const { data: userData } = await supabase.auth.getUser();
-      const result = await db.from("room_reservations").insert({
+      const payload = {
         room_id: roomId,
         renter_professional_id: renterMode === "professional" ? renterProfessionalId || null : null,
         renter_name: renterName,
@@ -243,15 +274,22 @@ export function AdminRoomReservations() {
         end_time: endTime,
         amount: parsedAmount === null ? null : Math.round((parsedAmount + Number.EPSILON) * 100) / 100,
         notes: notes.trim() || null,
-        status: "active",
-        created_by: userData.user?.id ?? null,
-      });
+      };
+      const result = editingReservationId
+        ? await db.from("room_reservations").update(payload).eq("id", editingReservationId).eq("status", "active").select("id").single()
+        : await db.from("room_reservations").insert({ ...payload, status: "active", created_by: userData.user?.id ?? null }).select("id").single();
       if (result.error) throw result.error;
-      toast.success("Sala reservada com sucesso.", { description: "O período já foi bloqueado nas agendas das profissionais vinculadas à sala." });
+      toast.success(editingReservationId ? "Reserva atualizada com sucesso." : "Sala reservada com sucesso.", { description: editingReservationId ? "Os bloqueios antigos foram liberados e o novo período já está indisponível nas agendas vinculadas." : "O período já foi bloqueado nas agendas das profissionais vinculadas à sala." });
       resetReservation();
       await invalidate();
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["professional-room-blocks"] }),
+        queryClient.invalidateQueries({ queryKey: ["professional-client-booking-tools"] }),
+        queryClient.invalidateQueries({ queryKey: ["professional-date-slots"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-date-availability-slots"] }),
+      ]);
     } catch (err: any) {
-      toast.error("Não foi possível reservar a sala.", { description: err?.message || "Verifique se já existe uma reserva ou atendimento nesse período." });
+      toast.error(editingReservationId ? "Não foi possível atualizar a reserva." : "Não foi possível reservar a sala.", { description: err?.message || "Verifique se já existe uma reserva ou atendimento nesse período." });
     } finally {
       setSavingReservation(false);
     }
@@ -279,7 +317,7 @@ export function AdminRoomReservations() {
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" onClick={() => refetch()} disabled={isFetching}>{isFetching ? "Atualizando..." : "Atualizar"}</Button>
           <Button type="button" variant="outline" onClick={openNewRoom}><Building2 className="size-4" /> Cadastrar sala</Button>
-          <Button type="button" onClick={() => setReservationOpen(true)}><Plus className="size-4" /> Nova reserva</Button>
+          <Button type="button" onClick={openNewReservation}><Plus className="size-4" /> Nova reserva</Button>
         </div>
       </div>
 
@@ -296,10 +334,10 @@ export function AdminRoomReservations() {
       ) : null}
 
       {reservationOpen ? (
-        <section className="mt-6 rounded-3xl border border-primary/15 bg-card p-5 shadow-soft sm:p-6">
-          <div className="flex items-center justify-between gap-3"><div><h2 className="text-lg font-semibold">Nova reserva</h2><p className="mt-1 text-xs text-muted-foreground">O sistema impede reservas sobrepostas e também bloqueia reservas quando já existe atendimento na sala.</p></div><Button type="button" size="icon" variant="ghost" onClick={resetReservation}><X className="size-4" /></Button></div>
+        <section id="room-reservation-form" className="mt-6 scroll-mt-6 rounded-3xl border border-primary/15 bg-card p-5 shadow-soft sm:p-6">
+          <div className="flex items-center justify-between gap-3"><div><h2 className="text-lg font-semibold">{editingReservationId ? "Editar reserva" : "Nova reserva"}</h2><p className="mt-1 text-xs text-muted-foreground">O sistema impede reservas sobrepostas e também bloqueia reservas quando já existe atendimento na sala.</p></div><Button type="button" size="icon" variant="ghost" onClick={resetReservation}><X className="size-4" /></Button></div>
           <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <div><Label>Sala</Label><Select value={roomId} onValueChange={setRoomId}><SelectTrigger className="mt-2"><SelectValue placeholder="Selecione a sala" /></SelectTrigger><SelectContent>{rooms.filter((room: any) => room.is_active).map((room: any) => <SelectItem key={room.id} value={room.id}>{room.name}</SelectItem>)}</SelectContent></Select></div>
+            <div><Label>Sala</Label><Select value={roomId} onValueChange={setRoomId}><SelectTrigger className="mt-2"><SelectValue placeholder="Selecione a sala" /></SelectTrigger><SelectContent>{rooms.filter((room: any) => room.is_active || room.id === roomId).map((room: any) => <SelectItem key={room.id} value={room.id}>{room.name}</SelectItem>)}</SelectContent></Select></div>
             <div><Label>Locatária</Label><Select value={renterMode} onValueChange={(value) => { setRenterMode(value as "professional" | "external"); setRenterProfessionalId(""); setExternalRenterName(""); }}><SelectTrigger className="mt-2"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="professional">Profissional cadastrada</SelectItem><SelectItem value="external">Nome externo</SelectItem></SelectContent></Select></div>
             {renterMode === "professional" ? <div><Label>Profissional</Label><Select value={renterProfessionalId} onValueChange={setRenterProfessionalId}><SelectTrigger className="mt-2"><SelectValue placeholder="Escolha" /></SelectTrigger><SelectContent>{professionals.map((professional: any) => <SelectItem key={professional.id} value={professional.id}>{professional.name}</SelectItem>)}</SelectContent></Select></div> : <div><Label>Nome da locatária</Label><Input className="mt-2" value={externalRenterName} onChange={(event) => setExternalRenterName(event.target.value)} placeholder="Nome completo" /></div>}
             <div><Label>Data</Label><Input className="mt-2" type="date" min={today} value={reservationDate} onChange={(event) => setReservationDate(event.target.value)} /></div>
@@ -310,7 +348,7 @@ export function AdminRoomReservations() {
             {rentalType === "shift" ? <div><Label>Valor do aluguel (opcional)</Label><Input className="mt-2" type="number" min="0" step="0.01" inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0,00" /></div> : null}
             <div className="sm:col-span-2 lg:col-span-3"><Label>Observação (opcional)</Label><Textarea className="mt-2" value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Informações sobre a reserva" /></div>
           </div>
-          <div className="mt-5 flex gap-2"><Button type="button" variant="outline" onClick={resetReservation} disabled={savingReservation}>Cancelar</Button><Button type="button" onClick={() => void saveReservation()} disabled={savingReservation}><CalendarDays className="size-4" /> {savingReservation ? "Reservando..." : "Confirmar reserva"}</Button></div>
+          <div className="mt-5 flex gap-2"><Button type="button" variant="outline" onClick={resetReservation} disabled={savingReservation}>Cancelar</Button><Button type="button" onClick={() => void saveReservation()} disabled={savingReservation}>{editingReservationId ? <Save className="size-4" /> : <CalendarDays className="size-4" />} {savingReservation ? "Salvando..." : editingReservationId ? "Salvar alterações" : "Confirmar reserva"}</Button></div>
         </section>
       ) : null}
 
@@ -372,9 +410,14 @@ export function AdminRoomReservations() {
                   </div>
                   {reservation.notes ? <p className="mt-2 text-xs text-muted-foreground">{String(reservation.notes)}</p> : null}
                 </div>
-                <Button type="button" variant="outline" className="text-destructive" onClick={() => void cancelReservation(reservation)}>
-                  <XCircle className="size-4" /> Cancelar reserva
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" variant="outline" onClick={() => editReservation(reservation)}>
+                    <Pencil className="size-4" /> Editar reserva
+                  </Button>
+                  <Button type="button" variant="outline" className="text-destructive" onClick={() => void cancelReservation(reservation)}>
+                    <XCircle className="size-4" /> Cancelar reserva
+                  </Button>
+                </div>
               </div>
             </article>
           )) : <div className="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">Nenhuma reserva futura.</div>}
