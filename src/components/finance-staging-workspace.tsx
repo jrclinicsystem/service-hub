@@ -557,6 +557,9 @@ function FullFinanceWorkspace({
   const [openingCash, setOpeningCash] = useState("200,00");
   const [countedCash, setCountedCash] = useState("");
   const [closingNote, setClosingNote] = useState("");
+  const [editingOpeningCash, setEditingOpeningCash] = useState(false);
+  const [correctedOpeningCash, setCorrectedOpeningCash] = useState("");
+  const [openingCorrectionReason, setOpeningCorrectionReason] = useState("");
   const [professionalFilter, setProfessionalFilter] = useState("all");
   const [serviceFilter, setServiceFilter] = useState("all");
   const [methodFilter, setMethodFilter] = useState("all");
@@ -974,11 +977,95 @@ function FullFinanceWorkspace({
               </div>
             ) : todayCash.status === "open" ? (
               <div className="grid gap-4 lg:grid-cols-4">
-                <MetricCard
-                  icon={Banknote}
-                  label="Fundo inicial"
-                  value={money(todayCash.opening_cash)}
-                />
+                <div className="space-y-2">
+                  <MetricCard
+                    icon={Banknote}
+                    label="Fundo inicial"
+                    value={money(todayCash.opening_cash)}
+                  />
+                  {!editingOpeningCash ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => {
+                        setCorrectedOpeningCash(String(todayCash.opening_cash ?? "0"));
+                        setOpeningCorrectionReason("");
+                        setEditingOpeningCash(true);
+                      }}
+                    >
+                      Corrigir abertura
+                    </Button>
+                  ) : (
+                    <div className="space-y-2 rounded-2xl border border-primary/15 bg-primary-soft/30 p-3">
+                      <div>
+                        <Label className="text-xs">Novo fundo inicial</Label>
+                        <Input
+                          value={correctedOpeningCash}
+                          onChange={(e) => setCorrectedOpeningCash(e.target.value)}
+                          placeholder="0,00"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Motivo da correção</Label>
+                        <Input
+                          value={openingCorrectionReason}
+                          onChange={(e) => setOpeningCorrectionReason(e.target.value)}
+                          placeholder="Ex.: valor informado em duplicidade"
+                        />
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        Corrige somente o fundo inicial deste caixa. Entradas e saídas registradas não são alteradas.
+                      </p>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="flex-1"
+                          disabled={busy === "correct-opening-cash"}
+                          onClick={() =>
+                            run(
+                              "correct-opening-cash",
+                              async () => {
+                                const value = parseMoney(correctedOpeningCash);
+                                if (!Number.isFinite(value) || value < 0)
+                                  throw new Error("Fundo inicial inválido.");
+                                if (!openingCorrectionReason.trim())
+                                  throw new Error("Informe o motivo da correção.");
+                                const result = await db.rpc("correct_open_cash_session", {
+                                  _session_id: todayCash.id,
+                                  _opening_cash: value,
+                                  _reason: openingCorrectionReason.trim(),
+                                });
+                                if (result.error) throw result.error;
+                                setEditingOpeningCash(false);
+                                setCorrectedOpeningCash("");
+                                setOpeningCorrectionReason("");
+                              },
+                              "Abertura do caixa corrigida.",
+                            )
+                          }
+                        >
+                          Salvar correção
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={busy === "correct-opening-cash"}
+                          onClick={() => {
+                            setEditingOpeningCash(false);
+                            setCorrectedOpeningCash("");
+                            setOpeningCorrectionReason("");
+                          }}
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
                 <div>
                   <Label>Dinheiro contado</Label>
                   <Input
@@ -2357,6 +2444,9 @@ function ReceptionWorkspace({ data, loading, error, refresh }: any) {
   const [openingCash, setOpeningCash] = useState("200,00");
   const [counted, setCounted] = useState("");
   const [note, setNote] = useState("");
+  const [editingOpeningCash, setEditingOpeningCash] = useState(false);
+  const [correctedOpeningCash, setCorrectedOpeningCash] = useState("");
+  const [openingCorrectionReason, setOpeningCorrectionReason] = useState("");
   const [method, setMethod] = useState("pix");
   const [busy, setBusy] = useState("");
   const todayCash = (data?.cash ?? []).find((row: any) => row.business_date === fortalezaIso());
@@ -2407,7 +2497,91 @@ function ReceptionWorkspace({ data, loading, error, refresh }: any) {
               </Button>
             </div>
           ) : todayCash.status === "open" ? (
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-border p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Fundo inicial informado</p>
+                    <strong className="text-lg">{money(todayCash.opening_cash)}</strong>
+                  </div>
+                  {!editingOpeningCash ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setCorrectedOpeningCash(String(todayCash.opening_cash ?? "0"));
+                        setOpeningCorrectionReason("");
+                        setEditingOpeningCash(true);
+                      }}
+                    >
+                      Corrigir abertura
+                    </Button>
+                  ) : null}
+                </div>
+                {editingOpeningCash ? (
+                  <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_1.6fr_auto]">
+                    <Input
+                      value={correctedOpeningCash}
+                      onChange={(e) => setCorrectedOpeningCash(e.target.value)}
+                      placeholder="Novo fundo inicial"
+                    />
+                    <Input
+                      value={openingCorrectionReason}
+                      onChange={(e) => setOpeningCorrectionReason(e.target.value)}
+                      placeholder="Motivo da correção"
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={busy === "correct-opening"}
+                        onClick={() =>
+                          run(
+                            "correct-opening",
+                            async () => {
+                              const value = parseMoney(correctedOpeningCash);
+                              if (!Number.isFinite(value) || value < 0)
+                                throw new Error("Fundo inicial inválido.");
+                              if (!openingCorrectionReason.trim())
+                                throw new Error("Informe o motivo da correção.");
+                              const result = await db.rpc("correct_open_cash_session", {
+                                _session_id: todayCash.id,
+                                _opening_cash: value,
+                                _reason: openingCorrectionReason.trim(),
+                              });
+                              if (result.error) throw result.error;
+                              setEditingOpeningCash(false);
+                              setCorrectedOpeningCash("");
+                              setOpeningCorrectionReason("");
+                            },
+                            "Abertura do caixa corrigida.",
+                          )
+                        }
+                      >
+                        Salvar
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={busy === "correct-opening"}
+                        onClick={() => {
+                          setEditingOpeningCash(false);
+                          setCorrectedOpeningCash("");
+                          setOpeningCorrectionReason("");
+                        }}
+                      >
+                        Cancelar
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  A correção altera apenas o fundo inicial. Recebimentos e despesas do dia continuam intactos.
+                </p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
               <Input
                 placeholder="Dinheiro contado"
                 value={counted}
@@ -2437,6 +2611,7 @@ function ReceptionWorkspace({ data, loading, error, refresh }: any) {
               >
                 Fechar caixa
               </Button>
+              </div>
             </div>
           ) : (
             <div className="grid gap-3 sm:grid-cols-3">
