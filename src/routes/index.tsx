@@ -15,10 +15,10 @@ const description =
 const tickerItems = [
   "Odontologia",
   "Estética",
-  "Cabelos",
+  "Cílios",
+  "Epilaçao",
+  "Manicure",
   "Clareamento",
-  "Make & Hair",
-  "Mega Hair",
   "Agendamento online",
 ];
 
