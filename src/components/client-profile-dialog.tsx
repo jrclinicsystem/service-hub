@@ -154,11 +154,14 @@ export function ClientProfileDialog({ clientId, open, onOpenChange, onUpdated }:
   };
 
   const uploadFiles = async (files: FileList | null) => {
-    if (!clientId || !files?.length) return;
+    // FileList is tied to the input element and becomes empty when the input is reset.
+    // Snapshot the selected files synchronously before the first await.
+    const selectedFiles = files ? Array.from(files) : [];
+    if (!clientId || !selectedFiles.length) return;
     setUploading(true);
     try {
       const { data: auth } = await supabase.auth.getUser();
-      for (const file of Array.from(files)) {
+      for (const file of selectedFiles) {
         if (file.size > 15 * 1024 * 1024) throw new Error(`${file.name}: limite de 15 MB por arquivo.`);
         const path = `${clientId}/${Date.now()}-${crypto.randomUUID()}-${safeName(file.name)}`;
         const uploadOptions = file.type ? { upsert: false, contentType: file.type } : { upsert: false };
@@ -173,7 +176,7 @@ export function ClientProfileDialog({ clientId, open, onOpenChange, onUpdated }:
           throw inserted.error;
         }
       }
-      toast.success(files.length === 1 ? "Arquivo anexado à ficha." : `${files.length} arquivos anexados à ficha.`);
+      toast.success(selectedFiles.length === 1 ? "Arquivo anexado à ficha." : `${selectedFiles.length} arquivos anexados à ficha.`);
       await refresh();
     } catch (error: any) {
       toast.error("Não foi possível anexar o arquivo.", { description: error?.message });
