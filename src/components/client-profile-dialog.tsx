@@ -255,8 +255,8 @@ export function ClientProfileDialog({ clientId, open, onOpenChange, onUpdated }:
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[88vh] max-h-[820px] max-w-[1120px] flex-col overflow-hidden border-primary/10 bg-gradient-to-b from-primary/[0.035] via-background to-background p-0 shadow-2xl">
-        <DialogHeader className="shrink-0 border-b border-primary/10 bg-gradient-to-r from-primary/[0.10] via-primary/[0.04] to-transparent px-6 py-5 pr-12">
+      <DialogContent className="grid h-[min(700px,90vh)] max-w-[1120px] grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden border-primary/10 bg-background p-0 shadow-2xl">
+        <DialogHeader className="relative z-10 border-b border-primary/15 bg-primary/[0.065] px-6 py-5 pr-12">
           <div className="flex items-start gap-3">
             <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-primary/15 text-primary ring-1 ring-primary/15"><UserRound className="size-5" /></span>
             <div className="min-w-0">
@@ -267,8 +267,8 @@ export function ClientProfileDialog({ clientId, open, onOpenChange, onUpdated }:
         </DialogHeader>
 
         {query.isLoading ? <div className="grid min-h-[420px] place-items-center"><Loader2 className="size-7 animate-spin text-primary" /></div> : query.error ? <div className="p-8 text-sm text-destructive">{query.error instanceof Error ? query.error.message : "Erro ao carregar a ficha."}</div> : client ? (
-          <Tabs defaultValue="profile" className="flex min-h-0 flex-1 flex-col overflow-hidden px-5 pb-5">
-            <div className="overflow-x-auto pt-4">
+          <Tabs defaultValue="profile" className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden px-5 pb-5">
+            <div className="shrink-0 overflow-x-auto pt-4">
               <TabsList className="h-auto w-max min-w-full justify-start gap-1 border border-primary/10 bg-primary/[0.065] p-1.5">
                 <TabsTrigger value="profile" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Ficha cadastral</TabsTrigger>
                 <TabsTrigger value="documents" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Anamnese e arquivos</TabsTrigger>
@@ -277,7 +277,7 @@ export function ClientProfileDialog({ clientId, open, onOpenChange, onUpdated }:
               </TabsList>
             </div>
 
-            <div className="mt-3 min-h-0 flex-1 overflow-y-auto pr-1">
+            <div className="mt-3 min-h-0 overflow-y-auto overscroll-contain pr-1 pb-1">
               <TabsContent value="profile" className="mt-0 space-y-5">
                 <div className="grid gap-4 rounded-2xl border border-primary/10 bg-gradient-to-br from-card via-card to-primary/[0.035] p-4 shadow-sm sm:grid-cols-2">
                   <div><Label>Nome completo</Label><Input className="mt-2" value={name} onChange={(e) => setName(e.target.value)} /></div>
