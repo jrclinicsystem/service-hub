@@ -1,0 +1,41 @@
+name: Appointment reminder and cash guard hotfix
+
+on:
+  push:
+    paths:
+      - '.github/scripts/appointment_reminder_and_cash_guard_patch.py'
+      - '.github/workflows/appointment-reminder-and-cash-guard-hotfix.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+      - name: Apply appointment reminder patch
+        run: python .github/scripts/appointment_reminder_and_cash_guard_patch.py
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Typecheck diagnostics
+        continue-on-error: true
+        run: bunx tsc --noEmit
+      - name: Production build
+        run: bun run build
+      - name: Commit application changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/appointment-contact.ts src/components/admin-appointments-workspace.tsx
+          if git diff --cached --quiet; then
+            echo "No application changes to commit"
+            exit 0
+          fi
+          git commit -m "fix: keep appointment details in confirmed WhatsApp reminders"
+          git push origin main
