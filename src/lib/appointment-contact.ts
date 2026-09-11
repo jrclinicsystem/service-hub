@@ -59,10 +59,20 @@ export function appointmentWhatsAppMessage(appointment: AppointmentContactData, 
     return `Olá, ${appointment.patient_name ?? "cliente"}! Tudo bem?`;
   }
 
+  const days = daysUntilAppointment(appointment.scheduled_date);
+  const reminderIntro =
+    days === 0
+      ? "Passando para lembrar que seu atendimento na JR Clinic é hoje."
+      : days === 1
+        ? "Passando para lembrar que seu atendimento na JR Clinic é amanhã."
+        : days !== null && days > 1
+          ? `Passando para lembrar do seu atendimento na JR Clinic, agendado para daqui a ${days} dias.`
+          : "Passando para lembrar do seu atendimento agendado na JR Clinic.";
+
   const lines = kind === "reminder"
     ? [
         `Olá, ${appointment.patient_name ?? "cliente"}! Tudo bem?`,
-        "Passando para lembrar que seu atendimento na JR Clinic é amanhã.",
+        reminderIntro,
       ]
     : [
         `Olá, ${appointment.patient_name ?? "cliente"}! Tudo bem?`,
