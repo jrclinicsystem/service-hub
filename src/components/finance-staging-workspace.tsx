@@ -15,6 +15,7 @@ import {
   Settings2,
   TrendingDown,
   TrendingUp,
+  Trash2,
   UsersRound,
   WalletCards,
 } from "lucide-react";
@@ -1961,28 +1962,6 @@ function FullFinanceWorkspace({
                         <Badge variant={statusVariant(row.display_status)}>
                           {statusLabel(row.display_status)}
                         </Badge>
-                        {row.status === "paid" ? (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={busy === `reverse-receivable-${row.id}`}
-                            onClick={() => {
-                              if (!window.confirm(`Reverter a baixa de ${row.client_name_snapshot}? O valor sairá das entradas e esta conta voltará para Pendente.`)) return;
-                              run(
-                                `reverse-receivable-${row.id}`,
-                                async () => {
-                                  const result = await db.rpc("reverse_account_receivable_payment", {
-                                    _receivable_id: row.id,
-                                  });
-                                  if (result.error) throw result.error;
-                                },
-                                "Baixa revertida. A conta voltou para Pendente.",
-                              );
-                            }}
-                          >
-                            Reverter baixa
-                          </Button>
-                        ) : null}
                         {row.status === "pending" ? (
                           <>
                             <Button
@@ -2014,6 +1993,37 @@ function FullFinanceWorkspace({
                               }
                             >
                               Pagar
+                            </Button>
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              className="size-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                              disabled={busy === `delete-payable-${row.id}` || busy === `pay-${row.id}`}
+                              aria-label={`Excluir ${row.title}`}
+                              title="Excluir conta a pagar"
+                              onClick={() => {
+                                const recurrenceNote =
+                                  row.series_kind === "recurring" && !row.occurrence_count
+                                    ? " Esta recorrência sem prazo será encerrada a partir desta ocorrência."
+                                    : row.series_kind !== "single"
+                                      ? " Apenas esta parcela/ocorrência será excluída."
+                                      : "";
+                                if (!window.confirm(`Excluir a conta a pagar “${row.title}” de ${money(row.amount)}?${recurrenceNote}`)) return;
+                                run(
+                                  `delete-payable-${row.id}`,
+                                  async () => {
+                                    const result = await db.rpc("delete_pending_account_payable", {
+                                      _account_id: row.id,
+                                    });
+                                    if (result.error) throw result.error;
+                                    if (editingPayableId === String(row.id)) resetPayableEditor();
+                                  },
+                                  "Conta a pagar excluída.",
+                                );
+                              }}
+                            >
+                              <Trash2 className="size-4" />
                             </Button>
                           </>
                         ) : null}
@@ -2161,6 +2171,32 @@ function FullFinanceWorkspace({
                               }
                             >
                               Receber
+                            </Button>
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              className="size-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                              disabled={busy === `delete-receivable-${row.id}` || busy === `receive-${row.id}`}
+                              aria-label={`Excluir conta a receber de ${row.client_name_snapshot}`}
+                              title="Excluir conta a receber"
+                              onClick={() => {
+                                const remaining = Number(row.original_amount) - Number(row.amount_received ?? 0);
+                                if (!window.confirm(`Excluir a conta a receber / fiado de “${row.client_name_snapshot}” no valor de ${money(remaining)}?`)) return;
+                                run(
+                                  `delete-receivable-${row.id}`,
+                                  async () => {
+                                    const result = await db.rpc("delete_pending_account_receivable", {
+                                      _receivable_id: row.id,
+                                    });
+                                    if (result.error) throw result.error;
+                                    if (editingReceivableId === String(row.id)) resetReceivableEditor();
+                                  },
+                                  "Conta a receber excluída.",
+                                );
+                              }}
+                            >
+                              <Trash2 className="size-4" />
                             </Button>
                           </>
                         ) : row.status === "paid" ? (

@@ -22,6 +22,21 @@ const money = (value: unknown) => Number(value ?? 0).toLocaleString("pt-BR", { s
 const dateLabel = (value?: string | null) => value ? new Date(`${value}T12:00:00`).toLocaleDateString("pt-BR") : "—";
 const fileSize = (value?: number | null) => !value ? "" : value < 1024 * 1024 ? `${Math.max(1, Math.round(value / 1024))} KB` : `${(value / 1024 / 1024).toFixed(1).replace(".", ",")} MB`;
 const digits = (value?: string | null) => String(value ?? "").replace(/\D/g, "");
+const serviceSessionCount = (service: any) => {
+  const metadata = [
+    service?.name,
+    service?.summary,
+    service?.description,
+    ...(Array.isArray(service?.includes) ? service.includes : []),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  const match = metadata.match(/\b(1[0-2]|[1-9])\s*(?:sessao|sessoes|sess)\b/i);
+  return match ? Math.min(12, Math.max(1, Number(match[1]))) : 1;
+};
 const safeName = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9._-]+/g, "-").slice(-90);
 
 const statusLabel: Record<string, string> = {
@@ -59,7 +74,7 @@ async function loadClientWorkspace(clientId: string) {
     db.from("appointments").select(appointmentSelect).ilike("patient_name", client.name).order("scheduled_date", { ascending: false }).limit(100),
     db.from("client_documents").select("id,client_id,category,file_name,storage_path,mime_type,size_bytes,notes,created_at").eq("client_id", clientId).order("created_at", { ascending: false }),
     db.from("client_budgets").select("id,client_id,title,notes,status,total_amount,valid_until,created_at,updated_at,client_budget_items(id,service_id,service_name_snapshot,unit_price,sessions,line_total,position)").eq("client_id", clientId).order("created_at", { ascending: false }),
-    db.from("services").select("id,name,price,duration_min").eq("is_active", true).order("name"),
+    db.from("services").select("id,name,price,duration_min,summary,description,includes").eq("is_active", true).order("name"),
   ]);
   for (const result of [directAppointments, legacyAppointments, documents, budgets, services]) if (result.error) throw result.error;
 
@@ -205,8 +220,19 @@ export function ClientProfileDialog({ clientId, open, onOpenChange, onUpdated }:
   };
 
   const setBudgetService = (index: number, serviceId: string) => {
+    const duplicate = budgetRows.some((row, i) => i !== index && row.serviceId === serviceId);
+    if (duplicate) {
+      toast.error("Esse serviço já foi adicionado ao combo. Ajuste as sessões na mesma linha.");
+      return;
+    }
     const service = query.data?.services?.find((item: any) => item.id === serviceId);
-    setBudgetRows((rows) => rows.map((row, i) => i === index ? { ...row, serviceId, unitPrice: service ? Number(service.price ?? 0).toFixed(2).replace(".", ",") : row.unitPrice } : row));
+    const sessions = serviceSessionCount(service);
+    setBudgetRows((rows) => rows.map((row, i) => i === index ? {
+      ...row,
+      serviceId,
+      sessions: String(sessions),
+      unitPrice: service ? Number(service.price ?? 0).toFixed(2).replace(".", ",") : row.unitPrice,
+    } : row));
   };
 
   const saveBudget = async () => {
@@ -342,10 +368,16 @@ export function ClientProfileDialog({ clientId, open, onOpenChange, onUpdated }:
                 <section className="rounded-2xl border border-primary/10 bg-gradient-to-br from-card via-card to-primary/[0.035] p-4 shadow-sm">
                   <div className="flex items-center gap-2"><ReceiptText className="size-4 text-primary" /><h3 className="font-semibold">Novo orçamento / combo</h3></div>
                   <div className="mt-4 grid gap-3 sm:grid-cols-2"><div><Label>Título</Label><Input className="mt-2" value={budgetTitle} onChange={(e) => setBudgetTitle(e.target.value)} /></div><div><Label>Validade (opcional)</Label><Input className="mt-2" type="date" value={budgetValidUntil} onChange={(e) => setBudgetValidUntil(e.target.value)} /></div></div>
-                  <div className="mt-4 space-y-2">
-                    {budgetRows.map((row, index) => <div key={index} className="grid gap-2 rounded-xl border p-3 sm:grid-cols-[minmax(0,1.6fr)_110px_140px_auto]">
+                  <div className="mt-4 rounded-xl border border-primary/10 bg-primary/[0.035] px-3 py-2.5 text-xs text-muted-foreground">
+                    Selecione cada serviço apenas uma vez. A quantidade de sessões do pacote é preenchida automaticamente pelo cadastro do serviço; adicione outra linha somente quando for outro serviço.
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    {budgetRows.map((row, index) => <div key={index} className="grid gap-2 rounded-xl border p-3 sm:grid-cols-[minmax(0,1.6fr)_125px_140px_auto]">
                       <Select value={row.serviceId} onValueChange={(value) => setBudgetService(index, value)}><SelectTrigger><SelectValue placeholder="Selecione o serviço" /></SelectTrigger><SelectContent>{(query.data?.services ?? []).map((service: any) => <SelectItem key={service.id} value={service.id}>{service.name} · {money(service.price)}</SelectItem>)}</SelectContent></Select>
-                      <Input type="number" min="1" max="60" title="Sessões" value={row.sessions} onChange={(e) => setBudgetRows((rows) => rows.map((item, i) => i === index ? { ...item, sessions: e.target.value } : item))} placeholder="Sessões" />
+                      <div className="relative">
+                        <span className="pointer-events-none absolute left-3 top-1.5 z-10 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">Sessões</span>
+                        <Input className="pt-4 font-semibold" type="number" min="1" max="12" title="Sessões incluídas neste serviço" value={row.sessions} onChange={(e) => setBudgetRows((rows) => rows.map((item, i) => i === index ? { ...item, sessions: String(Math.min(12, Math.max(1, Number(e.target.value) || 1))) } : item))} />
+                      </div>
                       <Input value={row.unitPrice} onChange={(e) => setBudgetRows((rows) => rows.map((item, i) => i === index ? { ...item, unitPrice: e.target.value } : item))} placeholder="Valor/sessão" />
                       <Button type="button" size="icon" variant="ghost" disabled={budgetRows.length === 1} onClick={() => setBudgetRows((rows) => rows.filter((_, i) => i !== index))}><Trash2 className="size-4" /></Button>
                     </div>)}
