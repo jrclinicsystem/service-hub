@@ -245,7 +245,7 @@ async function loadFinanceAccess() {
 async function loadFullOverview(from: string, to: string) {
   const results = await Promise.all([
     db.rpc("get_financial_dashboard", { _from: from, _to: to }),
-    db.from("cash_sessions").select("*").order("business_date", { ascending: false }).limit(30),
+    db.from("financial_cash_report").select("*").order("business_date", { ascending: false }).limit(30),
     db
       .from("financial_report_entries")
       .select("*")
@@ -397,7 +397,7 @@ async function loadFullOverview(from: string, to: string) {
 
 async function loadReceptionOverview() {
   const results = await Promise.all([
-    db.from("cash_sessions").select("*").order("business_date", { ascending: false }).limit(15),
+    db.from("financial_cash_report").select("*").order("business_date", { ascending: false }).limit(15),
     db
       .from("accounts_receivable_with_status")
       .select("*")
