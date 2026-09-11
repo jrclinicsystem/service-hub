@@ -25,6 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -265,6 +266,11 @@ async function loadFullOverview(from: string, to: string) {
       .order("due_date", { ascending: true })
       .limit(200),
     db
+      .from("account_payable_attachments")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(500),
+    db
       .from("accounts_receivable_with_status")
       .select("*")
       .order("due_date", { ascending: true })
@@ -309,6 +315,7 @@ async function loadFullOverview(from: string, to: string) {
     entries,
     expenses,
     payables,
+    payableAttachments,
     receivables,
     commissions,
     settlements,
@@ -375,6 +382,7 @@ async function loadFullOverview(from: string, to: string) {
     entries: enrichedEntries,
     expenses: expenses.data ?? [],
     payables: payables.data ?? [],
+    payableAttachments: payableAttachments.data ?? [],
     receivables: receivables.data ?? [],
     commissions: commissions.data ?? [],
     settlements: settlements.data ?? [],
@@ -643,10 +651,15 @@ function FullFinanceWorkspace({
     supplier: "",
     amount: "",
     due: fortalezaIso(),
-    recurrence: "none",
+    type: "single",
+    duration: "indefinite",
+    count: "12",
     category: "",
     center: "",
+    description: "",
   });
+  const [payableFiles, setPayableFiles] = useState<File[]>([]);
+  const [payableFileKey, setPayableFileKey] = useState(0);
   const [payMethod, setPayMethod] = useState("pix");
   const [receiveMethod, setReceiveMethod] = useState("pix");
   const [showPaidReceivables, setShowPaidReceivables] = useState(false);
@@ -674,7 +687,7 @@ function FullFinanceWorkspace({
   const [editingRuleId, setEditingRuleId] = useState("");
   const [editingFeeId, setEditingFeeId] = useState("");
   const [editingPayableId, setEditingPayableId] = useState("");
-  const [payableEdit, setPayableEdit] = useState({ amount: "", due: "" });
+  const [payableEdit, setPayableEdit] = useState({ amount: "", due: "", description: "" });
   const [editingReceivableId, setEditingReceivableId] = useState("");
   const [receivableEdit, setReceivableEdit] = useState({ amount: "", due: "" });
   const [editingExpenseId, setEditingExpenseId] = useState("");
@@ -824,12 +837,13 @@ function FullFinanceWorkspace({
     setPayableEdit({
       amount: String(currentPayable.amount ?? ""),
       due: currentPayable.due_date ?? "",
+      description: currentPayable.description ?? "",
     });
   };
 
   const resetPayableEditor = () => {
     setEditingPayableId("");
-    setPayableEdit({ amount: "", due: "" });
+    setPayableEdit({ amount: "", due: "", description: "" });
   };
 
   const editPendingReceivable = (currentReceivable: any) => {
@@ -853,6 +867,84 @@ function FullFinanceWorkspace({
   const resetExpenseEditor = () => {
     setEditingExpenseId("");
     setExpenseEditAmount("");
+  };
+
+  const payableSeriesLabel = (row: any) => {
+    if (row.series_kind === "installment")
+      return `Parcela ${row.occurrence_number}/${row.occurrence_count}`;
+    if (row.series_kind === "recurring" && row.occurrence_count)
+      return `Ocorrência ${row.occurrence_number}/${row.occurrence_count}`;
+    if (row.series_kind === "recurring")
+      return `Recorrência sem prazo · ocorrência ${row.occurrence_number}`;
+    return "";
+  };
+
+  const payableAttachmentsFor = (row: any) =>
+    (data?.payableAttachments ?? []).filter((attachment: any) => attachment.series_id === row.series_id);
+
+  const openPayableAttachment = async (attachment: any) => {
+    const result = await supabase.storage
+      .from("finance-payable-attachments")
+      .createSignedUrl(attachment.file_path, 120);
+    if (result.error || !result.data?.signedUrl) {
+      toast.error("Não foi possível abrir o comprovante.", { description: result.error?.message });
+      return;
+    }
+    window.open(result.data.signedUrl, "_blank", "noopener,noreferrer");
+  };
+
+  const deletePayableAttachment = async (attachment: any) => {
+    if (!window.confirm(`Excluir o comprovante "${attachment.original_name}"?`)) return;
+    try {
+      const storageResult = await supabase.storage
+        .from("finance-payable-attachments")
+        .remove([attachment.file_path]);
+      if (storageResult.error) throw storageResult.error;
+      const metadataResult = await db
+        .from("account_payable_attachments")
+        .delete()
+        .eq("id", attachment.id);
+      if (metadataResult.error) throw metadataResult.error;
+      toast.success("Comprovante excluído.");
+      await refresh();
+    } catch (error: any) {
+      toast.error("Não foi possível excluir o comprovante.", { description: error?.message });
+    }
+  };
+
+  const uploadPayableFiles = async (seriesId: string, files: File[]) => {
+    const acceptedTypes = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp"]);
+    for (const file of files) {
+      if (!acceptedTypes.has(file.type)) {
+        toast.error(`Arquivo não suportado: ${file.name}`);
+        continue;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error(`Arquivo maior que 10 MB: ${file.name}`);
+        continue;
+      }
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, "-");
+      const filePath = `${access.user.id}/${seriesId}/${crypto.randomUUID()}-${safeName}`;
+      const upload = await supabase.storage
+        .from("finance-payable-attachments")
+        .upload(filePath, file, { contentType: file.type, upsert: false });
+      if (upload.error) {
+        toast.error(`Falha ao enviar ${file.name}.`, { description: upload.error.message });
+        continue;
+      }
+      const metadata = await db.from("account_payable_attachments").insert({
+        series_id: seriesId,
+        file_path: filePath,
+        original_name: file.name,
+        mime_type: file.type,
+        file_size: file.size,
+        uploaded_by: access.user.id,
+      });
+      if (metadata.error) {
+        await supabase.storage.from("finance-payable-attachments").remove([filePath]);
+        toast.error(`Falha ao registrar ${file.name}.`, { description: metadata.error.message });
+      }
+    }
   };
 
   if (loading)
@@ -1576,71 +1668,126 @@ function FullFinanceWorkspace({
         </TabsContent>
 
         <TabsContent value="accounts" className="mt-5 space-y-5">
-          <Panel title="Cadastrar conta a pagar">
+          <Panel
+            title="Cadastrar conta a pagar"
+            subtitle="Cadastre uma conta avulsa, uma compra parcelada ou uma recorrência fixa com ou sem prazo."
+          >
             <div className="grid gap-3 md:grid-cols-6">
-              <Input
-                className="md:col-span-2"
-                placeholder="Conta / título"
-                value={payable.title}
-                onChange={(e) => setPayable({ ...payable, title: e.target.value })}
-              />
-              <Input
-                placeholder="Fornecedor"
-                value={payable.supplier}
-                onChange={(e) => setPayable({ ...payable, supplier: e.target.value })}
-              />
-              <Input
-                placeholder="Valor"
-                value={payable.amount}
-                onChange={(e) => setPayable({ ...payable, amount: e.target.value })}
-              />
-              <Input
-                type="date"
-                value={payable.due}
-                onChange={(e) => setPayable({ ...payable, due: e.target.value })}
-              />
-              <Button
-                disabled={busy === "payable"}
-                onClick={() =>
-                  run(
-                    "payable",
-                    async () => {
-                      const amount = parseMoney(payable.amount);
-                      if (!payable.title.trim() || !Number.isFinite(amount) || amount <= 0)
-                        throw new Error("Título e valor são obrigatórios.");
-                      const result = await db.from("accounts_payable").insert({
-                        title: payable.title.trim(),
-                        supplier: payable.supplier.trim() || null,
-                        amount,
-                        due_date: payable.due,
-                        status: "pending",
-                        is_fixed: payable.recurrence !== "none",
-                        recurrence_type: payable.recurrence,
-                        category_id: payable.category || null,
-                        cost_center_id: payable.center || null,
-                        created_by: access.user.id,
-                      });
-                      if (result.error) throw result.error;
-                      setPayable({ ...payable, title: "", supplier: "", amount: "" });
-                    },
-                    "Conta cadastrada.",
-                  )
-                }
-              >
-                Cadastrar
-              </Button>
+              <div className="md:col-span-2">
+                <Label>Conta / título</Label>
+                <Input
+                  placeholder="Ex.: Cadeira para recepção"
+                  value={payable.title}
+                  onChange={(e) => setPayable({ ...payable, title: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>Fornecedor</Label>
+                <Input
+                  placeholder="Opcional"
+                  value={payable.supplier}
+                  onChange={(e) => setPayable({ ...payable, supplier: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>{payable.type === "installment" ? "Valor total da compra" : "Valor"}</Label>
+                <Input
+                  placeholder="0,00"
+                  value={payable.amount}
+                  onChange={(e) => setPayable({ ...payable, amount: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>{payable.type === "installment" ? "Vencimento da 1ª parcela" : "Primeiro vencimento"}</Label>
+                <Input
+                  type="date"
+                  value={payable.due}
+                  onChange={(e) => setPayable({ ...payable, due: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>Tipo da conta</Label>
+                <select
+                  className={selectClass}
+                  value={payable.type}
+                  onChange={(e) => setPayable({ ...payable, type: e.target.value })}
+                >
+                  <option value="single">Única / avulsa</option>
+                  <option value="installment">Compra parcelada</option>
+                  <option value="monthly">Fixa mensal</option>
+                  <option value="weekly">Fixa semanal</option>
+                  <option value="yearly">Fixa anual</option>
+                </select>
+              </div>
             </div>
-            <div className="mt-3 grid gap-3 md:grid-cols-3">
-              <select
-                className={selectClass}
-                value={payable.recurrence}
-                onChange={(e) => setPayable({ ...payable, recurrence: e.target.value })}
-              >
-                <option value="none">Conta variável</option>
-                <option value="monthly">Fixa mensal</option>
-                <option value="weekly">Fixa semanal</option>
-                <option value="yearly">Fixa anual</option>
-              </select>
+
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              <div className="md:col-span-2">
+                <Label>Descrição / o que foi comprado</Label>
+                <Textarea
+                  className="min-h-24"
+                  placeholder="Ex.: 2 cadeiras, 1 mesa auxiliar e frete."
+                  value={payable.description}
+                  onChange={(e) => setPayable({ ...payable, description: e.target.value })}
+                />
+              </div>
+
+              {payable.type === "installment" ? (
+                <div>
+                  <Label>Número de parcelas</Label>
+                  <Input
+                    type="number"
+                    min="2"
+                    max="60"
+                    value={payable.count}
+                    onChange={(e) => setPayable({ ...payable, count: e.target.value })}
+                  />
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Todas as parcelas serão criadas agora e já aparecerão nos meses seguintes.
+                  </p>
+                </div>
+              ) : null}
+
+              {["monthly", "weekly", "yearly"].includes(payable.type) ? (
+                <>
+                  <div>
+                    <Label>Duração da recorrência</Label>
+                    <select
+                      className={selectClass}
+                      value={payable.duration}
+                      onChange={(e) => setPayable({ ...payable, duration: e.target.value })}
+                    >
+                      <option value="indefinite">Sem prazo</option>
+                      <option value="defined">Quantidade definida</option>
+                    </select>
+                  </div>
+                  {payable.duration === "defined" ? (
+                    <div>
+                      <Label>Número de ocorrências</Label>
+                      <Input
+                        type="number"
+                        min="1"
+                        max="120"
+                        value={payable.count}
+                        onChange={(e) => setPayable({ ...payable, count: e.target.value })}
+                      />
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        Ex.: mensal com 12 ocorrências = 12 meses já programados.
+                      </p>
+                    </div>
+                  ) : null}
+                </>
+              ) : null}
+            </div>
+
+            {["monthly", "weekly", "yearly"].includes(payable.type) && payable.duration === "indefinite" ? (
+              <div className="mt-3 rounded-2xl border border-primary/15 bg-primary-soft/40 px-4 py-3 text-xs text-muted-foreground">
+                <strong className="text-foreground">Recorrência sem prazo:</strong>{" "}
+                {payable.type === "monthly" ? "Fixa mensal" : payable.type === "weekly" ? "Fixa semanal" : "Fixa anual"} continua gerando a próxima conta até você encerrar. <strong>Fixa mensal não significa 12 meses.</strong>
+              </div>
+            ) : null}
+
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
               <select
                 className={selectClass}
                 value={payable.category}
@@ -1648,9 +1795,7 @@ function FullFinanceWorkspace({
               >
                 <option value="">Sem categoria</option>
                 {(data.categories ?? []).map((c: any) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
+                  <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
               <select
@@ -1660,11 +1805,96 @@ function FullFinanceWorkspace({
               >
                 <option value="">Sem centro</option>
                 {(data.centers ?? []).map((c: any) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
+                  <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
+            </div>
+
+            <div className="mt-3 rounded-2xl border border-dashed border-border p-4">
+              <Label>Comprovantes / anexos</Label>
+              <Input
+                key={payableFileKey}
+                className="mt-2"
+                type="file"
+                multiple
+                accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
+                onChange={(e) => setPayableFiles(Array.from(e.target.files ?? []))}
+              />
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                PDF ou imagem (JPG, PNG, WEBP), até 10 MB por arquivo. O comprovante fica privado e, em séries, aparece em todas as parcelas/ocorrências.
+              </p>
+              {payableFiles.length ? (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {payableFiles.map((file) => (
+                    <Badge key={`${file.name}-${file.size}`} variant="outline">{file.name}</Badge>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="mt-4 flex justify-end">
+              <Button
+                disabled={busy === "payable"}
+                onClick={() =>
+                  run(
+                    "payable",
+                    async () => {
+                      const amount = parseMoney(payable.amount);
+                      if (!payable.title.trim() || !Number.isFinite(amount) || amount <= 0)
+                        throw new Error("Título e valor são obrigatórios.");
+                      if (!payable.due) throw new Error("Informe o primeiro vencimento.");
+
+                      let occurrenceCount: number | null = null;
+                      if (payable.type === "installment") {
+                        occurrenceCount = Number(payable.count);
+                        if (!Number.isInteger(occurrenceCount) || occurrenceCount < 2 || occurrenceCount > 60)
+                          throw new Error("Informe entre 2 e 60 parcelas.");
+                      } else if (["monthly", "weekly", "yearly"].includes(payable.type) && payable.duration === "defined") {
+                        occurrenceCount = Number(payable.count);
+                        if (!Number.isInteger(occurrenceCount) || occurrenceCount < 1 || occurrenceCount > 120)
+                          throw new Error("Informe entre 1 e 120 ocorrências.");
+                      }
+
+                      const result = await db.rpc("create_account_payable_plan", {
+                        _title: payable.title.trim(),
+                        _supplier: payable.supplier.trim() || null,
+                        _amount: amount,
+                        _first_due_date: payable.due,
+                        _plan_type: payable.type,
+                        _occurrence_count: occurrenceCount,
+                        _description: payable.description.trim() || null,
+                        _category_id: payable.category || null,
+                        _cost_center_id: payable.center || null,
+                      });
+                      if (result.error) throw result.error;
+
+                      const createdRows = Array.isArray(result.data) ? result.data : [];
+                      const seriesId = createdRows[0]?.series_id;
+                      if (seriesId && payableFiles.length) {
+                        await uploadPayableFiles(seriesId, payableFiles);
+                      }
+
+                      setPayable({
+                        title: "",
+                        supplier: "",
+                        amount: "",
+                        due: fortalezaIso(),
+                        type: "single",
+                        duration: "indefinite",
+                        count: "12",
+                        category: "",
+                        center: "",
+                        description: "",
+                      });
+                      setPayableFiles([]);
+                      setPayableFileKey((current) => current + 1);
+                    },
+                    payable.type === "installment" ? "Compra parcelada cadastrada." : "Conta cadastrada.",
+                  )
+                }
+              >
+                {busy === "payable" ? "Cadastrando..." : "Cadastrar conta"}
+              </Button>
             </div>
           </Panel>
           <div className="grid gap-5 xl:grid-cols-2">
@@ -1689,11 +1919,41 @@ function FullFinanceWorkspace({
                     key={row.id}
                     className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border p-4"
                   >
-                    <div>
-                      <strong className="text-sm">{row.title}</strong>
-                      <p className="text-xs text-muted-foreground">
-                        Vence {formatDate(row.due_date)}
-                      </p>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <strong className="text-sm">{row.title}</strong>
+                        {payableSeriesLabel(row) ? <Badge variant="outline">{payableSeriesLabel(row)}</Badge> : null}
+                      </div>
+                      {row.supplier ? <p className="mt-1 text-xs text-muted-foreground">Fornecedor: {row.supplier}</p> : null}
+                      {row.description ? <p className="mt-1 max-w-xl whitespace-pre-wrap text-xs text-foreground/75">{row.description}</p> : null}
+                      <p className="mt-1 text-xs text-muted-foreground">Vence {formatDate(row.due_date)}</p>
+                      {row.series_kind === "installment" && row.purchase_total_amount ? (
+                        <p className="mt-1 text-[11px] text-muted-foreground">Compra total: {money(row.purchase_total_amount)}</p>
+                      ) : null}
+                      {payableAttachmentsFor(row).length ? (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {payableAttachmentsFor(row).map((attachment: any) => (
+                            <div key={attachment.id} className="flex items-center rounded-lg border border-border bg-muted/30">
+                              <button
+                                type="button"
+                                className="max-w-[220px] truncate px-2.5 py-1.5 text-[11px] font-medium text-primary hover:underline"
+                                onClick={() => void openPayableAttachment(attachment)}
+                                title={attachment.original_name}
+                              >
+                                📎 {attachment.original_name}
+                              </button>
+                              <button
+                                type="button"
+                                className="border-l border-border px-2 py-1.5 text-[11px] text-destructive"
+                                onClick={() => void deletePayableAttachment(attachment)}
+                                title="Excluir comprovante"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
                     <div className="text-right">
                       <strong>{money(row.amount)}</strong>
@@ -1760,14 +2020,12 @@ function FullFinanceWorkspace({
                       </div>
                     </div>
                     {editingPayableId === String(row.id) ? (
-                      <div className="grid w-full gap-3 border-t border-border pt-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+                      <div className="grid w-full gap-3 border-t border-border pt-3 sm:grid-cols-2 sm:items-end">
                         <div>
-                          <Label className="text-xs">Valor</Label>
+                          <Label className="text-xs">Valor desta parcela / ocorrência</Label>
                           <Input
                             value={payableEdit.amount}
-                            onChange={(e) =>
-                              setPayableEdit({ ...payableEdit, amount: e.target.value })
-                            }
+                            onChange={(e) => setPayableEdit({ ...payableEdit, amount: e.target.value })}
                           />
                         </div>
                         <div>
@@ -1775,12 +2033,18 @@ function FullFinanceWorkspace({
                           <Input
                             type="date"
                             value={payableEdit.due}
-                            onChange={(e) =>
-                              setPayableEdit({ ...payableEdit, due: e.target.value })
-                            }
+                            onChange={(e) => setPayableEdit({ ...payableEdit, due: e.target.value })}
                           />
                         </div>
-                        <div className="flex gap-2">
+                        <div className="sm:col-span-2">
+                          <Label className="text-xs">Descrição / o que foi comprado</Label>
+                          <Textarea
+                            className="min-h-20"
+                            value={payableEdit.description}
+                            onChange={(e) => setPayableEdit({ ...payableEdit, description: e.target.value })}
+                          />
+                        </div>
+                        <div className="flex gap-2 sm:col-span-2 sm:justify-end">
                           <Button
                             size="sm"
                             disabled={busy === `edit-payable-${row.id}`}
@@ -1797,6 +2061,7 @@ function FullFinanceWorkspace({
                                     _account_id: row.id,
                                     _amount: value,
                                     _due_date: payableEdit.due,
+                                    _description: payableEdit.description.trim() || null,
                                   });
                                   if (result.error) throw result.error;
                                   resetPayableEditor();
