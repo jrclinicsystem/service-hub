@@ -68,6 +68,7 @@ function approvedPayment(item: any) {
 }
 
 function paymentLabel(item: any) {
+  if (item?.payment_received === true) return item?.payment_method_code ? `Pago · ${String(item.payment_method_code).toUpperCase()}` : "Pago";
   if (item?.payment_choice === "onsite") return "Presencial";
   const approved = approvedPayment(item);
   const latest = latestPayment(item);
@@ -86,6 +87,11 @@ function appointmentServiceItems(item: any) {
     .sort((a: any, b: any) => Number(a.position ?? 0) - Number(b.position ?? 0));
 }
 
+function appointmentSessionItems(item: any) {
+  return [...(item?.appointment_sessions ?? [])]
+    .sort((a: any, b: any) => Number(a.session_number ?? 0) - Number(b.session_number ?? 0));
+}
+
 function appointmentServiceLabel(item: any) {
   const linked = appointmentServiceItems(item)
     .map((entry: any) => entry?.service?.name)
@@ -95,6 +101,18 @@ function appointmentServiceLabel(item: any) {
 }
 
 function appointmentComboProgress(item: any) {
+  const sessions = appointmentSessionItems(item);
+  if (sessions.length > 1) {
+    const completed = sessions.filter((entry: any) => entry.status === "completed").length;
+    return {
+      items: sessions,
+      total: sessions.length,
+      completed,
+      isCombo: true,
+      started: completed > 0,
+      allCompleted: completed === sessions.length,
+    };
+  }
   const items = appointmentServiceItems(item);
   const total = items.length;
   const completed = items.filter((entry: any) => entry.status === "completed").length;
@@ -169,7 +187,7 @@ function playNotificationSound(audioRef: { current: AudioContext | null }) {
 }
 
 async function fetchAppointment(id: string) {
-  const { data, error } = await db.from("appointments").select("id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status, created_at, status_updated_at, payment_choice, service_price_snapshot, deposit_percent, deposit_amount, balance_amount, service:services!appointments_service_id_fkey(name, price, duration_min), appointment_services(service_id, position, price_snapshot, status, completed_at, completed_by, service:services!appointment_services_service_id_fkey(name, price, duration_min)), professional:professionals(name, specialty), payments(status, amount, kind, payment_method_id, provider, paid_at, created_at, status_detail)").eq("id", id).maybeSingle();
+  const { data, error } = await db.from("appointments").select("id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status, created_at, status_updated_at, payment_choice, payment_received, payment_method_code, service_price_snapshot, deposit_percent, deposit_amount, balance_amount, service:services!appointments_service_id_fkey(name, price, duration_min), appointment_services(service_id, position, price_snapshot, status, completed_at, completed_by, service:services!appointment_services_service_id_fkey(name, price, duration_min)), appointment_sessions(id, session_number, scheduled_date, scheduled_time, status, completed_at, completed_by), professional:professionals(name, specialty), payments(status, amount, kind, payment_method_id, provider, paid_at, created_at, status_detail)").eq("id", id).maybeSingle();
   if (error) return null;
   return data;
 }
@@ -350,7 +368,7 @@ function AdminAppointmentCard({ appointment, onOpen, onEdit, onDelete, onAttende
     <button type="button" onClick={onOpen} className="block w-full min-w-0 max-w-full overflow-hidden text-left">
       <div className="flex min-w-0 flex-wrap items-start justify-between gap-2"><div className="min-w-0 flex-1 basis-[150px]"><p className="truncate text-base font-semibold">{appointment.patient_name}</p><p className="mt-0.5 truncate text-xs text-muted-foreground">{appointment.patient_email || "Sem e-mail"}</p></div><div className="max-w-full shrink-0"><AdminStatusBadge status={appointment.status} /></div></div>
       <div className="mt-3 rounded-xl bg-secondary/45 p-3"><p className="truncate text-sm font-medium">{appointmentServiceLabel(appointment)}</p><p className="mt-1 truncate text-xs text-muted-foreground">{appointment.professional?.name ?? "Profissional não definido"} · {appointment.professional?.specialty ?? "Equipe"}</p></div>
-      {combo.isCombo ? <div className={`mt-2 rounded-xl border px-3 py-2 text-[11px] font-medium ${combo.allCompleted ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-border bg-background text-muted-foreground"}`}><div className="flex items-center justify-between gap-2"><span>Progresso do combo</span><strong>{combo.completed} de {combo.total} concluídos</strong></div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${combo.total ? (combo.completed / combo.total) * 100 : 0}%` }} /></div>{combo.allCompleted ? <p className="mt-1.5 font-semibold text-emerald-700">Combo concluído · pronto para o financeiro</p> : null}</div> : null}
+      {combo.isCombo ? <div className={`mt-2 rounded-xl border px-3 py-2 text-[11px] font-medium ${combo.allCompleted ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-border bg-background text-muted-foreground"}`}><div className="flex items-center justify-between gap-2"><span>Progresso do pacote</span><strong>{combo.completed} de {combo.total} sessões concluídas</strong></div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${combo.total ? (combo.completed / combo.total) * 100 : 0}%` }} /></div>{combo.allCompleted ? <p className="mt-1.5 font-semibold text-emerald-700">Todas as sessões concluídas</p> : null}</div> : null}
       <div className="mt-3 grid min-w-0 grid-cols-2 gap-2 min-[390px]:grid-cols-3"><SmallInfo label="Data" value={formatDate(appointment.scheduled_date)} /><SmallInfo label="Horário" value={appointment.scheduled_time} /><SmallInfo label="Pagamento" value={paymentLabel(appointment)} accent /></div>
     </button>
     {hasWhatsApp && appointment.status !== "cancelado" ? <div className="mt-3">{appointment.status === "confirmado" ? <Button type="button" size="sm" className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => openAppointmentWhatsApp(appointment, "reminder")}><MessageCircle className="size-4" /> Enviar lembrete no WhatsApp</Button> : proximity === "urgent" ? <Button type="button" size="sm" className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => openAppointmentWhatsApp(appointment, "reminder")}><MessageCircle className="size-4" /> {days === 0 ? "Falar com cliente" : "Enviar lembrete no WhatsApp"}</Button> : <Button type="button" size="sm" variant="outline" className="rounded-xl border-emerald-600/40 text-emerald-700 hover:bg-emerald-50" onClick={() => openAppointmentWhatsApp(appointment, "confirmation")}><MessageCircle className="size-4" /> Confirmar pelo WhatsApp</Button>}</div> : null}
@@ -380,6 +398,7 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated, editing = null
   const [professionalId, setProfessionalId] = useState("");
   const [scheduledDate, setScheduledDate] = useState(todayIso());
   const [scheduledTime, setScheduledTime] = useState("");
+  const [sessionCount, setSessionCount] = useState("1");
   const [notes, setNotes] = useState("");
 
   useEffect(() => {
@@ -417,6 +436,7 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated, editing = null
     setProfessionalId(editing.professional_id ?? editing.professional?.id ?? "");
     setScheduledDate(editing.scheduled_date ?? todayIso());
     setScheduledTime(editing.scheduled_time ?? "");
+    setSessionCount(String(Math.max(1, appointmentSessionItems(editing).length || 1)));
     setNotes(editing.notes ?? "");
   }, [open, editing]);
 
@@ -516,14 +536,10 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated, editing = null
     setPatientEmail("");
   };
 
-  const reset = () => { setSelectedClientId(""); setPatientName(""); setPatientEmail(""); setPatientPhone(""); setServiceIds([]); setServiceSearch(""); setAppointmentValue(""); setProfessionalId(""); setScheduledDate(todayIso()); setScheduledTime(""); setNotes(""); };
+  const reset = () => { setSelectedClientId(""); setPatientName(""); setPatientEmail(""); setPatientPhone(""); setServiceIds([]); setServiceSearch(""); setAppointmentValue(""); setProfessionalId(""); setScheduledDate(todayIso()); setScheduledTime(""); setSessionCount("1"); setNotes(""); };
   const handleOpenChange = (next: boolean) => { if (!next && !saving) reset(); onOpenChange(next); };
 
   const saveAppointment = async () => {
-    if (editing && appointmentComboProgress(editing).started) {
-      toast.error("Este combo já possui serviço concluído.", { description: "Para preservar o histórico do pacote, conclua o combo antes de alterar serviços ou reagendar." });
-      return;
-    }
     if (!patientName.trim()) { toast.error("Informe o nome do cliente."); return; }
     if (!serviceIds.length) { toast.error("Selecione ao menos um serviço."); return; }
     if (!professionalId) { toast.error("Selecione o profissional."); return; }
@@ -533,9 +549,12 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated, editing = null
     if (invalidLink) { toast.error("Esse profissional não atende todos os serviços selecionados."); return; }
     const parsedValue = Number(appointmentValue.replace(",", "."));
     if (!Number.isFinite(parsedValue) || parsedValue < 0) { toast.error("Informe um valor válido para o atendimento."); return; }
+    const parsedSessionCount = Number(sessionCount);
+    if (!Number.isInteger(parsedSessionCount) || parsedSessionCount < 1 || parsedSessionCount > 50) { toast.error("Informe entre 1 e 50 sessões."); return; }
     const total = Math.round((parsedValue + Number.EPSILON) * 100) / 100;
     setSaving(true);
     let error: any = null;
+    let appointmentId = editing?.id ?? "";
     if (editing) {
       const result = await db.rpc("update_admin_multi_service_appointment", {
         _appointment_id: editing.id,
@@ -568,6 +587,16 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated, editing = null
         _total: total,
       });
       error = result.error;
+      appointmentId = String(result.data ?? "");
+    }
+    if (!error && appointmentId) {
+      const configured = await db.rpc("configure_appointment_sessions", {
+        _appointment_id: appointmentId,
+        _session_count: parsedSessionCount,
+        _first_date: scheduledDate,
+        _first_time: scheduledTime,
+      });
+      error = configured.error;
     }
     setSaving(false);
     if (error) { toast.error(error.message); return; }
@@ -607,6 +636,7 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated, editing = null
       <p className="text-[11px] text-muted-foreground">Você pode marcar vários procedimentos no mesmo agendamento. O profissional precisa atender todos os serviços escolhidos.</p>
     </div>
     <div className="space-y-1.5 sm:col-span-2"><Label htmlFor="admin-appointment-value">Valor total do atendimento *</Label><Input id="admin-appointment-value" type="number" min="0" step="0.01" inputMode="decimal" value={appointmentValue} onChange={(e) => setAppointmentValue(e.target.value)} disabled={saving || !serviceIds.length} /><p className="text-[11px] text-muted-foreground">A soma dos serviços é preenchida automaticamente. Altere aqui para aplicar desconto ou valor combinado sem mudar o catálogo.</p></div>
+    <div className="space-y-1.5 sm:col-span-2"><Label htmlFor="admin-session-count">Quantidade de sessões *</Label><Input id="admin-session-count" type="number" min="1" max="50" step="1" inputMode="numeric" value={sessionCount} onChange={(e) => setSessionCount(e.target.value)} disabled={saving} /><p className="text-[11px] text-muted-foreground">Ex.: combo de 3 sessões. A primeira usa a data deste agendamento; depois você define ou altera a data de cada próxima sessão.</p></div>
     <div className="space-y-1.5 sm:col-span-2"><Label>Profissional *</Label><Select value={professionalId} onValueChange={setProfessionalId} disabled={saving || !serviceIds.length || availableProfessionals.length === 0}><SelectTrigger><SelectValue placeholder={!serviceIds.length ? "Escolha primeiro os serviços" : availableProfessionals.length ? "Selecione o profissional" : "Nenhum profissional atende todos os serviços"} /></SelectTrigger><SelectContent>{availableProfessionals.map((professional) => <SelectItem key={professional.id} value={professional.id}>{professional.name}{professional.specialty ? ` · ${professional.specialty}` : ""}</SelectItem>)}</SelectContent></Select></div>
     <div className="space-y-1.5"><Label htmlFor="admin-scheduled-date">Data *</Label><Input id="admin-scheduled-date" type="date" min={todayIso()} value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} disabled={saving} /></div>
     <div className="space-y-1.5"><Label>Horário *</Label><Select value={scheduledTime} onValueChange={setScheduledTime} disabled={saving || loadingCatalog || bookingSlotsLoading || !professionalId || !scheduledDate}><SelectTrigger><SelectValue placeholder={bookingSlotsLoading ? "Carregando horários..." : bookingSlots.length ? "Selecione o horário" : "Sem horários disponíveis"} /></SelectTrigger><SelectContent>{bookingSlots.map((slot) => <SelectItem key={`${slot.slot}-${slot.source ?? "slot"}`} value={slot.slot}>{slot.slot}</SelectItem>)}</SelectContent></Select></div>
@@ -620,41 +650,69 @@ function SmallInfo({ label, value, accent = false }: { label: string; value: str
 function DetailBox({ icon: Icon, label, value }: any) { return <div className="flex items-start gap-3 rounded-2xl border border-border bg-card p-3"><span className="grid size-8 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary"><Icon className="size-4" /></span><div className="min-w-0"><p className="text-[9px] uppercase tracking-wide text-muted-foreground">{label}</p><p className="mt-1 break-words text-sm font-medium">{value}</p></div></div>; }
 
 
-function ComboServicesManager({ appointment, onRefresh }: any) {
-  const [items, setItems] = useState<any[]>(() => appointmentServiceItems(appointment));
+function PackageSessionsManager({ appointment, onRefresh }: any) {
+  const [items, setItems] = useState<any[]>(() => appointmentSessionItems(appointment));
   const [busyId, setBusyId] = useState("");
+  const [drafts, setDrafts] = useState<Record<string, { date: string; time: string }>>({});
 
   useEffect(() => {
-    setItems(appointmentServiceItems(appointment));
-  }, [appointment?.id, appointment?.appointment_services]);
+    const next = appointmentSessionItems(appointment);
+    setItems(next);
+    setDrafts(Object.fromEntries(next.map((item: any) => [item.id, { date: item.scheduled_date ?? "", time: String(item.scheduled_time ?? "").slice(0, 5) }])));
+  }, [appointment?.id, appointment?.appointment_sessions]);
 
   if (items.length <= 1) return null;
 
   const completed = items.filter((item: any) => item.status === "completed").length;
   const allCompleted = completed === items.length;
-  const canManage = appointment.status === "confirmado";
+  const canManage = ["confirmado", "atendido"].includes(appointment.status);
+
+  const saveSchedule = async (item: any) => {
+    const draft = drafts[item.id] ?? { date: "", time: "" };
+    if (!draft.date || !draft.time) {
+      toast.error("Informe a data e o horário da sessão.");
+      return;
+    }
+    setBusyId(`date-${item.id}`);
+    const result = await db.rpc("update_appointment_session_schedule", {
+      _session_id: item.id,
+      _scheduled_date: draft.date,
+      _scheduled_time: draft.time,
+    });
+    setBusyId("");
+    if (result.error) {
+      toast.error("Não foi possível alterar a data da sessão.", { description: result.error.message });
+      return;
+    }
+    setItems((current) => current.map((row) => row.id === item.id ? { ...row, scheduled_date: draft.date, scheduled_time: draft.time } : row));
+    toast.success(`Sessão ${item.session_number} agendada para ${formatDate(draft.date)} às ${draft.time}.`);
+    onRefresh?.();
+  };
 
   const toggle = async (item: any) => {
     const isCompleted = item.status === "completed";
-    if (isCompleted && !window.confirm(`Desmarcar ${item.service?.name ?? "este serviço"} como concluído?`)) return;
-    setBusyId(item.service_id);
-    const result = await db.rpc("set_appointment_service_completion", {
-      _appointment_id: appointment.id,
-      _service_id: item.service_id,
+    if (isCompleted && !window.confirm(`Desmarcar a sessão ${item.session_number} como concluída?`)) return;
+    if (!isCompleted && !item.scheduled_date) {
+      toast.error("Defina a data desta sessão antes de concluí-la.");
+      return;
+    }
+    setBusyId(`done-${item.id}`);
+    const result = await db.rpc("set_appointment_session_completion", {
+      _session_id: item.id,
       _completed: !isCompleted,
     });
     setBusyId("");
     if (result.error) {
-      toast.error("Não foi possível atualizar o serviço.", { description: result.error.message });
+      toast.error("Não foi possível atualizar a sessão.", { description: result.error.message });
       return;
     }
     const now = new Date().toISOString();
-    setItems((current) => current.map((row) => row.service_id === item.service_id ? {
+    setItems((current) => current.map((row) => row.id === item.id ? {
       ...row,
       status: isCompleted ? "pending" : "completed",
       completed_at: isCompleted ? null : (row.completed_at ?? now),
     } : row));
-    toast.success(isCompleted ? "Serviço reaberto no combo." : "Serviço concluído no combo.");
+    toast.success(isCompleted ? `Sessão ${item.session_number} reaberta.` : `Sessão ${item.session_number} concluída.`);
     onRefresh?.();
   };
 
@@ -662,10 +720,10 @@ function ComboServicesManager({ appointment, onRefresh }: any) {
     <div className="mt-4 rounded-2xl border border-border bg-background/70 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold">Serviços do combo</p>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">Conclua cada procedimento separadamente. O financeiro só libera quando todos estiverem feitos.</p>
+          <p className="text-sm font-semibold">Sessões do pacote</p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">O pagamento é independente das sessões. Agende e conclua cada sessão na data em que ela acontecer.</p>
         </div>
-        <Badge variant={allCompleted ? "default" : "secondary"} className={allCompleted ? "bg-emerald-600 text-white hover:bg-emerald-600" : ""}>{completed} de {items.length} concluídos</Badge>
+        <Badge variant={allCompleted ? "default" : "secondary"} className={allCompleted ? "bg-emerald-600 text-white hover:bg-emerald-600" : ""}>{completed} de {items.length} concluídas</Badge>
       </div>
       <div className="mt-3 h-2 overflow-hidden rounded-full bg-secondary">
         <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${items.length ? (completed / items.length) * 100 : 0}%` }} />
@@ -673,23 +731,35 @@ function ComboServicesManager({ appointment, onRefresh }: any) {
       <div className="mt-3 space-y-2">
         {items.map((item: any) => {
           const done = item.status === "completed";
+          const draft = drafts[item.id] ?? { date: item.scheduled_date ?? "", time: String(item.scheduled_time ?? "").slice(0, 5) };
           return (
-            <div key={item.service_id} className={`flex flex-col gap-3 rounded-xl border p-3 sm:flex-row sm:items-center sm:justify-between ${done ? "border-emerald-200 bg-emerald-50/70" : "border-border bg-card"}`}>
-              <div className="min-w-0">
+            <div key={item.id} className={`rounded-xl border p-3 ${done ? "border-emerald-200 bg-emerald-50/70" : "border-border bg-card"}`}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex flex-wrap items-center gap-2">
-                  <strong className="text-sm">{item.service?.name ?? "Serviço"}</strong>
-                  <Badge variant={done ? "default" : "outline"} className={done ? "bg-emerald-600 text-white hover:bg-emerald-600" : ""}>{done ? "Concluído" : "Pendente"}</Badge>
+                  <strong className="text-sm">Sessão {item.session_number}</strong>
+                  <Badge variant={done ? "default" : "outline"} className={done ? "bg-emerald-600 text-white hover:bg-emerald-600" : ""}>{done ? "Concluída" : "Pendente"}</Badge>
                 </div>
-                <p className="mt-1 text-xs text-muted-foreground">{formatPrice(Number(item.price_snapshot ?? item.service?.price ?? 0))}{done && item.completed_at ? ` · concluído em ${formatDateTime(item.completed_at)}` : ""}</p>
+                {done && item.completed_at ? <span className="text-[11px] text-muted-foreground">Concluída em {formatDateTime(item.completed_at)}</span> : null}
               </div>
-              <Button type="button" size="sm" variant={done ? "outline" : "default"} disabled={!canManage || busyId === item.service_id} onClick={() => void toggle(item)} className="shrink-0 rounded-xl">
-                <Check className="size-4" /> {busyId === item.service_id ? "Salvando..." : done ? "Desfazer conclusão" : "Marcar como concluído"}
-              </Button>
+              {done ? (
+                <p className="mt-2 text-xs text-muted-foreground">Data da sessão: <strong className="text-foreground">{item.scheduled_date ? formatDate(item.scheduled_date) : "—"}{item.scheduled_time ? ` às ${String(item.scheduled_time).slice(0, 5)}` : ""}</strong></p>
+              ) : (
+                <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_120px_auto] sm:items-end">
+                  <div><Label className="text-[11px]">Data da sessão</Label><Input type="date" value={draft.date} onChange={(event) => setDrafts((current) => ({ ...current, [item.id]: { ...draft, date: event.target.value } }))} disabled={!canManage || busyId === `date-${item.id}`} /></div>
+                  <div><Label className="text-[11px]">Horário</Label><Input type="time" value={draft.time} onChange={(event) => setDrafts((current) => ({ ...current, [item.id]: { ...draft, time: event.target.value } }))} disabled={!canManage || busyId === `date-${item.id}`} /></div>
+                  <Button type="button" size="sm" variant="outline" onClick={() => void saveSchedule(item)} disabled={!canManage || busyId === `date-${item.id}`}>{busyId === `date-${item.id}` ? "Salvando..." : item.scheduled_date ? "Alterar data" : "Agendar"}</Button>
+                </div>
+              )}
+              <div className="mt-3 flex justify-end">
+                <Button type="button" size="sm" variant={done ? "outline" : "default"} disabled={!canManage || busyId === `done-${item.id}`} onClick={() => void toggle(item)} className="rounded-xl">
+                  <Check className="size-4" /> {busyId === `done-${item.id}` ? "Salvando..." : done ? "Desfazer conclusão" : "Marcar sessão concluída"}
+                </Button>
+              </div>
             </div>
           );
         })}
       </div>
-      {allCompleted ? <div className="mt-3 rounded-xl bg-emerald-100 px-3 py-2 text-xs font-semibold text-emerald-800">Combo concluído — pronto para finalizar no financeiro.</div> : <div className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-900">Ainda existem serviços pendentes. O lançamento financeiro do combo permanece bloqueado.</div>}
+      {allCompleted ? <div className="mt-3 rounded-xl bg-emerald-100 px-3 py-2 text-xs font-semibold text-emerald-800">Todas as sessões do pacote foram concluídas.</div> : <div className="mt-3 rounded-xl bg-primary-soft/60 px-3 py-2 text-xs text-muted-foreground">As sessões pendentes continuam no pacote mesmo que o valor total já tenha sido pago. A data principal da agenda acompanha a próxima sessão pendente agendada.</div>}
     </div>
   );
 }
@@ -731,7 +801,7 @@ function AppointmentAdminDialog({ appointment, open, onOpenChange, onConfirm, on
     {proximity === "urgent" && appointment.status !== "cancelado" ? <div className="mt-2 flex items-center gap-2 rounded-xl bg-amber-100 p-3 text-xs font-semibold text-amber-900"><AlertTriangle className="size-4" /> {days === 0 ? "Atendimento hoje" : "Atendimento amanhã — faça o recontato"}</div> : null}
     <div className="mt-2 rounded-2xl bg-primary-soft/60 p-4"><div className="flex items-center gap-2 text-primary"><CreditCard className="size-4" /><p className="text-sm font-semibold">{paymentLabel(appointment)}</p></div><div className="mt-3 grid grid-cols-3 gap-2"><SmallInfo label="Total" value={formatPrice(total)} /><SmallInfo label="Pago" value={formatPrice(paid)} /><SmallInfo label="Restante" value={formatPrice(Number(appointment.balance_amount ?? Math.max(0, total - paid)))} /></div>{approved?.paid_at ? <p className="mt-3 text-[11px] text-muted-foreground">Pagamento confirmado em {formatDateTime(approved.paid_at)}</p> : null}</div>
     <AppointmentPriceEditor appointment={appointment} onSaved={onPriceSaved} />
-    <ComboServicesManager appointment={appointment} onRefresh={onRefresh} />
+    <PackageSessionsManager appointment={appointment} onRefresh={onRefresh} />
     <div className="mt-4 grid gap-2 sm:grid-cols-2"><DetailBox icon={CalendarDays} label="Data" value={formatDate(appointment.scheduled_date)} /><DetailBox icon={Clock3} label="Horário" value={appointment.scheduled_time} /><DetailBox icon={Stethoscope} label="Profissional" value={appointment.professional?.name ?? "Não definido"} /><DetailBox icon={UserRound} label="Paciente" value={appointment.patient_name} /><DetailBox icon={Phone} label="WhatsApp" value={appointment.patient_phone || "Não informado"} /><DetailBox icon={Mail} label="E-mail" value={appointment.patient_email || "Não informado"} /></div>
     {hasWhatsApp && appointment.status !== "cancelado" ? <div className="mt-4">{proximity === "urgent" ? <Button className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => openAppointmentWhatsApp(appointment, "reminder")}><MessageCircle className="size-4" /> {days === 0 ? "Falar com cliente" : "Recontatar cliente"}</Button> : appointment.status === "pendente" ? <Button variant="outline" className="rounded-xl border-emerald-600/40 text-emerald-700" onClick={() => openAppointmentWhatsApp(appointment, "confirmation")}><MessageCircle className="size-4" /> Confirmar pelo WhatsApp</Button> : null}</div> : null}
     {hasWhatsApp && appointment.status === "confirmado" && proximity !== "urgent" ? <div className="mt-4"><Button className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => openAppointmentWhatsApp(appointment, "reminder")}><MessageCircle className="size-4" /> Enviar lembrete no WhatsApp</Button></div> : null}

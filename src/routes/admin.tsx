@@ -139,7 +139,7 @@ async function loadAdminOverview() {
     db
       .from("appointments")
       .select(
-        "id, client_id, service_id, professional_id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status, created_at, status_updated_at, payment_choice, service_price_snapshot, deposit_percent, deposit_amount, balance_amount, service:services!appointments_service_id_fkey(id, name, price, duration_min), appointment_services(service_id, position, price_snapshot, status, completed_at, completed_by, service:services!appointment_services_service_id_fkey(id, name, price, duration_min)), professional:professionals(id, name, specialty), payments(status, amount, kind, payment_method_id, provider, paid_at, created_at, status_detail)",
+        "id, client_id, service_id, professional_id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status, created_at, status_updated_at, payment_choice, payment_received, payment_method_code, service_price_snapshot, deposit_percent, deposit_amount, balance_amount, service:services!appointments_service_id_fkey(id, name, price, duration_min), appointment_services(service_id, position, price_snapshot, status, completed_at, completed_by, service:services!appointment_services_service_id_fkey(id, name, price, duration_min)), appointment_sessions(id, session_number, scheduled_date, scheduled_time, status, completed_at, completed_by), professional:professionals(id, name, specialty), payments(status, amount, kind, payment_method_id, provider, paid_at, created_at, status_detail)",
       )
       .order("scheduled_date", { ascending: true })
       .order("scheduled_time", { ascending: true }),

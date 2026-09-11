@@ -34,9 +34,10 @@ function comboItems(appointment: any) {
   );
 }
 
-function comboReady(appointment: any) {
-  const items = comboItems(appointment);
-  return items.length <= 1 || items.every((item: any) => item.status === "completed");
+function packageSessions(appointment: any) {
+  return [...(appointment?.appointment_sessions ?? [])].sort(
+    (a: any, b: any) => Number(a.session_number ?? 0) - Number(b.session_number ?? 0),
+  );
 }
 
 function dateLabel(value?: string | null) {
@@ -65,7 +66,7 @@ async function loadConfirmedAppointments() {
     db
       .from("appointments")
       .select(
-        "id,patient_name,scheduled_date,scheduled_time,status,professional_id,professional_name_snapshot,custom_price,service_price_snapshot,service_id,service:services!appointments_service_id_fkey(name,price),appointment_services(service_id,position,price_snapshot,status,completed_at,service:services!appointment_services_service_id_fkey(name,price)),professional:professionals(name)",
+        "id,patient_name,scheduled_date,scheduled_time,status,professional_id,professional_name_snapshot,custom_price,service_price_snapshot,service_id,service:services!appointments_service_id_fkey(name,price),appointment_services(service_id,position,price_snapshot,status,completed_at,service:services!appointment_services_service_id_fkey(name,price)),appointment_sessions(id,session_number,scheduled_date,scheduled_time,status,completed_at),financial_entries(id,status),professional:professionals(name)",
       )
       .eq("status", "confirmado")
       .order("scheduled_date", { ascending: true })
@@ -84,7 +85,7 @@ async function loadConfirmedAppointments() {
   ]);
   for (const result of [appointments, methods, cash]) if (result.error) throw result.error;
   return {
-    appointments: appointments.data ?? [],
+    appointments: (appointments.data ?? []).filter((row: any) => !(row.financial_entries ?? []).some((entry: any) => !["cancelled", "refunded"].includes(entry.status))),
     methods: methods.data ?? [],
     openCash: cash.data?.[0] ?? null,
   };
@@ -119,7 +120,7 @@ export function FinanceAttendanceCompletion() {
   );
 
   const selectedItems = useMemo(() => comboItems(selected), [selected]);
-  const selectedReady = comboReady(selected);
+  const selectedSessions = useMemo(() => packageSessions(selected), [selected]);
 
   useEffect(() => {
     if (!selected) return;
@@ -138,10 +139,6 @@ export function FinanceAttendanceCompletion() {
   const finalize = async () => {
     if (!selected) {
       toast.error("Selecione um atendimento confirmado.");
-      return;
-    }
-    if (!comboReady(selected)) {
-      toast.error("Ainda existem serviços pendentes neste combo.", { description: "Conclua todos os procedimentos no painel antes de enviar o pacote ao financeiro." });
       return;
     }
     const parsedAmount = parseMoney(amount);
@@ -200,7 +197,10 @@ export function FinanceAttendanceCompletion() {
       return;
     }
 
-    toast.success("Atendimento finalizado e enviado ao financeiro.");
+    const hasPendingPackageSessions = selectedSessions.length > 1 && selectedSessions.some((item: any) => item.status !== "completed");
+    toast.success(hasPendingPackageSessions ? "Pagamento do pacote registrado." : "Atendimento finalizado e enviado ao financeiro.", {
+      description: hasPendingPackageSessions ? "As sessões pendentes continuam em andamento na Agenda." : undefined,
+    });
     setSelectedId("");
     setDiscountType("none");
     setDiscountValue("");
@@ -223,12 +223,12 @@ export function FinanceAttendanceCompletion() {
           <div>
             <div className="flex items-center gap-2">
               <CheckCircle2 className="size-5 text-primary" />
-              <h2 className="text-xl font-semibold">Finalizar atendimento</h2>
+              <h2 className="text-xl font-semibold">Registrar pagamento</h2>
             </div>
             <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-              Última etapa do fluxo Confirmado → Atendido → Financeiro. Aqui a recepção informa
-              pagamento, desconto, fiado e eventual ajuste manual de comissão antes do faturamento
-              nascer.
+              Registre o pagamento, desconto, fiado e eventual ajuste manual de comissão. Em pacotes,
+              o valor pode ser recebido integralmente agora e as sessões continuam sendo acompanhadas
+              separadamente até a última conclusão.
             </p>
           </div>
           <div className="flex gap-2">
@@ -272,7 +272,8 @@ export function FinanceAttendanceCompletion() {
                       selected.service?.price,
                   )}
                 </p>
-                {selectedItems.length > 1 ? <div className="mt-3 space-y-1.5 border-t border-border/70 pt-3"><div className="flex items-center justify-between gap-2"><span className="text-xs font-semibold">Serviços do combo</span><Badge variant={selectedReady ? "default" : "secondary"} className={selectedReady ? "bg-emerald-600 text-white hover:bg-emerald-600" : ""}>{selectedItems.filter((item: any) => item.status === "completed").length}/{selectedItems.length} concluídos</Badge></div>{selectedItems.map((item: any) => <div key={item.service_id} className="flex items-center justify-between gap-3 rounded-lg bg-background px-2.5 py-2 text-xs"><span className="min-w-0 truncate">{item.status === "completed" ? "✓ " : "○ "}{item.service?.name ?? "Serviço"}</span><strong className="shrink-0">{money(item.price_snapshot ?? item.service?.price)}</strong></div>)}{selectedReady ? <p className="text-[11px] font-semibold text-emerald-700">Combo concluído — pronto para finalizar.</p> : <p className="text-[11px] font-medium text-amber-700">Finalize os serviços pendentes antes do lançamento financeiro.</p>}</div> : null}
+                {selectedItems.length > 1 ? <div className="mt-3 space-y-1.5 border-t border-border/70 pt-3"><span className="text-xs font-semibold">Serviços incluídos</span>{selectedItems.map((item: any) => <div key={item.service_id} className="flex items-center justify-between gap-3 rounded-lg bg-background px-2.5 py-2 text-xs"><span className="min-w-0 truncate">{item.service?.name ?? "Serviço"}</span><strong className="shrink-0">{money(item.price_snapshot ?? item.service?.price)}</strong></div>)}</div> : null}
+                {selectedSessions.length > 1 ? <div className="mt-3 space-y-1.5 border-t border-border/70 pt-3"><div className="flex items-center justify-between gap-2"><span className="text-xs font-semibold">Sessões do pacote</span><Badge variant="outline">{selectedSessions.filter((item: any) => item.status === "completed").length}/{selectedSessions.length} concluídas</Badge></div>{selectedSessions.map((item: any) => <div key={item.id} className="flex items-center justify-between gap-3 rounded-lg bg-background px-2.5 py-2 text-xs"><span>Sessão {item.session_number} · {item.status === "completed" ? "Concluída" : "Pendente"}</span><span className="text-muted-foreground">{item.scheduled_date ? dateLabel(item.scheduled_date) : "Data a definir"}</span></div>)}<p className="text-[11px] font-medium text-primary">O pagamento pode ser registrado mesmo com sessões pendentes.</p></div> : null}
               </div>
             ) : null}
           </div>
@@ -388,9 +389,9 @@ export function FinanceAttendanceCompletion() {
                 : "Será criada uma conta a receber; a taxa da forma de pagamento será calculada apenas quando o cliente pagar."}
             </span>
           </div>
-          <Button disabled={!selected || busy || !selectedReady} onClick={() => void finalize()}>
+          <Button disabled={!selected || busy} onClick={() => void finalize()}>
             <ReceiptText className="mr-2 size-4" />{" "}
-            {busy ? "Finalizando..." : "Finalizar e enviar ao financeiro"}
+            {busy ? "Registrando..." : "Registrar pagamento no financeiro"}
           </Button>
         </div>
       </div>

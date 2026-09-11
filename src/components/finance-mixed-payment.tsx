@@ -29,9 +29,10 @@ function comboItems(appointment: any) {
   );
 }
 
-function comboReady(appointment: any) {
-  const items = comboItems(appointment);
-  return items.length <= 1 || items.every((item: any) => item.status === "completed");
+function packageSessions(appointment: any) {
+  return [...(appointment?.appointment_sessions ?? [])].sort(
+    (a: any, b: any) => Number(a.session_number ?? 0) - Number(b.session_number ?? 0),
+  );
 }
 
 function dateLabel(value?: string | null) {
@@ -47,7 +48,7 @@ async function loadMixedPaymentData() {
     db.from("financial_access").select("role").eq("user_id", data.user.id).eq("is_active", true),
     db
       .from("appointments")
-      .select("id,patient_name,scheduled_date,scheduled_time,status,professional_id,professional_name_snapshot,custom_price,service_price_snapshot,service_id,service:services(name,price),appointment_services(service_id,position,price_snapshot,status,completed_at,service:services!appointment_services_service_id_fkey(name,price)),professional:professionals(name)")
+      .select("id,patient_name,scheduled_date,scheduled_time,status,professional_id,professional_name_snapshot,custom_price,service_price_snapshot,service_id,service:services(name,price),appointment_services(service_id,position,price_snapshot,status,completed_at,service:services!appointment_services_service_id_fkey(name,price)),appointment_sessions(id,session_number,scheduled_date,scheduled_time,status,completed_at),financial_entries(id,status),professional:professionals(name)")
       .eq("status", "confirmado")
       .order("scheduled_date", { ascending: true })
       .order("scheduled_time", { ascending: true }),
@@ -60,7 +61,7 @@ async function loadMixedPaymentData() {
   const roles = (access.data ?? []).map((row: any) => String(row.role));
   return {
     allowed: roles.some((role: string) => ["admin", "finance", "reception"].includes(role)),
-    appointments: appointments.data ?? [],
+    appointments: (appointments.data ?? []).filter((row: any) => !(row.financial_entries ?? []).some((entry: any) => !["cancelled", "refunded"].includes(entry.status))),
     methods: methods.data ?? [],
   };
 }
@@ -88,7 +89,7 @@ export function FinanceMixedPayment() {
   );
 
   const selectedItems = useMemo(() => comboItems(selected), [selected]);
-  const selectedReady = comboReady(selected);
+  const selectedSessions = useMemo(() => packageSessions(selected), [selected]);
 
   useEffect(() => {
     if (!selected) return;
@@ -118,7 +119,6 @@ export function FinanceMixedPayment() {
 
   const finalize = async () => {
     if (!selected) return toast.error("Selecione um atendimento confirmado.");
-    if (!comboReady(selected)) return toast.error("Ainda existem serviços pendentes neste combo. Conclua todos antes do pagamento final.");
     if (!Number.isFinite(parsedAmount) || parsedAmount < 0) return toast.error("Informe um valor original válido.");
     if (discountType === "percent" && (parsedDiscount < 0 || parsedDiscount > 100)) return toast.error("Percentual de desconto inválido.");
     if (discountType === "amount" && (parsedDiscount < 0 || parsedDiscount > parsedAmount)) return toast.error("Valor de desconto inválido.");
@@ -150,8 +150,9 @@ export function FinanceMixedPayment() {
         _manual_commission_reason: commission === null ? null : manualReason.trim(),
       });
       if (result.error) throw result.error;
-      toast.success("Atendimento finalizado com pagamento misto.", {
-        description: "Cada forma foi registrada separadamente e as taxas foram aplicadas somente na parte correspondente.",
+      const hasPendingPackageSessions = selectedSessions.length > 1 && selectedSessions.some((item: any) => item.status !== "completed");
+      toast.success(hasPendingPackageSessions ? "Pagamento do pacote registrado." : "Atendimento finalizado com pagamento misto.", {
+        description: hasPendingPackageSessions ? "As sessões pendentes continuam em andamento na Agenda." : "Cada forma foi registrada separadamente e as taxas foram aplicadas somente na parte correspondente.",
       });
       setSelectedId("");
       setDiscountType("none");
@@ -208,7 +209,8 @@ export function FinanceMixedPayment() {
               <div className="mt-3 rounded-2xl bg-muted/50 p-4 text-sm">
                 <strong>{selected.patient_name}</strong>
                 <p className="mt-1 text-muted-foreground">{selected.service?.name ?? "Serviço"} · {selected.professional?.name ?? selected.professional_name_snapshot ?? "Profissional"}</p>
-                {selectedItems.length > 1 ? <div className="mt-3 space-y-1.5 border-t border-border/70 pt-3">{selectedItems.map((item: any) => <div key={item.service_id} className="flex items-center justify-between gap-2 text-xs"><span>{item.status === "completed" ? "✓" : "○"} {item.service?.name ?? "Serviço"}</span><strong>{money(item.price_snapshot ?? item.service?.price)}</strong></div>)}<p className={`text-[11px] font-semibold ${selectedReady ? "text-emerald-700" : "text-amber-700"}`}>{selectedReady ? "Combo concluído — pronto para o financeiro." : "Há serviços pendentes neste combo."}</p></div> : null}
+                {selectedItems.length > 1 ? <div className="mt-3 space-y-1.5 border-t border-border/70 pt-3">{selectedItems.map((item: any) => <div key={item.service_id} className="flex items-center justify-between gap-2 text-xs"><span>{item.service?.name ?? "Serviço"}</span><strong>{money(item.price_snapshot ?? item.service?.price)}</strong></div>)}</div> : null}
+                {selectedSessions.length > 1 ? <div className="mt-3 space-y-1.5 border-t border-border/70 pt-3"><strong className="text-xs">Sessões: {selectedSessions.filter((item: any) => item.status === "completed").length}/{selectedSessions.length} concluídas</strong>{selectedSessions.map((item: any) => <div key={item.id} className="flex items-center justify-between gap-2 text-xs"><span>Sessão {item.session_number} · {item.status === "completed" ? "Concluída" : "Pendente"}</span><span className="text-muted-foreground">{item.scheduled_date ? dateLabel(item.scheduled_date) : "Data a definir"}</span></div>)}<p className="text-[11px] font-semibold text-primary">O pagamento pode ser registrado agora; as sessões continuam em andamento.</p></div> : null}
               </div>
             ) : null}
           </div>
@@ -255,7 +257,7 @@ export function FinanceMixedPayment() {
               <div><Label>Motivo da comissão manual</Label><Input disabled={!manualCommission.trim()} value={manualReason} onChange={(e) => setManualReason(e.target.value)} /></div>
             </div>
 
-            <div className="flex justify-end"><Button disabled={!selected || busy || !selectedReady} onClick={() => void finalize()}>{busy ? "Finalizando..." : "Finalizar pagamento misto"}</Button></div>
+            <div className="flex justify-end"><Button disabled={!selected || busy} onClick={() => void finalize()}>{busy ? "Finalizando..." : "Finalizar pagamento misto"}</Button></div>
           </div>
         </div>
       </div>
