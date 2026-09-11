@@ -28,6 +28,17 @@ function parseMoney(value: string) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function comboItems(appointment: any) {
+  return [...(appointment?.appointment_services ?? [])].sort(
+    (a: any, b: any) => Number(a.position ?? 0) - Number(b.position ?? 0),
+  );
+}
+
+function comboReady(appointment: any) {
+  const items = comboItems(appointment);
+  return items.length <= 1 || items.every((item: any) => item.status === "completed");
+}
+
 function dateLabel(value?: string | null) {
   if (!value) return "—";
   return new Date(`${value}T12:00:00`).toLocaleDateString("pt-BR");
@@ -54,7 +65,7 @@ async function loadConfirmedAppointments() {
     db
       .from("appointments")
       .select(
-        "id,patient_name,scheduled_date,scheduled_time,status,professional_id,professional_name_snapshot,custom_price,service_price_snapshot,service_id,service:services!appointments_service_id_fkey(name,price),professional:professionals(name)",
+        "id,patient_name,scheduled_date,scheduled_time,status,professional_id,professional_name_snapshot,custom_price,service_price_snapshot,service_id,service:services!appointments_service_id_fkey(name,price),appointment_services(service_id,position,price_snapshot,status,completed_at,service:services!appointment_services_service_id_fkey(name,price)),professional:professionals(name)",
       )
       .eq("status", "confirmado")
       .order("scheduled_date", { ascending: true })
@@ -107,6 +118,9 @@ export function FinanceAttendanceCompletion() {
     [data.data?.appointments, selectedId],
   );
 
+  const selectedItems = useMemo(() => comboItems(selected), [selected]);
+  const selectedReady = comboReady(selected);
+
   useEffect(() => {
     if (!selected) return;
     const base = Number(
@@ -124,6 +138,10 @@ export function FinanceAttendanceCompletion() {
   const finalize = async () => {
     if (!selected) {
       toast.error("Selecione um atendimento confirmado.");
+      return;
+    }
+    if (!comboReady(selected)) {
+      toast.error("Ainda existem serviços pendentes neste combo.", { description: "Conclua todos os procedimentos no painel antes de enviar o pacote ao financeiro." });
       return;
     }
     const parsedAmount = parseMoney(amount);
@@ -254,6 +272,7 @@ export function FinanceAttendanceCompletion() {
                       selected.service?.price,
                   )}
                 </p>
+                {selectedItems.length > 1 ? <div className="mt-3 space-y-1.5 border-t border-border/70 pt-3"><div className="flex items-center justify-between gap-2"><span className="text-xs font-semibold">Serviços do combo</span><Badge variant={selectedReady ? "default" : "secondary"} className={selectedReady ? "bg-emerald-600 text-white hover:bg-emerald-600" : ""}>{selectedItems.filter((item: any) => item.status === "completed").length}/{selectedItems.length} concluídos</Badge></div>{selectedItems.map((item: any) => <div key={item.service_id} className="flex items-center justify-between gap-3 rounded-lg bg-background px-2.5 py-2 text-xs"><span className="min-w-0 truncate">{item.status === "completed" ? "✓ " : "○ "}{item.service?.name ?? "Serviço"}</span><strong className="shrink-0">{money(item.price_snapshot ?? item.service?.price)}</strong></div>)}{selectedReady ? <p className="text-[11px] font-semibold text-emerald-700">Combo concluído — pronto para finalizar.</p> : <p className="text-[11px] font-medium text-amber-700">Finalize os serviços pendentes antes do lançamento financeiro.</p>}</div> : null}
               </div>
             ) : null}
           </div>
@@ -369,7 +388,7 @@ export function FinanceAttendanceCompletion() {
                 : "Será criada uma conta a receber; a taxa da forma de pagamento será calculada apenas quando o cliente pagar."}
             </span>
           </div>
-          <Button disabled={!selected || busy} onClick={() => void finalize()}>
+          <Button disabled={!selected || busy || !selectedReady} onClick={() => void finalize()}>
             <ReceiptText className="mr-2 size-4" />{" "}
             {busy ? "Finalizando..." : "Finalizar e enviar ao financeiro"}
           </Button>

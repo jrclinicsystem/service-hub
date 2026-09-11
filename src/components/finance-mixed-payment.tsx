@@ -23,6 +23,17 @@ function parseMoney(value: string) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function comboItems(appointment: any) {
+  return [...(appointment?.appointment_services ?? [])].sort(
+    (a: any, b: any) => Number(a.position ?? 0) - Number(b.position ?? 0),
+  );
+}
+
+function comboReady(appointment: any) {
+  const items = comboItems(appointment);
+  return items.length <= 1 || items.every((item: any) => item.status === "completed");
+}
+
 function dateLabel(value?: string | null) {
   if (!value) return "—";
   return new Date(`${value}T12:00:00`).toLocaleDateString("pt-BR");
@@ -36,7 +47,7 @@ async function loadMixedPaymentData() {
     db.from("financial_access").select("role").eq("user_id", data.user.id).eq("is_active", true),
     db
       .from("appointments")
-      .select("id,patient_name,scheduled_date,scheduled_time,status,professional_id,professional_name_snapshot,custom_price,service_price_snapshot,service_id,service:services(name,price),professional:professionals(name)")
+      .select("id,patient_name,scheduled_date,scheduled_time,status,professional_id,professional_name_snapshot,custom_price,service_price_snapshot,service_id,service:services(name,price),appointment_services(service_id,position,price_snapshot,status,completed_at,service:services!appointment_services_service_id_fkey(name,price)),professional:professionals(name)")
       .eq("status", "confirmado")
       .order("scheduled_date", { ascending: true })
       .order("scheduled_time", { ascending: true }),
@@ -76,6 +87,9 @@ export function FinanceMixedPayment() {
     [query.data?.appointments, selectedId],
   );
 
+  const selectedItems = useMemo(() => comboItems(selected), [selected]);
+  const selectedReady = comboReady(selected);
+
   useEffect(() => {
     if (!selected) return;
     const base = Number(selected.custom_price ?? selected.service_price_snapshot ?? selected.service?.price ?? 0);
@@ -104,6 +118,7 @@ export function FinanceMixedPayment() {
 
   const finalize = async () => {
     if (!selected) return toast.error("Selecione um atendimento confirmado.");
+    if (!comboReady(selected)) return toast.error("Ainda existem serviços pendentes neste combo. Conclua todos antes do pagamento final.");
     if (!Number.isFinite(parsedAmount) || parsedAmount < 0) return toast.error("Informe um valor original válido.");
     if (discountType === "percent" && (parsedDiscount < 0 || parsedDiscount > 100)) return toast.error("Percentual de desconto inválido.");
     if (discountType === "amount" && (parsedDiscount < 0 || parsedDiscount > parsedAmount)) return toast.error("Valor de desconto inválido.");
@@ -193,6 +208,7 @@ export function FinanceMixedPayment() {
               <div className="mt-3 rounded-2xl bg-muted/50 p-4 text-sm">
                 <strong>{selected.patient_name}</strong>
                 <p className="mt-1 text-muted-foreground">{selected.service?.name ?? "Serviço"} · {selected.professional?.name ?? selected.professional_name_snapshot ?? "Profissional"}</p>
+                {selectedItems.length > 1 ? <div className="mt-3 space-y-1.5 border-t border-border/70 pt-3">{selectedItems.map((item: any) => <div key={item.service_id} className="flex items-center justify-between gap-2 text-xs"><span>{item.status === "completed" ? "✓" : "○"} {item.service?.name ?? "Serviço"}</span><strong>{money(item.price_snapshot ?? item.service?.price)}</strong></div>)}<p className={`text-[11px] font-semibold ${selectedReady ? "text-emerald-700" : "text-amber-700"}`}>{selectedReady ? "Combo concluído — pronto para o financeiro." : "Há serviços pendentes neste combo."}</p></div> : null}
               </div>
             ) : null}
           </div>
@@ -239,7 +255,7 @@ export function FinanceMixedPayment() {
               <div><Label>Motivo da comissão manual</Label><Input disabled={!manualCommission.trim()} value={manualReason} onChange={(e) => setManualReason(e.target.value)} /></div>
             </div>
 
-            <div className="flex justify-end"><Button disabled={!selected || busy} onClick={() => void finalize()}>{busy ? "Finalizando..." : "Finalizar pagamento misto"}</Button></div>
+            <div className="flex justify-end"><Button disabled={!selected || busy || !selectedReady} onClick={() => void finalize()}>{busy ? "Finalizando..." : "Finalizar pagamento misto"}</Button></div>
           </div>
         </div>
       </div>

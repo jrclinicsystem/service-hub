@@ -81,13 +81,31 @@ function paymentLabel(item: any) {
   return "Aguardando pagamento";
 }
 
+function appointmentServiceItems(item: any) {
+  return [...(item?.appointment_services ?? [])]
+    .sort((a: any, b: any) => Number(a.position ?? 0) - Number(b.position ?? 0));
+}
+
 function appointmentServiceLabel(item: any) {
-  const linked = [...(item?.appointment_services ?? [])]
-    .sort((a: any, b: any) => Number(a.position ?? 0) - Number(b.position ?? 0))
+  const linked = appointmentServiceItems(item)
     .map((entry: any) => entry?.service?.name)
     .filter(Boolean);
   if (linked.length) return linked.join(" + ");
   return item?.service?.name ?? "Atendimento";
+}
+
+function appointmentComboProgress(item: any) {
+  const items = appointmentServiceItems(item);
+  const total = items.length;
+  const completed = items.filter((entry: any) => entry.status === "completed").length;
+  return {
+    items,
+    total,
+    completed,
+    isCombo: total > 1,
+    started: total > 1 && completed > 0,
+    allCompleted: total > 1 && completed === total,
+  };
 }
 
 function statusLabel(status: string) {
@@ -151,7 +169,7 @@ function playNotificationSound(audioRef: { current: AudioContext | null }) {
 }
 
 async function fetchAppointment(id: string) {
-  const { data, error } = await db.from("appointments").select("id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status, created_at, status_updated_at, payment_choice, service_price_snapshot, deposit_percent, deposit_amount, balance_amount, service:services!appointments_service_id_fkey(name, price, duration_min), appointment_services(position, service:services!appointment_services_service_id_fkey(name, price, duration_min)), professional:professionals(name, specialty), payments(status, amount, kind, payment_method_id, provider, paid_at, created_at, status_detail)").eq("id", id).maybeSingle();
+  const { data, error } = await db.from("appointments").select("id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status, created_at, status_updated_at, payment_choice, service_price_snapshot, deposit_percent, deposit_amount, balance_amount, service:services!appointments_service_id_fkey(name, price, duration_min), appointment_services(service_id, position, price_snapshot, status, completed_at, completed_by, service:services!appointment_services_service_id_fkey(name, price, duration_min)), professional:professionals(name, specialty), payments(status, amount, kind, payment_method_id, provider, paid_at, created_at, status_detail)").eq("id", id).maybeSingle();
   if (error) return null;
   return data;
 }
@@ -312,7 +330,7 @@ export function AdminAppointmentsWorkspace({ appointments, onStatusChange, onRef
       <CreateAppointmentDialog open={createOpen} onOpenChange={setCreateOpen} onCreated={() => { setCreateOpen(false); setScope("pending"); onRefresh(); }} />
       <CreateAppointmentDialog open={Boolean(editingAppointment)} onOpenChange={(open) => { if (!open) setEditingAppointment(null); }} editing={editingAppointment} onCreated={() => { setEditingAppointment(null); setScope("pending"); onRefresh(); }} />
       <CalendarDayDialog date={calendarDayOpen} appointments={appointments} open={Boolean(calendarDayOpen)} onOpenChange={(open) => { if (!open) setCalendarDayOpen(null); }} />
-      <AppointmentAdminDialog appointment={selected} open={Boolean(selected)} onOpenChange={(open: boolean) => !open && setSelected(null)} onConfirm={() => selected && act(selected, "confirmado")} onCancel={() => selected && act(selected, "cancelado")} onAttended={() => selected && completeAttendance(selected)} onEdit={() => { if (!selected || selected.status === "atendido") return; const current = selected; setSelected(null); setEditingAppointment(current); }} onPriceSaved={(value: number) => { setSelected((current: any) => current ? { ...current, service_price_snapshot: value, balance_amount: value } : current); onRefresh(); }} busy={busyAction} />
+      <AppointmentAdminDialog appointment={selected} open={Boolean(selected)} onOpenChange={(open: boolean) => !open && setSelected(null)} onConfirm={() => selected && act(selected, "confirmado")} onCancel={() => selected && act(selected, "cancelado")} onAttended={() => selected && completeAttendance(selected)} onEdit={() => { if (!selected || selected.status === "atendido") return; const current = selected; setSelected(null); setEditingAppointment(current); }} onPriceSaved={(value: number) => { setSelected((current: any) => current ? { ...current, service_price_snapshot: value, balance_amount: value } : current); onRefresh(); }} onRefresh={onRefresh} busy={busyAction} />
       <NewAppointmentAlert appointment={incoming} open={Boolean(incoming)} onLater={() => setIncoming(null)} onConfirm={() => incoming && act(incoming, "confirmado")} onCancel={() => incoming && act(incoming, "cancelado")} busy={busyAction} />
     </section>
   );
@@ -324,13 +342,15 @@ function AdminAppointmentCard({ appointment, onOpen, onEdit, onDelete, onAttende
   const days = daysUntilAppointment(appointment.scheduled_date);
   const hasWhatsApp = normalizeWhatsAppPhone(appointment.patient_phone).length > 0;
   const scheduledMoment = new Date(`${appointment.scheduled_date}T${appointment.scheduled_time}:00`);
-  const canMarkAttended = appointment.status === "confirmado" && Number.isFinite(scheduledMoment.getTime()) && scheduledMoment.getTime() <= Date.now();
+  const combo = appointmentComboProgress(appointment);
+  const canMarkAttended = !combo.isCombo && appointment.status === "confirmado" && Number.isFinite(scheduledMoment.getTime()) && scheduledMoment.getTime() <= Date.now();
   const cardClass = proximity === "urgent" ? "border-amber-500/60 bg-amber-50/70 shadow-md" : proximity === "soon" ? "border-amber-300/60 bg-amber-50/35" : "border-border bg-card";
   return <article className={`w-full min-w-0 overflow-hidden rounded-2xl border p-4 text-left shadow-soft transition hover:shadow-md ${cardClass}`}>
     {proximity === "urgent" && appointment.status !== "cancelado" ? <div className="mb-3 flex items-center gap-2 rounded-xl bg-amber-100 px-3 py-2 text-xs font-semibold text-amber-900"><AlertTriangle className="size-4" /> {days === 0 ? "Atendimento hoje" : "Atendimento amanhã — recontato recomendado"}</div> : proximity === "soon" ? <div className="mb-3 rounded-xl bg-amber-100/60 px-3 py-2 text-[11px] font-medium text-amber-900">Faltam {days} dias para este atendimento.</div> : null}
     <button type="button" onClick={onOpen} className="block w-full min-w-0 max-w-full overflow-hidden text-left">
       <div className="flex min-w-0 flex-wrap items-start justify-between gap-2"><div className="min-w-0 flex-1 basis-[150px]"><p className="truncate text-base font-semibold">{appointment.patient_name}</p><p className="mt-0.5 truncate text-xs text-muted-foreground">{appointment.patient_email || "Sem e-mail"}</p></div><div className="max-w-full shrink-0"><AdminStatusBadge status={appointment.status} /></div></div>
       <div className="mt-3 rounded-xl bg-secondary/45 p-3"><p className="truncate text-sm font-medium">{appointmentServiceLabel(appointment)}</p><p className="mt-1 truncate text-xs text-muted-foreground">{appointment.professional?.name ?? "Profissional não definido"} · {appointment.professional?.specialty ?? "Equipe"}</p></div>
+      {combo.isCombo ? <div className={`mt-2 rounded-xl border px-3 py-2 text-[11px] font-medium ${combo.allCompleted ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-border bg-background text-muted-foreground"}`}><div className="flex items-center justify-between gap-2"><span>Progresso do combo</span><strong>{combo.completed} de {combo.total} concluídos</strong></div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${combo.total ? (combo.completed / combo.total) * 100 : 0}%` }} /></div>{combo.allCompleted ? <p className="mt-1.5 font-semibold text-emerald-700">Combo concluído · pronto para o financeiro</p> : null}</div> : null}
       <div className="mt-3 grid min-w-0 grid-cols-2 gap-2 min-[390px]:grid-cols-3"><SmallInfo label="Data" value={formatDate(appointment.scheduled_date)} /><SmallInfo label="Horário" value={appointment.scheduled_time} /><SmallInfo label="Pagamento" value={paymentLabel(appointment)} accent /></div>
     </button>
     {hasWhatsApp && appointment.status !== "cancelado" ? <div className="mt-3">{appointment.status === "confirmado" ? <Button type="button" size="sm" className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => openAppointmentWhatsApp(appointment, "reminder")}><MessageCircle className="size-4" /> Enviar lembrete no WhatsApp</Button> : proximity === "urgent" ? <Button type="button" size="sm" className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => openAppointmentWhatsApp(appointment, "reminder")}><MessageCircle className="size-4" /> {days === 0 ? "Falar com cliente" : "Enviar lembrete no WhatsApp"}</Button> : <Button type="button" size="sm" variant="outline" className="rounded-xl border-emerald-600/40 text-emerald-700 hover:bg-emerald-50" onClick={() => openAppointmentWhatsApp(appointment, "confirmation")}><MessageCircle className="size-4" /> Confirmar pelo WhatsApp</Button>}</div> : null}
@@ -500,6 +520,10 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated, editing = null
   const handleOpenChange = (next: boolean) => { if (!next && !saving) reset(); onOpenChange(next); };
 
   const saveAppointment = async () => {
+    if (editing && appointmentComboProgress(editing).started) {
+      toast.error("Este combo já possui serviço concluído.", { description: "Para preservar o histórico do pacote, conclua o combo antes de alterar serviços ou reagendar." });
+      return;
+    }
     if (!patientName.trim()) { toast.error("Informe o nome do cliente."); return; }
     if (!serviceIds.length) { toast.error("Selecione ao menos um serviço."); return; }
     if (!professionalId) { toast.error("Selecione o profissional."); return; }
@@ -595,6 +619,81 @@ function AdminStatusBadge({ status }: { status: string }) { const variant = stat
 function SmallInfo({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) { return <div className="min-w-0"><p className="text-[9px] uppercase tracking-wide text-muted-foreground">{label}</p><p className={`mt-0.5 break-words text-xs font-medium ${accent ? "text-primary" : ""}`}>{value}</p></div>; }
 function DetailBox({ icon: Icon, label, value }: any) { return <div className="flex items-start gap-3 rounded-2xl border border-border bg-card p-3"><span className="grid size-8 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary"><Icon className="size-4" /></span><div className="min-w-0"><p className="text-[9px] uppercase tracking-wide text-muted-foreground">{label}</p><p className="mt-1 break-words text-sm font-medium">{value}</p></div></div>; }
 
+
+function ComboServicesManager({ appointment, onRefresh }: any) {
+  const [items, setItems] = useState<any[]>(() => appointmentServiceItems(appointment));
+  const [busyId, setBusyId] = useState("");
+
+  useEffect(() => {
+    setItems(appointmentServiceItems(appointment));
+  }, [appointment?.id, appointment?.appointment_services]);
+
+  if (items.length <= 1) return null;
+
+  const completed = items.filter((item: any) => item.status === "completed").length;
+  const allCompleted = completed === items.length;
+  const canManage = appointment.status === "confirmado";
+
+  const toggle = async (item: any) => {
+    const isCompleted = item.status === "completed";
+    if (isCompleted && !window.confirm(`Desmarcar ${item.service?.name ?? "este serviço"} como concluído?`)) return;
+    setBusyId(item.service_id);
+    const result = await db.rpc("set_appointment_service_completion", {
+      _appointment_id: appointment.id,
+      _service_id: item.service_id,
+      _completed: !isCompleted,
+    });
+    setBusyId("");
+    if (result.error) {
+      toast.error("Não foi possível atualizar o serviço.", { description: result.error.message });
+      return;
+    }
+    const now = new Date().toISOString();
+    setItems((current) => current.map((row) => row.service_id === item.service_id ? {
+      ...row,
+      status: isCompleted ? "pending" : "completed",
+      completed_at: isCompleted ? null : (row.completed_at ?? now),
+    } : row));
+    toast.success(isCompleted ? "Serviço reaberto no combo." : "Serviço concluído no combo.");
+    onRefresh?.();
+  };
+
+  return (
+    <div className="mt-4 rounded-2xl border border-border bg-background/70 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold">Serviços do combo</p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">Conclua cada procedimento separadamente. O financeiro só libera quando todos estiverem feitos.</p>
+        </div>
+        <Badge variant={allCompleted ? "default" : "secondary"} className={allCompleted ? "bg-emerald-600 text-white hover:bg-emerald-600" : ""}>{completed} de {items.length} concluídos</Badge>
+      </div>
+      <div className="mt-3 h-2 overflow-hidden rounded-full bg-secondary">
+        <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${items.length ? (completed / items.length) * 100 : 0}%` }} />
+      </div>
+      <div className="mt-3 space-y-2">
+        {items.map((item: any) => {
+          const done = item.status === "completed";
+          return (
+            <div key={item.service_id} className={`flex flex-col gap-3 rounded-xl border p-3 sm:flex-row sm:items-center sm:justify-between ${done ? "border-emerald-200 bg-emerald-50/70" : "border-border bg-card"}`}>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <strong className="text-sm">{item.service?.name ?? "Serviço"}</strong>
+                  <Badge variant={done ? "default" : "outline"} className={done ? "bg-emerald-600 text-white hover:bg-emerald-600" : ""}>{done ? "Concluído" : "Pendente"}</Badge>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">{formatPrice(Number(item.price_snapshot ?? item.service?.price ?? 0))}{done && item.completed_at ? ` · concluído em ${formatDateTime(item.completed_at)}` : ""}</p>
+              </div>
+              <Button type="button" size="sm" variant={done ? "outline" : "default"} disabled={!canManage || busyId === item.service_id} onClick={() => void toggle(item)} className="shrink-0 rounded-xl">
+                <Check className="size-4" /> {busyId === item.service_id ? "Salvando..." : done ? "Desfazer conclusão" : "Marcar como concluído"}
+              </Button>
+            </div>
+          );
+        })}
+      </div>
+      {allCompleted ? <div className="mt-3 rounded-xl bg-emerald-100 px-3 py-2 text-xs font-semibold text-emerald-800">Combo concluído — pronto para finalizar no financeiro.</div> : <div className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-900">Ainda existem serviços pendentes. O lançamento financeiro do combo permanece bloqueado.</div>}
+    </div>
+  );
+}
+
 function AppointmentPriceEditor({ appointment, onSaved }: any) {
   const total = Number(appointment?.service_price_snapshot ?? appointment?.service?.price ?? 0);
   const [value, setValue] = useState(total.toFixed(2));
@@ -631,11 +730,12 @@ function AppointmentAdminDialog({ appointment, open, onOpenChange, onConfirm, on
     {proximity === "urgent" && appointment.status !== "cancelado" ? <div className="mt-2 flex items-center gap-2 rounded-xl bg-amber-100 p-3 text-xs font-semibold text-amber-900"><AlertTriangle className="size-4" /> {days === 0 ? "Atendimento hoje" : "Atendimento amanhã — faça o recontato"}</div> : null}
     <div className="mt-2 rounded-2xl bg-primary-soft/60 p-4"><div className="flex items-center gap-2 text-primary"><CreditCard className="size-4" /><p className="text-sm font-semibold">{paymentLabel(appointment)}</p></div><div className="mt-3 grid grid-cols-3 gap-2"><SmallInfo label="Total" value={formatPrice(total)} /><SmallInfo label="Pago" value={formatPrice(paid)} /><SmallInfo label="Restante" value={formatPrice(Number(appointment.balance_amount ?? Math.max(0, total - paid)))} /></div>{approved?.paid_at ? <p className="mt-3 text-[11px] text-muted-foreground">Pagamento confirmado em {formatDateTime(approved.paid_at)}</p> : null}</div>
     <AppointmentPriceEditor appointment={appointment} onSaved={onPriceSaved} />
+    <ComboServicesManager appointment={appointment} onRefresh={onRefresh} />
     <div className="mt-4 grid gap-2 sm:grid-cols-2"><DetailBox icon={CalendarDays} label="Data" value={formatDate(appointment.scheduled_date)} /><DetailBox icon={Clock3} label="Horário" value={appointment.scheduled_time} /><DetailBox icon={Stethoscope} label="Profissional" value={appointment.professional?.name ?? "Não definido"} /><DetailBox icon={UserRound} label="Paciente" value={appointment.patient_name} /><DetailBox icon={Phone} label="WhatsApp" value={appointment.patient_phone || "Não informado"} /><DetailBox icon={Mail} label="E-mail" value={appointment.patient_email || "Não informado"} /></div>
     {hasWhatsApp && appointment.status !== "cancelado" ? <div className="mt-4">{proximity === "urgent" ? <Button className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => openAppointmentWhatsApp(appointment, "reminder")}><MessageCircle className="size-4" /> {days === 0 ? "Falar com cliente" : "Recontatar cliente"}</Button> : appointment.status === "pendente" ? <Button variant="outline" className="rounded-xl border-emerald-600/40 text-emerald-700" onClick={() => openAppointmentWhatsApp(appointment, "confirmation")}><MessageCircle className="size-4" /> Confirmar pelo WhatsApp</Button> : null}</div> : null}
     {hasWhatsApp && appointment.status === "confirmado" && proximity !== "urgent" ? <div className="mt-4"><Button className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => openAppointmentWhatsApp(appointment, "reminder")}><MessageCircle className="size-4" /> Enviar lembrete no WhatsApp</Button></div> : null}
     <div className="mt-4 rounded-2xl border border-border p-4"><div className="grid gap-3 text-xs sm:grid-cols-2"><div><p className="text-[9px] uppercase tracking-wide text-muted-foreground">Criado em</p><p className="mt-1 font-medium">{formatDateTime(appointment.created_at)}</p></div><div><p className="text-[9px] uppercase tracking-wide text-muted-foreground">Status atualizado</p><p className="mt-1 font-medium">{formatDateTime(appointment.status_updated_at)}</p></div></div>{appointment.notes ? <div className="mt-3 border-t border-border pt-3"><p className="text-[9px] uppercase tracking-wide text-muted-foreground">Observações</p><p className="mt-1 text-sm">{appointment.notes}</p></div> : null}</div>
-    {appointment.status !== "atendido" ? <div className="mt-4"><Button type="button" variant="outline" className="w-full rounded-xl sm:w-auto" onClick={onEdit}><Pencil className="size-4" /> {appointment.status === "cancelado" ? "Reagendar" : "Editar agendamento"}</Button></div> : null}
+    {appointment.status !== "atendido" && !combo.started ? <div className="mt-4"><Button type="button" variant="outline" className="w-full rounded-xl sm:w-auto" onClick={onEdit}><Pencil className="size-4" /> {appointment.status === "cancelado" ? "Reagendar" : "Editar agendamento"}</Button></div> : null}
     {canDecide ? <DialogFooter className="mt-4 grid grid-cols-2 gap-2 sm:flex"><Button variant="destructive" disabled={busy} onClick={onCancel}><X className="size-4" /> Cancelar</Button><Button disabled={busy} onClick={onConfirm}><Check className="size-4" /> Confirmar manualmente</Button></DialogFooter> : null}
     {canMarkAttended ? <DialogFooter className="mt-4"><Button className="w-full bg-emerald-600 text-white hover:bg-emerald-700 sm:w-auto" disabled={busy} onClick={onAttended}><Check className="size-4" /> Confirmar atendimento</Button></DialogFooter> : null}
     {appointment.status === "atendido" ? <div className="mt-4 rounded-xl bg-emerald-50 px-3 py-2 text-center text-xs font-semibold text-emerald-800">Atendimento concluído · receita contabilizada</div> : null}
