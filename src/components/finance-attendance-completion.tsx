@@ -8,6 +8,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 
 const db = supabase as any;
@@ -301,17 +308,18 @@ export function FinanceAttendanceCompletion() {
             {received === "yes" ? (
               <div>
                 <Label>Forma de pagamento</Label>
-                <select
-                  className={selectClass}
-                  value={method}
-                  onChange={(event) => setMethod(event.target.value)}
-                >
-                  {(data.data?.methods ?? []).map((row: any) => (
-                    <option key={row.id} value={row.code}>
-                      {row.name}
-                    </option>
-                  ))}
-                </select>
+                <Select value={method} onValueChange={setMethod}>
+                  <SelectTrigger className="h-10 w-full bg-background">
+                    <SelectValue placeholder="Selecione a forma de pagamento" />
+                  </SelectTrigger>
+                  <SelectContent position="popper" className="z-[120]">
+                    {(data.data?.methods ?? []).map((row: any) => (
+                      <SelectItem key={row.id} value={row.code}>
+                        {row.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             ) : (
               <div>
