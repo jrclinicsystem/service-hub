@@ -69,11 +69,11 @@ async function loadCompletionAccess() {
 }
 
 async function loadConfirmedAppointments() {
-  const [appointments, methods, cash] = await Promise.all([
+  const [appointments, methods, cash, financialEntries] = await Promise.all([
     db
       .from("appointments")
       .select(
-        "id,patient_name,scheduled_date,scheduled_time,status,professional_id,professional_name_snapshot,custom_price,service_price_snapshot,service_id,service:services!appointments_service_id_fkey(name,price),appointment_services(service_id,position,price_snapshot,status,completed_at,service:services!appointment_services_service_id_fkey(name,price)),appointment_sessions(id,session_number,scheduled_date,scheduled_time,status,completed_at),financial_entries(id,status),professional:professionals(name)",
+        "id,patient_name,scheduled_date,scheduled_time,status,professional_id,professional_name_snapshot,custom_price,service_price_snapshot,service_id,service:services!appointments_service_id_fkey(name,price),appointment_services(service_id,position,price_snapshot,status,completed_at,service:services!appointment_services_service_id_fkey(name,price)),appointment_sessions(id,session_number,scheduled_date,scheduled_time,status,completed_at),professional:professionals(name)",
       )
       .eq("status", "confirmado")
       .order("scheduled_date", { ascending: true })
@@ -89,10 +89,19 @@ async function loadConfirmedAppointments() {
       .eq("status", "open")
       .order("opened_at", { ascending: false })
       .limit(1),
+    db
+      .from("financial_entries")
+      .select("appointment_id,status")
+      .not("appointment_id", "is", null),
   ]);
-  for (const result of [appointments, methods, cash]) if (result.error) throw result.error;
+  for (const result of [appointments, methods, cash, financialEntries]) if (result.error) throw result.error;
+  const alreadyRegistered = new Set(
+    (financialEntries.data ?? [])
+      .filter((entry: any) => !["cancelled", "refunded"].includes(String(entry.status ?? "")))
+      .map((entry: any) => entry.appointment_id),
+  );
   return {
-    appointments: (appointments.data ?? []).filter((row: any) => !(row.financial_entries ?? []).some((entry: any) => !["cancelled", "refunded"].includes(entry.status))),
+    appointments: (appointments.data ?? []).filter((row: any) => !alreadyRegistered.has(row.id)),
     methods: methods.data ?? [],
     openCash: cash.data?.[0] ?? null,
   };
@@ -402,7 +411,13 @@ export function FinanceAttendanceCompletion() {
               type="button"
               variant="outline"
               disabled={!selected}
-              onClick={() => document.getElementById("finance-split-payment")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+              onClick={() => {
+                if (!selected) return;
+                window.dispatchEvent(new CustomEvent("finance:open-split-payment", { detail: { appointmentId: selected.id } }));
+                requestAnimationFrame(() =>
+                  document.getElementById("finance-split-payment")?.scrollIntoView({ behavior: "smooth", block: "start" }),
+                );
+              }}
             >
               Dividir em 2 ou mais formas
             </Button>

@@ -7,6 +7,13 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 
 const db = supabase as any;
@@ -44,24 +51,31 @@ async function loadMixedPaymentData() {
   const { data, error } = await supabase.auth.getUser();
   if (error || !data.user) throw new Error("Sessão expirada.");
 
-  const [access, appointments, methods] = await Promise.all([
+  const [access, appointments, methods, financialEntries] = await Promise.all([
     db.from("financial_access").select("role").eq("user_id", data.user.id).eq("is_active", true),
     db
       .from("appointments")
-      .select("id,patient_name,scheduled_date,scheduled_time,status,professional_id,professional_name_snapshot,custom_price,service_price_snapshot,service_id,service:services(name,price),appointment_services(service_id,position,price_snapshot,status,completed_at,service:services!appointment_services_service_id_fkey(name,price)),appointment_sessions(id,session_number,scheduled_date,scheduled_time,status,completed_at),financial_entries(id,status),professional:professionals(name)")
+      .select("id,patient_name,scheduled_date,scheduled_time,status,professional_id,professional_name_snapshot,custom_price,service_price_snapshot,service_id,service:services!appointments_service_id_fkey(name,price),appointment_services(service_id,position,price_snapshot,status,completed_at,service:services!appointment_services_service_id_fkey(name,price)),appointment_sessions(id,session_number,scheduled_date,scheduled_time,status,completed_at),professional:professionals(name)")
       .eq("status", "confirmado")
       .order("scheduled_date", { ascending: true })
       .order("scheduled_time", { ascending: true }),
     db.from("payment_methods").select("id,code,name").eq("is_active", true).order("sort_order"),
+    db.from("financial_entries").select("appointment_id,status").not("appointment_id", "is", null),
   ]);
   if (access.error) throw access.error;
   if (appointments.error) throw appointments.error;
   if (methods.error) throw methods.error;
+  if (financialEntries.error) throw financialEntries.error;
 
+  const alreadyRegistered = new Set(
+    (financialEntries.data ?? [])
+      .filter((entry: any) => !["cancelled", "refunded"].includes(String(entry.status ?? "")))
+      .map((entry: any) => entry.appointment_id),
+  );
   const roles = (access.data ?? []).map((row: any) => String(row.role));
   return {
     allowed: roles.some((role: string) => ["admin", "finance", "reception"].includes(role)),
-    appointments: (appointments.data ?? []).filter((row: any) => !(row.financial_entries ?? []).some((entry: any) => !["cancelled", "refunded"].includes(entry.status))),
+    appointments: (appointments.data ?? []).filter((row: any) => !alreadyRegistered.has(row.id)),
     methods: methods.data ?? [],
   };
 }
@@ -87,6 +101,15 @@ export function FinanceMixedPayment() {
     () => (query.data?.appointments ?? []).find((row: any) => row.id === selectedId) ?? null,
     [query.data?.appointments, selectedId],
   );
+
+  useEffect(() => {
+    const openSplitPayment = (event: Event) => {
+      const appointmentId = (event as CustomEvent<{ appointmentId?: string }>).detail?.appointmentId;
+      if (appointmentId) setSelectedId(appointmentId);
+    };
+    window.addEventListener("finance:open-split-payment", openSplitPayment);
+    return () => window.removeEventListener("finance:open-split-payment", openSplitPayment);
+  }, []);
 
   const selectedItems = useMemo(() => comboItems(selected), [selected]);
   const selectedSessions = useMemo(() => packageSessions(selected), [selected]);
@@ -237,9 +260,16 @@ export function FinanceMixedPayment() {
               <div className="mt-3 space-y-2">
                 {splits.map((row, index) => (
                   <div key={index} className="grid gap-2 sm:grid-cols-[1.2fr_1fr_100px_auto]">
-                    <select className={selectClass} value={row.method} onChange={(e) => updateSplit(index, { method: e.target.value })}>
-                      {(query.data?.methods ?? []).map((methodRow: any) => <option key={methodRow.id} value={methodRow.code}>{methodRow.name}</option>)}
-                    </select>
+                    <Select value={row.method} onValueChange={(value) => updateSplit(index, { method: value })}>
+                      <SelectTrigger className="h-10 w-full bg-background">
+                        <SelectValue placeholder="Forma de pagamento" />
+                      </SelectTrigger>
+                      <SelectContent position="popper" className="z-[120]">
+                        {(query.data?.methods ?? []).map((methodRow: any) => (
+                          <SelectItem key={methodRow.id} value={methodRow.code}>{methodRow.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <Input placeholder="Valor" value={row.amount} onChange={(e) => updateSplit(index, { amount: e.target.value })} />
                     <Input type="number" min="1" max="12" value={row.installments} onChange={(e) => updateSplit(index, { installments: e.target.value })} />
                     <Button type="button" size="icon" variant="outline" disabled={splits.length <= 2} onClick={() => setSplits((rows) => rows.filter((_, i) => i !== index))}><Trash2 className="size-4" /></Button>
