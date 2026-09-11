@@ -255,10 +255,10 @@ export function ClientProfileDialog({ clientId, open, onOpenChange, onUpdated }:
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92vh] max-w-[1120px] overflow-hidden p-0">
-        <DialogHeader className="border-b px-6 py-5 pr-12">
+      <DialogContent className="flex h-[88vh] max-h-[820px] max-w-[1120px] flex-col overflow-hidden border-primary/10 bg-gradient-to-b from-primary/[0.035] via-background to-background p-0 shadow-2xl">
+        <DialogHeader className="shrink-0 border-b border-primary/10 bg-gradient-to-r from-primary/[0.10] via-primary/[0.04] to-transparent px-6 py-5 pr-12">
           <div className="flex items-start gap-3">
-            <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-primary-soft text-primary"><UserRound className="size-5" /></span>
+            <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-primary/15 text-primary ring-1 ring-primary/15"><UserRound className="size-5" /></span>
             <div className="min-w-0">
               <DialogTitle className="truncate text-xl">{client?.name ?? "Ficha do cliente"}</DialogTitle>
               <DialogDescription className="mt-1">Cadastro, anamnese e arquivos, agendamentos e orçamentos/combos em um só lugar.</DialogDescription>
@@ -267,19 +267,19 @@ export function ClientProfileDialog({ clientId, open, onOpenChange, onUpdated }:
         </DialogHeader>
 
         {query.isLoading ? <div className="grid min-h-[420px] place-items-center"><Loader2 className="size-7 animate-spin text-primary" /></div> : query.error ? <div className="p-8 text-sm text-destructive">{query.error instanceof Error ? query.error.message : "Erro ao carregar a ficha."}</div> : client ? (
-          <Tabs defaultValue="profile" className="min-h-0 flex-1 overflow-hidden px-5 pb-5">
+          <Tabs defaultValue="profile" className="flex min-h-0 flex-1 flex-col overflow-hidden px-5 pb-5">
             <div className="overflow-x-auto pt-4">
-              <TabsList className="w-max min-w-full justify-start">
-                <TabsTrigger value="profile">Ficha cadastral</TabsTrigger>
-                <TabsTrigger value="documents">Anamnese e arquivos</TabsTrigger>
-                <TabsTrigger value="appointments">Agendamentos</TabsTrigger>
-                <TabsTrigger value="budgets">Orçamentos e combos</TabsTrigger>
+              <TabsList className="h-auto w-max min-w-full justify-start gap-1 border border-primary/10 bg-primary/[0.065] p-1.5">
+                <TabsTrigger value="profile" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Ficha cadastral</TabsTrigger>
+                <TabsTrigger value="documents" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Anamnese e arquivos</TabsTrigger>
+                <TabsTrigger value="appointments" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Agendamentos</TabsTrigger>
+                <TabsTrigger value="budgets" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Orçamentos e combos</TabsTrigger>
               </TabsList>
             </div>
 
-            <div className="mt-3 max-h-[68vh] overflow-y-auto pr-1">
+            <div className="mt-3 min-h-0 flex-1 overflow-y-auto pr-1">
               <TabsContent value="profile" className="mt-0 space-y-5">
-                <div className="grid gap-4 rounded-2xl border bg-card p-4 sm:grid-cols-2">
+                <div className="grid gap-4 rounded-2xl border border-primary/10 bg-gradient-to-br from-card via-card to-primary/[0.035] p-4 shadow-sm sm:grid-cols-2">
                   <div><Label>Nome completo</Label><Input className="mt-2" value={name} onChange={(e) => setName(e.target.value)} /></div>
                   <div><Label>WhatsApp</Label><Input className="mt-2" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} /></div>
                   <div><Label>E-mail</Label><Input className="mt-2" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="cliente@email.com" /></div>
@@ -294,7 +294,7 @@ export function ClientProfileDialog({ clientId, open, onOpenChange, onUpdated }:
               </TabsContent>
 
               <TabsContent value="documents" className="mt-0 space-y-4">
-                <div className="rounded-2xl border border-dashed bg-muted/25 p-5">
+                <div className="rounded-2xl border border-dashed border-primary/25 bg-primary/[0.045] p-5">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                     <div><h3 className="font-semibold">Anexar à ficha</h3><p className="mt-1 text-xs text-muted-foreground">A anamnese não tem formulário padrão: basta anexar o arquivo preenchido, fotos, PDF ou outros documentos. Limite de 15 MB por arquivo.</p></div>
                     <div className="flex flex-wrap items-end gap-2">
@@ -308,8 +308,8 @@ export function ClientProfileDialog({ clientId, open, onOpenChange, onUpdated }:
                 </div>
                 <div className="grid gap-2 md:grid-cols-2">
                   {(query.data?.documents ?? []).length === 0 ? <div className="col-span-full rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">Nenhum arquivo anexado ainda.</div> : (query.data?.documents ?? []).map((doc: any) => (
-                    <div key={doc.id} className="flex items-center gap-3 rounded-2xl border p-3">
-                      <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-muted">{doc.mime_type?.startsWith("image/") ? <Image className="size-4" /> : <FileText className="size-4" />}</span>
+                    <div key={doc.id} className="flex items-center gap-3 rounded-2xl border border-primary/10 bg-card p-3 shadow-sm transition hover:border-primary/25 hover:bg-primary/[0.025]">
+                      <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">{doc.mime_type?.startsWith("image/") ? <Image className="size-4" /> : <FileText className="size-4" />}</span>
                       <button type="button" className="min-w-0 flex-1 text-left" onClick={() => void openDocument(doc)}><p className="truncate text-sm font-medium">{doc.file_name}</p><p className="mt-1 text-xs text-muted-foreground">{categoryLabel[doc.category] ?? "Arquivo"}{doc.size_bytes ? ` · ${fileSize(doc.size_bytes)}` : ""} · {new Date(doc.created_at).toLocaleDateString("pt-BR")}</p></button>
                       <Button size="icon" variant="ghost" className="shrink-0 text-destructive" onClick={() => void removeDocument(doc)}><Trash2 className="size-4" /></Button>
                     </div>
@@ -321,17 +321,17 @@ export function ClientProfileDialog({ clientId, open, onOpenChange, onUpdated }:
                 {(query.data?.appointments ?? []).length === 0 ? <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">Nenhum agendamento encontrado para este cliente.</div> : (query.data?.appointments ?? []).map((appointment: any) => {
                   const sessions = [...(appointment.appointment_sessions ?? [])].sort((a: any, b: any) => Number(a.session_number) - Number(b.session_number));
                   const services = [...(appointment.appointment_services ?? [])].sort((a: any, b: any) => Number(a.position) - Number(b.position));
-                  return <article key={appointment.id} className="rounded-2xl border p-4">
+                  return <article key={appointment.id} className="rounded-2xl border border-primary/10 bg-card p-4 shadow-sm">
                     <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex items-center gap-2"><CalendarDays className="size-4 text-primary" /><strong>{dateLabel(appointment.scheduled_date)} às {String(appointment.scheduled_time ?? "").slice(0,5)}</strong></div><p className="mt-1 text-sm text-muted-foreground">{appointment.service?.name ?? "Serviço"} · {appointment.professional?.name ?? "Profissional"}</p></div><Badge variant="outline">{statusLabel[appointment.status] ?? appointment.status}</Badge></div>
-                    {services.length > 1 ? <div className="mt-3 rounded-xl bg-muted/40 p-3"><p className="text-xs font-semibold">Serviços do combo</p><div className="mt-2 flex flex-wrap gap-2">{services.map((item: any) => <Badge key={`${appointment.id}-${item.service_id}`} variant="secondary">{item.service?.name ?? "Serviço"} · {money(item.price_snapshot ?? item.service?.price)}</Badge>)}</div></div> : null}
-                    {sessions.length > 1 ? <div className="mt-3 rounded-xl bg-muted/40 p-3"><p className="text-xs font-semibold">Sessões do pacote</p><div className="mt-2 grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">{sessions.map((session: any) => <div key={session.id} className="rounded-lg bg-background px-2.5 py-2 text-xs"><strong>Sessão {session.session_number}</strong> · {session.status === "completed" ? "Concluída" : "Pendente"}<br/><span className="text-muted-foreground">{session.scheduled_date ? dateLabel(session.scheduled_date) : "Data a definir"}</span></div>)}</div></div> : null}
+                    {services.length > 1 ? <div className="mt-3 rounded-xl border border-primary/10 bg-primary/[0.045] p-3"><p className="text-xs font-semibold">Serviços do combo</p><div className="mt-2 flex flex-wrap gap-2">{services.map((item: any) => <Badge key={`${appointment.id}-${item.service_id}`} variant="secondary">{item.service?.name ?? "Serviço"} · {money(item.price_snapshot ?? item.service?.price)}</Badge>)}</div></div> : null}
+                    {sessions.length > 1 ? <div className="mt-3 rounded-xl border border-primary/10 bg-primary/[0.045] p-3"><p className="text-xs font-semibold">Sessões do pacote</p><div className="mt-2 grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">{sessions.map((session: any) => <div key={session.id} className="rounded-lg bg-background px-2.5 py-2 text-xs"><strong>Sessão {session.session_number}</strong> · {session.status === "completed" ? "Concluída" : "Pendente"}<br/><span className="text-muted-foreground">{session.scheduled_date ? dateLabel(session.scheduled_date) : "Data a definir"}</span></div>)}</div></div> : null}
                     {appointment.notes ? <p className="mt-3 text-xs text-muted-foreground"><strong>Observação:</strong> {appointment.notes}</p> : null}
                   </article>;
                 })}
               </TabsContent>
 
               <TabsContent value="budgets" className="mt-0 space-y-5">
-                <section className="rounded-2xl border bg-card p-4">
+                <section className="rounded-2xl border border-primary/10 bg-gradient-to-br from-card via-card to-primary/[0.035] p-4 shadow-sm">
                   <div className="flex items-center gap-2"><ReceiptText className="size-4 text-primary" /><h3 className="font-semibold">Novo orçamento / combo</h3></div>
                   <div className="mt-4 grid gap-3 sm:grid-cols-2"><div><Label>Título</Label><Input className="mt-2" value={budgetTitle} onChange={(e) => setBudgetTitle(e.target.value)} /></div><div><Label>Validade (opcional)</Label><Input className="mt-2" type="date" value={budgetValidUntil} onChange={(e) => setBudgetValidUntil(e.target.value)} /></div></div>
                   <div className="mt-4 space-y-2">
@@ -344,14 +344,14 @@ export function ClientProfileDialog({ clientId, open, onOpenChange, onUpdated }:
                   </div>
                   <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => setBudgetRows((rows) => [...rows, { serviceId: "", sessions: "1", unitPrice: "" }])}><Plus className="size-4" /> Adicionar serviço ao combo</Button>
                   <div className="mt-4"><Label>Observações do orçamento</Label><Textarea className="mt-2" value={budgetNotes} onChange={(e) => setBudgetNotes(e.target.value)} placeholder="Condições, intervalos entre sessões, orientações..." /></div>
-                  <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-muted/40 p-3"><div><p className="text-xs text-muted-foreground">Total estimado</p><p className="text-xl font-bold">{money(budgetTotal)}</p></div><Button onClick={() => void saveBudget()} disabled={budgetSaving}><Save className="size-4" /> {budgetSaving ? "Salvando..." : "Salvar orçamento"}</Button></div>
+                  <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/10 bg-primary/[0.05] p-3"><div><p className="text-xs text-muted-foreground">Total estimado</p><p className="text-xl font-bold">{money(budgetTotal)}</p></div><Button onClick={() => void saveBudget()} disabled={budgetSaving}><Save className="size-4" /> {budgetSaving ? "Salvando..." : "Salvar orçamento"}</Button></div>
                 </section>
 
                 <section className="space-y-3">
                   <div className="flex items-center gap-2"><FolderOpen className="size-4 text-primary" /><h3 className="font-semibold">Orçamentos salvos</h3></div>
-                  {(query.data?.budgets ?? []).length === 0 ? <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">Nenhum orçamento salvo ainda.</div> : (query.data?.budgets ?? []).map((budget: any) => <article key={budget.id} className="rounded-2xl border p-4">
+                  {(query.data?.budgets ?? []).length === 0 ? <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">Nenhum orçamento salvo ainda.</div> : (query.data?.budgets ?? []).map((budget: any) => <article key={budget.id} className="rounded-2xl border border-primary/10 bg-card p-4 shadow-sm">
                     <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-semibold">{budget.title}</p><p className="mt-1 text-xs text-muted-foreground">Criado em {new Date(budget.created_at).toLocaleDateString("pt-BR")}{budget.valid_until ? ` · válido até ${dateLabel(budget.valid_until)}` : ""}</p></div><div className="flex items-center gap-2"><Badge variant="outline">{statusLabel[budget.status] ?? budget.status}</Badge><strong>{money(budget.total_amount)}</strong></div></div>
-                    <div className="mt-3 grid gap-2 sm:grid-cols-2">{[...(budget.client_budget_items ?? [])].sort((a: any,b: any) => Number(a.position)-Number(b.position)).map((item: any) => <div key={item.id} className="rounded-xl bg-muted/40 p-3 text-sm"><strong>{item.service_name_snapshot}</strong><p className="mt-1 text-xs text-muted-foreground">{item.sessions} sessão(ões) × {money(item.unit_price)} = {money(item.line_total)}</p></div>)}</div>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">{[...(budget.client_budget_items ?? [])].sort((a: any,b: any) => Number(a.position)-Number(b.position)).map((item: any) => <div key={item.id} className="rounded-xl border border-primary/10 bg-primary/[0.04] p-3 text-sm"><strong>{item.service_name_snapshot}</strong><p className="mt-1 text-xs text-muted-foreground">{item.sessions} sessão(ões) × {money(item.unit_price)} = {money(item.line_total)}</p></div>)}</div>
                     {budget.notes ? <p className="mt-3 text-sm text-muted-foreground">{budget.notes}</p> : null}
                     <div className="mt-3 flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => void updateBudgetStatus(budget.id, "approved")}>Marcar aprovado</Button><Button size="sm" variant="outline" onClick={() => void updateBudgetStatus(budget.id, "declined")}>Marcar recusado</Button><Button size="sm" variant="ghost" className="text-destructive" onClick={() => void removeBudget(budget.id)}><Trash2 className="size-4" /> Excluir</Button></div>
                   </article>)}
