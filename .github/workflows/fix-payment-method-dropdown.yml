@@ -1,0 +1,38 @@
+name: Fix payment method dropdown
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/scripts/fix_payment_method_dropdown.py'
+      - '.github/workflows/fix-payment-method-dropdown.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Apply dropdown fix
+        run: python .github/scripts/fix_payment_method_dropdown.py
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Typecheck
+        run: bunx tsc --noEmit
+      - name: Build
+        run: bun run build
+      - name: Commit fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/finance-attendance-completion.tsx
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "fix: make finance payment method dropdown interactive"
+            git push origin main
+          fi
