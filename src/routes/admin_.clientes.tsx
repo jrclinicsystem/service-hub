@@ -100,6 +100,7 @@ async function loadClients() {
   const { data, error } = await db
     .from("clients")
     .select("id,name,whatsapp,birth_date,birthday_benefit_type,birthday_discount_percent,birthday_custom_benefit,is_active,created_at,updated_at")
+    .is("deleted_at", null)
     .order("name");
   if (error) throw error;
   return data ?? [];
@@ -118,6 +119,7 @@ function ClientsPage() {
   const [customBenefit, setCustomBenefit] = useState("");
   const [active, setActive] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const formRef = useRef<HTMLElement | null>(null);
 
   const today = todayParts();
@@ -154,6 +156,32 @@ function ClientsPage() {
     setCustomBenefit(client.birthday_custom_benefit || "");
     setActive(client.is_active !== false);
     requestAnimationFrame(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  };
+
+  const deleteClient = async (client: any) => {
+    const confirmed = window.confirm(
+      `Excluir ${client.name}?\n\nO cliente será removido da lista, mas o histórico de agendamentos será preservado.`,
+    );
+    if (!confirmed) return;
+
+    setDeletingId(client.id);
+    try {
+      const { error: deleteError } = await db
+        .from("clients")
+        .update({ is_active: false, deleted_at: new Date().toISOString() })
+        .eq("id", client.id)
+        .is("deleted_at", null);
+      if (deleteError) throw deleteError;
+
+      if (selectedClientId === client.id) setSelectedClientId(null);
+      if (editingId === client.id) resetForm();
+      toast.success("Cliente excluído. O histórico de agendamentos foi preservado.");
+      await refetch();
+    } catch (err: any) {
+      toast.error(err?.message || "Não foi possível excluir o cliente.");
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const save = async () => {
@@ -242,28 +270,47 @@ function ClientsPage() {
             ) : filtered.map((client: any) => {
               const parts = birthParts(client.birth_date);
               const isBirthday = client.is_active && parts.month === today.month && parts.day === today.day;
+              const isDeleting = deletingId === client.id;
               return (
-                <button
-                  type="button"
+                <article
                   key={client.id}
-                  onClick={() => setSelectedClientId(client.id)}
-                  className={`group rounded-2xl border p-3.5 text-left transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md ${isBirthday ? "border-emerald-300 bg-emerald-50/40" : "border-border bg-background"}`}
+                  className={`group rounded-2xl border transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md ${isBirthday ? "border-emerald-300 bg-emerald-50/40" : "border-border bg-background"}`}
                 >
-                  <div className="flex items-start gap-3">
-                    <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary"><UserRound className="size-4" /></span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="truncate text-sm font-semibold">{client.name}</p>
-                        {!client.is_active ? <Badge variant="secondary" className="shrink-0 text-[10px]">Inativo</Badge> : null}
+                  <div className="flex items-start gap-1 p-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedClientId(client.id)}
+                      className="min-w-0 flex-1 rounded-xl p-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary"><UserRound className="size-4" /></span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="truncate text-sm font-semibold">{client.name}</p>
+                            {!client.is_active ? <Badge variant="secondary" className="shrink-0 text-[10px]">Inativo</Badge> : null}
+                          </div>
+                          <p className="mt-1 truncate text-xs text-muted-foreground">{client.whatsapp}</p>
+                          <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+                            <span className="flex items-center gap-1"><CalendarDays className="size-3" /> {formatBirthDate(client.birth_date)}</span>
+                            {isBirthday ? <Badge className="bg-emerald-600 px-1.5 py-0 text-[9px] text-white">Aniversário hoje</Badge> : <span className="font-medium text-primary opacity-0 transition group-hover:opacity-100">Abrir ficha →</span>}
+                          </div>
+                        </div>
                       </div>
-                      <p className="mt-1 truncate text-xs text-muted-foreground">{client.whatsapp}</p>
-                      <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
-                        <span className="flex items-center gap-1"><CalendarDays className="size-3" /> {formatBirthDate(client.birth_date)}</span>
-                        {isBirthday ? <Badge className="bg-emerald-600 px-1.5 py-0 text-[9px] text-white">Aniversário hoje</Badge> : <span className="font-medium text-primary opacity-0 transition group-hover:opacity-100">Abrir ficha →</span>}
-                      </div>
-                    </div>
+                    </button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="size-9 shrink-0 rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                      onClick={() => void deleteClient(client)}
+                      disabled={isDeleting}
+                      aria-label={`Excluir ${client.name}`}
+                      title="Excluir cliente"
+                    >
+                      <Trash2 className={`size-4 ${isDeleting ? "animate-pulse" : ""}`} />
+                    </Button>
                   </div>
-                </button>
+                </article>
               );
             })}
           </div>
