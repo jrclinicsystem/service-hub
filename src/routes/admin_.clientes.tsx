@@ -5,6 +5,7 @@ import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { AdminSubpageSidebar } from "@/components/admin-subpage-sidebar";
+import { ClientProfileDialog } from "@/components/client-profile-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -107,6 +108,7 @@ async function loadClients() {
 function ClientsPage() {
   const { data = [], isLoading, error, refetch, isFetching } = useQuery({ queryKey: ["admin-clients"], queryFn: loadClients, retry: 1 });
   const [search, setSearch] = useState("");
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
@@ -234,14 +236,45 @@ function ClientsPage() {
         <section className="mt-6 rounded-3xl border border-border bg-card p-5 shadow-soft sm:p-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="text-lg font-bold">Clientes cadastrados</h2><p className="mt-1 text-xs text-muted-foreground">{data.length} cliente{data.length === 1 ? "" : "s"} no cadastro.</p></div><div className="relative sm:w-[300px]"><Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar cliente ou WhatsApp" className="pl-9" /></div></div>
 
-          <div className="mt-5 space-y-2">
-            {filtered.length === 0 ? <div className="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">Nenhum cliente encontrado.</div> : filtered.map((client: any) => {
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {filtered.length === 0 ? (
+              <div className="col-span-full rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">Nenhum cliente encontrado.</div>
+            ) : filtered.map((client: any) => {
               const parts = birthParts(client.birth_date);
               const isBirthday = client.is_active && parts.month === today.month && parts.day === today.day;
-              return <article key={client.id} className={`flex flex-col gap-4 rounded-2xl border p-4 sm:flex-row sm:items-center sm:justify-between ${isBirthday ? "border-emerald-300 bg-emerald-50/40" : "border-border"}`}><div className="flex min-w-0 items-center gap-3"><span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary"><UserRound className="size-4" /></span><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="truncate font-semibold">{client.name}</p>{isBirthday ? <Badge className="bg-emerald-600 text-white">Aniversário hoje</Badge> : null}{!client.is_active ? <Badge variant="secondary">Inativo</Badge> : null}</div><div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"><span>{client.whatsapp}</span><span className="flex items-center gap-1"><CalendarDays className="size-3" /> {formatBirthDate(client.birth_date)}</span></div></div></div><div className="flex shrink-0 flex-wrap gap-2">{isBirthday ? <Button size="sm" className="bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => openBirthdayWhatsApp(client)}><MessageCircle className="size-4" /> WhatsApp</Button> : null}<Button type="button" size="sm" variant="outline" onClick={() => editClient(client)}><Pencil className="size-4" /> Editar</Button><Button size="sm" variant="ghost" className="text-destructive" onClick={async () => { if (!window.confirm(`Excluir ${client.name} do cadastro?`)) return; const { error: deleteError } = await db.from("clients").delete().eq("id", client.id); if (deleteError) { toast.error(deleteError.message); return; } toast.success("Cliente removido."); if (editingId === client.id) resetForm(); await refetch(); }}><Trash2 className="size-4" /></Button></div></article>;
+              return (
+                <button
+                  type="button"
+                  key={client.id}
+                  onClick={() => setSelectedClientId(client.id)}
+                  className={`group rounded-2xl border p-3.5 text-left transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md ${isBirthday ? "border-emerald-300 bg-emerald-50/40" : "border-border bg-background"}`}
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary"><UserRound className="size-4" /></span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="truncate text-sm font-semibold">{client.name}</p>
+                        {!client.is_active ? <Badge variant="secondary" className="shrink-0 text-[10px]">Inativo</Badge> : null}
+                      </div>
+                      <p className="mt-1 truncate text-xs text-muted-foreground">{client.whatsapp}</p>
+                      <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+                        <span className="flex items-center gap-1"><CalendarDays className="size-3" /> {formatBirthDate(client.birth_date)}</span>
+                        {isBirthday ? <Badge className="bg-emerald-600 px-1.5 py-0 text-[9px] text-white">Aniversário hoje</Badge> : <span className="font-medium text-primary opacity-0 transition group-hover:opacity-100">Abrir ficha →</span>}
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              );
             })}
           </div>
         </section>
+
+        <ClientProfileDialog
+          clientId={selectedClientId}
+          open={Boolean(selectedClientId)}
+          onOpenChange={(nextOpen) => { if (!nextOpen) setSelectedClientId(null); }}
+          onUpdated={async () => { await refetch(); }}
+        />
       </main>
     </div>
   );

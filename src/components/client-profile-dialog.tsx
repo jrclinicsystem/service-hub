@@ -129,8 +129,8 @@ export function ClientProfileDialog({ clientId, open, onOpenChange, onUpdated }:
   };
 
   const saveProfile = async () => {
-    if (!clientId || name.trim().length < 2) return toast.error("Informe o nome do cliente.");
-    if (digits(whatsapp).length < 10) return toast.error("Informe um WhatsApp válido.");
+    if (!clientId || name.trim().length < 2) { toast.error("Informe o nome do cliente."); return undefined; }
+    if (digits(whatsapp).length < 10) { toast.error("Informe um WhatsApp válido."); return undefined; }
     setSaving(true);
     const result = await db.from("clients").update({
       name: name.trim(), whatsapp: whatsapp.trim(), email: email.trim() || null, birth_date: birthDate || null,
@@ -141,10 +141,11 @@ export function ClientProfileDialog({ clientId, open, onOpenChange, onUpdated }:
       updated_at: new Date().toISOString(),
     }).eq("id", clientId);
     setSaving(false);
-    if (result.error) return toast.error("Não foi possível salvar a ficha.", { description: result.error.message });
+    if (result.error) { toast.error("Não foi possível salvar a ficha.", { description: result.error.message }); return undefined; }
     toast.success("Ficha do cliente atualizada.");
     await refresh();
     await onUpdated?.();
+    return undefined;
   };
 
   const uploadFiles = async (files: FileList | null) => {
@@ -155,7 +156,8 @@ export function ClientProfileDialog({ clientId, open, onOpenChange, onUpdated }:
       for (const file of Array.from(files)) {
         if (file.size > 15 * 1024 * 1024) throw new Error(`${file.name}: limite de 15 MB por arquivo.`);
         const path = `${clientId}/${Date.now()}-${crypto.randomUUID()}-${safeName(file.name)}`;
-        const uploaded = await supabase.storage.from("client-records").upload(path, file, { upsert: false, contentType: file.type || undefined });
+        const uploadOptions = file.type ? { upsert: false, contentType: file.type } : { upsert: false };
+        const uploaded = await supabase.storage.from("client-records").upload(path, file, uploadOptions);
         if (uploaded.error) throw uploaded.error;
         const inserted = await db.from("client_documents").insert({
           client_id: clientId, category: documentCategory, file_name: file.name, storage_path: path,
@@ -173,22 +175,25 @@ export function ClientProfileDialog({ clientId, open, onOpenChange, onUpdated }:
     } finally {
       setUploading(false);
     }
+    return undefined;
   };
 
   const openDocument = async (doc: any) => {
     const { data, error } = await supabase.storage.from("client-records").createSignedUrl(doc.storage_path, 300);
-    if (error || !data?.signedUrl) return toast.error("Não foi possível abrir o arquivo.");
+    if (error || !data?.signedUrl) { toast.error("Não foi possível abrir o arquivo."); return undefined; }
     window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+    return undefined;
   };
 
   const removeDocument = async (doc: any) => {
     if (!window.confirm(`Excluir ${doc.file_name} da ficha?`)) return;
     const removed = await supabase.storage.from("client-records").remove([doc.storage_path]);
-    if (removed.error) return toast.error("Não foi possível excluir o arquivo.", { description: removed.error.message });
+    if (removed.error) { toast.error("Não foi possível excluir o arquivo.", { description: removed.error.message }); return undefined; }
     const deleted = await db.from("client_documents").delete().eq("id", doc.id);
-    if (deleted.error) return toast.error("O arquivo foi removido, mas o registro não pôde ser apagado.", { description: deleted.error.message });
+    if (deleted.error) { toast.error("O arquivo foi removido, mas o registro não pôde ser apagado.", { description: deleted.error.message }); return undefined; }
     toast.success("Arquivo removido da ficha.");
     await refresh();
+    return undefined;
   };
 
   const setBudgetService = (index: number, serviceId: string) => {
@@ -197,9 +202,9 @@ export function ClientProfileDialog({ clientId, open, onOpenChange, onUpdated }:
   };
 
   const saveBudget = async () => {
-    if (!clientId) return;
+    if (!clientId) return undefined;
     const validRows = budgetRows.filter((row) => row.serviceId);
-    if (!validRows.length) return toast.error("Adicione pelo menos um serviço ao orçamento.");
+    if (!validRows.length) { toast.error("Adicione pelo menos um serviço ao orçamento."); return undefined; }
     setBudgetSaving(true);
     try {
       const { data: auth } = await supabase.auth.getUser();
@@ -229,20 +234,23 @@ export function ClientProfileDialog({ clientId, open, onOpenChange, onUpdated }:
     } finally {
       setBudgetSaving(false);
     }
+    return undefined;
   };
 
   const updateBudgetStatus = async (id: string, status: string) => {
     const result = await db.from("client_budgets").update({ status, updated_at: new Date().toISOString() }).eq("id", id);
-    if (result.error) return toast.error(result.error.message);
+    if (result.error) { toast.error(result.error.message); return undefined; }
     await refresh();
+    return undefined;
   };
 
   const removeBudget = async (id: string) => {
     if (!window.confirm("Excluir este orçamento da ficha?")) return;
     const result = await db.from("client_budgets").delete().eq("id", id);
-    if (result.error) return toast.error(result.error.message);
+    if (result.error) { toast.error(result.error.message); return undefined; }
     toast.success("Orçamento excluído.");
     await refresh();
+    return undefined;
   };
 
   return (
