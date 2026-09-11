@@ -389,10 +389,20 @@ export function FinanceAttendanceCompletion() {
                 : "Será criada uma conta a receber; a taxa da forma de pagamento será calculada apenas quando o cliente pagar."}
             </span>
           </div>
-          <Button disabled={!selected || busy} onClick={() => void finalize()}>
-            <ReceiptText className="mr-2 size-4" />{" "}
-            {busy ? "Registrando..." : "Registrar pagamento no financeiro"}
-          </Button>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!selected}
+              onClick={() => document.getElementById("finance-split-payment")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+            >
+              Dividir em 2 ou mais formas
+            </Button>
+            <Button disabled={!selected || busy} onClick={() => void finalize()}>
+              <ReceiptText className="mr-2 size-4" />{" "}
+              {busy ? "Registrando..." : "Registrar pagamento no financeiro"}
+            </Button>
+          </div>
         </div>
       </div>
     </section>

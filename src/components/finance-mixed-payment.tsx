@@ -180,16 +180,16 @@ export function FinanceMixedPayment() {
   };
 
   return (
-    <section className="finance-mixed-payment hidden mx-auto w-full max-w-[1540px] px-5 pt-3 sm:px-8 lg:px-10">
+    <section id="finance-split-payment" className="finance-mixed-payment hidden mx-auto w-full max-w-[1540px] scroll-mt-36 px-5 pt-3 sm:px-8 lg:px-10">
       <div className="rounded-3xl border border-border bg-card p-5 shadow-soft sm:p-6">
         <div className="flex items-start gap-3">
           <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-primary-soft text-primary">
             <Split className="size-5" />
           </span>
           <div>
-            <h2 className="text-xl font-bold tracking-tight text-foreground">Finalizar com pagamento misto</h2>
+            <h2 className="text-xl font-bold tracking-tight text-foreground">Pagamento dividido</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Divida o mesmo atendimento entre Pix, dinheiro, cartão ou outras formas. A taxa é calculada apenas sobre cada parte.
+              Use duas ou mais formas no mesmo atendimento — por exemplo, R$ 100 em dinheiro + R$ 50 no Pix. A taxa é calculada apenas sobre cada parte.
             </p>
           </div>
         </div>
