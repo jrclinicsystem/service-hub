@@ -1,0 +1,48 @@
+name: Client combo session finance fix
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/scripts/client_combo_session_finance_fix.py'
+      - '.github/workflows/client-combo-session-finance-fix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Apply client combo session finance fix
+        run: python .github/scripts/client_combo_session_finance_fix.py
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck diagnostics
+        run: bunx tsc --noEmit
+
+      - name: Production build
+        run: bun run build
+
+      - name: Commit source changes
+        run: |
+          if git diff --quiet; then
+            echo "No source changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/client-profile-dialog.tsx src/components/admin-appointments-workspace.tsx src/components/finance-staging-workspace.tsx src/components/finance-attendance-completion.tsx
+          git commit -m "fix: track combo sessions and finance recognition"
+          git push
