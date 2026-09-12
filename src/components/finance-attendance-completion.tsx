@@ -105,7 +105,7 @@ async function loadConfirmedAppointments() {
       if (alreadyRegistered.has(row.id)) return false;
       const sessions = packageSessions(row);
       if (sessions.length > 1) return sessions.every((session: any) => session.status === "completed");
-      return true;
+      return row.status === "confirmado";
     }),
     methods: methods.data ?? [],
     openCash: cash.data?.[0] ?? null,
