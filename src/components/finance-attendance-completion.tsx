@@ -183,7 +183,7 @@ export function FinanceAttendanceCompletion() {
       return;
     }
 
-    if (received === "yes" && !method) {
+    if (received === "yes" && parsedAmount > 0 && !method) {
       toast.error("Selecione a forma de pagamento.");
       return;
     }
@@ -201,7 +201,7 @@ export function FinanceAttendanceCompletion() {
       _appointment_id: selected.id,
       _original_amount: parsedAmount,
       _payment_received: received === "yes",
-      _payment_method_code: received === "yes" ? method : null,
+      _payment_method_code: received === "yes" && parsedAmount > 0 ? method : null,
       _installments: parsedInstallments,
       _discount_type: discountType === "none" ? null : discountType,
       _discount_value: parsedDiscount ?? 0,
@@ -307,6 +307,9 @@ export function FinanceAttendanceCompletion() {
                 onChange={(event) => setAmount(event.target.value)}
                 placeholder="600,00"
               />
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Pode usar 0,00 quando a cliente já tiver pago anteriormente. Nesse caso não é criada uma nova entrada no caixa.
+              </p>
             </div>
             <div>
               <Label>Recebeu agora?</Label>
