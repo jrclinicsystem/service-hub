@@ -601,7 +601,7 @@ export function FinanceCompletionSuite() {
                 <th className="p-3">Comissões</th>
                 <th className="p-3">Clínica</th>
                 <th className="p-3">Despesas</th>
-                <th className="p-3">Resultado financeiro</th>
+                <th className="p-3">{cashFilterActive ? "Saldo atual em dinheiro" : "Resultado financeiro"}</th>
               </tr>
             </thead>
             <tbody>
@@ -615,7 +615,7 @@ export function FinanceCompletionSuite() {
                   <td className="p-3">{money(row.commission_amount)}</td>
                   <td className="p-3">{money(row.clinic_amount)}</td>
                   <td className="p-3">{money(row.expense_amount)}</td>
-                  <td className="p-3 font-semibold">{money(row.result_amount)}</td>
+                  <td className="p-3 font-semibold">{cashFilterActive ? money(cashTotals.open > 0 ? cashTotals.openExpected : cashTotals.cashResult) : money(row.result_amount)}</td>
                 </tr>
               ))}
               {!selectedRows.length ? (
