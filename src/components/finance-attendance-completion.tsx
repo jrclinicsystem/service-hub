@@ -47,6 +47,14 @@ function packageSessions(appointment: any) {
   );
 }
 
+function isPackageAppointment(appointment: any) {
+  const items = comboItems(appointment);
+  if (items.length) {
+    return items.some((item: any) => Number(item?.session_count ?? item?.service?.session_count ?? 1) > 1);
+  }
+  return packageSessions(appointment).length > 1;
+}
+
 function dateLabel(value?: string | null) {
   if (!value) return "—";
   return new Date(`${value}T12:00:00`).toLocaleDateString("pt-BR");
@@ -73,7 +81,7 @@ async function loadConfirmedAppointments() {
     db
       .from("appointments")
       .select(
-        "id,patient_name,scheduled_date,scheduled_time,status,professional_id,professional_name_snapshot,custom_price,service_price_snapshot,service_id,service:services!appointments_service_id_fkey(name,price),appointment_services(service_id,position,price_snapshot,status,completed_at,service:services!appointment_services_service_id_fkey(name,price)),appointment_sessions(id,session_number,scheduled_date,scheduled_time,status,completed_at),professional:professionals(name)",
+        "id,patient_name,scheduled_date,scheduled_time,status,professional_id,professional_name_snapshot,custom_price,service_price_snapshot,service_id,service:services!appointments_service_id_fkey(name,price),appointment_services(service_id,position,price_snapshot,session_count,status,completed_at,service:services!appointment_services_service_id_fkey(name,price,session_count)),appointment_sessions(id,session_number,scheduled_date,scheduled_time,status,completed_at),professional:professionals(name)",
       )
       .in("status", ["confirmado", "atendido"])
       .order("scheduled_date", { ascending: true })
@@ -104,7 +112,7 @@ async function loadConfirmedAppointments() {
     appointments: (appointments.data ?? []).filter((row: any) => {
       if (alreadyRegistered.has(row.id)) return false;
       const sessions = packageSessions(row);
-      if (sessions.length > 1) return sessions.every((session: any) => session.status === "completed");
+      if (isPackageAppointment(row)) return sessions.length > 0 && sessions.every((session: any) => session.status === "completed");
       return row.status === "confirmado";
     }),
     methods: methods.data ?? [],
@@ -223,7 +231,7 @@ export function FinanceAttendanceCompletion() {
       return;
     }
 
-    const hasPendingPackageSessions = selectedSessions.length > 1 && selectedSessions.some((item: any) => item.status !== "completed");
+    const hasPendingPackageSessions = isPackageAppointment(selected) && selectedSessions.some((item: any) => item.status !== "completed");
     if (isZeroAmount) {
       toast.success("Atendimento de R$ 0,00 finalizado.", {
         description: "Nenhuma nova receita, comissão ou movimentação de caixa foi criada.",
@@ -305,7 +313,7 @@ export function FinanceAttendanceCompletion() {
                   )}
                 </p>
                 {selectedItems.length > 1 ? <div className="mt-3 space-y-1.5 border-t border-border/70 pt-3"><span className="text-xs font-semibold">Serviços incluídos</span>{selectedItems.map((item: any) => <div key={item.service_id} className="flex items-center justify-between gap-3 rounded-lg bg-background px-2.5 py-2 text-xs"><span className="min-w-0 truncate">{item.service?.name ?? "Serviço"}</span><strong className="shrink-0">{money(item.price_snapshot ?? item.service?.price)}</strong></div>)}</div> : null}
-                {selectedSessions.length > 1 ? <div className="mt-3 space-y-1.5 border-t border-border/70 pt-3"><div className="flex items-center justify-between gap-2"><span className="text-xs font-semibold">Sessões do pacote</span><Badge variant="outline">{selectedSessions.filter((item: any) => item.status === "completed").length}/{selectedSessions.length} concluídas</Badge></div>{selectedSessions.map((item: any) => <div key={item.id} className="flex items-center justify-between gap-3 rounded-lg bg-background px-2.5 py-2 text-xs"><span>Sessão {item.session_number} · {item.status === "completed" ? "Concluída" : "Pendente"}</span><span className="text-muted-foreground">{item.scheduled_date ? dateLabel(item.scheduled_date) : "Data a definir"}</span></div>)}<p className="text-[11px] font-medium text-primary">O lançamento financeiro é liberado somente após todas as sessões serem concluídas.</p></div> : null}
+                {isPackageAppointment(selected) && selectedSessions.length > 0 ? <div className="mt-3 space-y-1.5 border-t border-border/70 pt-3"><div className="flex items-center justify-between gap-2"><span className="text-xs font-semibold">Sessões do pacote</span><Badge variant="outline">{selectedSessions.filter((item: any) => item.status === "completed").length}/{selectedSessions.length} concluídas</Badge></div>{selectedSessions.map((item: any) => <div key={item.id} className="flex items-center justify-between gap-3 rounded-lg bg-background px-2.5 py-2 text-xs"><span>Sessão {item.session_number} · {item.status === "completed" ? "Concluída" : "Pendente"}</span><span className="text-muted-foreground">{item.scheduled_date ? dateLabel(item.scheduled_date) : "Data a definir"}</span></div>)}<p className="text-[11px] font-medium text-primary">O lançamento financeiro é liberado somente após todas as sessões serem concluídas.</p></div> : null}
               </div>
             ) : null}
           </div>

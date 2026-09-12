@@ -109,8 +109,13 @@ function appointmentServiceLabel(item: any) {
 }
 
 function appointmentComboProgress(item: any) {
+  const services = appointmentServiceItems(item);
   const sessions = appointmentSessionItems(item);
-  if (sessions.length > 1) {
+  const isPackage = services.length
+    ? services.some((entry: any) => Number(entry?.session_count ?? serviceSessionCount(entry?.service)) > 1)
+    : sessions.length > 1;
+
+  if (isPackage) {
     const completed = sessions.filter((entry: any) => entry.status === "completed").length;
     return {
       items: sessions,
@@ -118,19 +123,17 @@ function appointmentComboProgress(item: any) {
       completed,
       isCombo: true,
       started: completed > 0,
-      allCompleted: completed === sessions.length,
+      allCompleted: sessions.length > 0 && completed === sessions.length,
     };
   }
-  const items = appointmentServiceItems(item);
-  const total = items.length;
-  const completed = items.filter((entry: any) => entry.status === "completed").length;
+
   return {
-    items,
-    total,
-    completed,
-    isCombo: total > 1,
-    started: total > 1 && completed > 0,
-    allCompleted: total > 1 && completed === total,
+    items: services,
+    total: services.length,
+    completed: 0,
+    isCombo: false,
+    started: false,
+    allCompleted: false,
   };
 }
 
