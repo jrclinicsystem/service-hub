@@ -640,21 +640,15 @@ export function FinanceCompletionSuite() {
                   Resultado financeiro e dinheiro físico em caixa são informações diferentes. O fundo inicial não entra no faturamento; para saber quanto deve existir fisicamente, consulte <strong>Caixa esperado agora</strong>.
                 </p>
               </div>
-              {cashFilterActive && reconciliationGap != null ? (
-                <Badge variant={Math.abs(reconciliationGap) <= 0.01 ? "default" : "outline"}>
-                  {Math.abs(reconciliationGap) <= 0.01 ? "Relatório e caixa conciliados" : `Diferença relatório × caixa: ${money(reconciliationGap)}`}
-                </Badge>
-              ) : (
-                <Badge variant="secondary">{cashTotals.sessions} caixa(s) no período</Badge>
-              )}
+              <Badge variant="secondary">{cashTotals.sessions} caixa(s) no período</Badge>
             </div>
 
             <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
               {cashFilterActive ? (
-                <div className="rounded-xl border border-border bg-card p-3">
-                  <span className="text-[11px] text-muted-foreground">Resultado financeiro · Dinheiro</span>
-                  <strong className="mt-1 block">{money(reportCashResult)}</strong>
-                  <p className="mt-1 text-[10px] text-muted-foreground">Não inclui o fundo de abertura.</p>
+                <div className="rounded-xl border border-primary/25 bg-primary/[0.06] p-3">
+                  <span className="text-[11px] font-medium text-foreground">Saldo atual em dinheiro</span>
+                  <strong className="mt-1 block text-lg">{money(cashTotals.open > 0 ? cashTotals.openExpected : cashTotals.cashResult)}</strong>
+                  <p className="mt-1 text-[10px] text-muted-foreground">Inclui o fundo de abertura + entradas em dinheiro − saídas em dinheiro.</p>
                 </div>
               ) : null}
               {cashTotals.open > 0 ? (
@@ -682,11 +676,7 @@ export function FinanceCompletionSuite() {
               </div>
             </div>
 
-            {cashFilterActive && reconciliationGap != null && Math.abs(reconciliationGap) > 0.01 ? (
-              <p className="mt-3 rounded-lg border border-border bg-muted/35 px-3 py-2 text-[11px] text-muted-foreground">
-                A diferença acima compara o <strong>relatório financeiro</strong> com os <strong>movimentos físicos de caixa</strong> do período. Ela não significa, sozinha, que está faltando dinheiro no caixa atual. Para o valor físico de hoje, use <strong>Caixa esperado agora</strong>.
-              </p>
-            ) : !cashFilterActive && method === "" ? (
+            {!cashFilterActive && method === "" ? (
               <p className="mt-3 text-[11px] text-muted-foreground">
                 Para analisar apenas dinheiro, selecione <strong>Dinheiro</strong> em Forma de pagamento. O saldo físico do caixa continua sendo mostrado separadamente em <strong>Caixa esperado agora</strong>.
               </p>
