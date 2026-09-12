@@ -304,7 +304,7 @@ export function AdminAppointmentsWorkspace({ appointments, onStatusChange, onRef
       toast.error("Não foi possível confirmar o atendimento.", { description: error.message });
       return false;
     }
-    toast.success("Atendimento concluído.", { description: "O valor agora foi contabilizado na receita." });
+    toast.success("Atendimento concluído.", { description: "Serviço de R$ 0,00 finalizado sem gerar nova receita ou movimentação de caixa." });
     setSelected((current: any) => current?.id === appointment.id ? { ...current, status: "atendido" } : current);
     setScope("history");
     onRefresh();

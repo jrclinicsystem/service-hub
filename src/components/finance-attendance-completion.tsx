@@ -166,6 +166,7 @@ export function FinanceAttendanceCompletion() {
     const parsedDiscount = discountType === "none" ? 0 : parseMoney(discountValue);
     const parsedCommission = parseMoney(manualCommission);
     const parsedInstallments = Number(installments);
+    const isZeroAmount = parsedAmount === 0;
     if (parsedAmount === null || parsedAmount < 0) {
       toast.error("Informe um valor válido para o procedimento.");
       return;
@@ -187,8 +188,12 @@ export function FinanceAttendanceCompletion() {
       toast.error("Selecione a forma de pagamento.");
       return;
     }
-    if (received === "no" && !dueDate) {
+    if (!isZeroAmount && received === "no" && !dueDate) {
       toast.error("Informe o vencimento do valor a receber.");
+      return;
+    }
+    if (isZeroAmount && parsedCommission !== null && parsedCommission !== 0) {
+      toast.error("Atendimento de R$ 0,00 não pode gerar comissão manual.");
       return;
     }
     if (parsedCommission !== null && !manualReason.trim()) {
@@ -200,14 +205,14 @@ export function FinanceAttendanceCompletion() {
     const result = await db.rpc("complete_appointment_financially", {
       _appointment_id: selected.id,
       _original_amount: parsedAmount,
-      _payment_received: received === "yes",
-      _payment_method_code: received === "yes" && parsedAmount > 0 ? method : null,
+      _payment_received: isZeroAmount ? true : received === "yes",
+      _payment_method_code: !isZeroAmount && received === "yes" && parsedAmount > 0 ? method : null,
       _installments: parsedInstallments,
       _discount_type: discountType === "none" ? null : discountType,
       _discount_value: parsedDiscount ?? 0,
-      _receivable_due_date: received === "no" ? dueDate : null,
-      _manual_commission_amount: parsedCommission,
-      _manual_commission_reason: parsedCommission === null ? null : manualReason.trim(),
+      _receivable_due_date: !isZeroAmount && received === "no" ? dueDate : null,
+      _manual_commission_amount: isZeroAmount ? null : parsedCommission,
+      _manual_commission_reason: isZeroAmount || parsedCommission === null ? null : manualReason.trim(),
     });
     setBusy(false);
 
@@ -219,9 +224,15 @@ export function FinanceAttendanceCompletion() {
     }
 
     const hasPendingPackageSessions = selectedSessions.length > 1 && selectedSessions.some((item: any) => item.status !== "completed");
-    toast.success(hasPendingPackageSessions ? "Pagamento do pacote registrado." : "Atendimento finalizado e enviado ao financeiro.", {
-      description: hasPendingPackageSessions ? "As sessões pendentes continuam em andamento na Agenda." : undefined,
-    });
+    if (isZeroAmount) {
+      toast.success("Atendimento de R$ 0,00 finalizado.", {
+        description: "Nenhuma nova receita, comissão ou movimentação de caixa foi criada.",
+      });
+    } else {
+      toast.success(hasPendingPackageSessions ? "Pagamento do pacote registrado." : "Atendimento finalizado e enviado ao financeiro.", {
+        description: hasPendingPackageSessions ? "As sessões pendentes continuam em andamento na Agenda." : undefined,
+      });
+    }
     setSelectedId("");
     setDiscountType("none");
     setDiscountValue("");
@@ -407,11 +418,13 @@ export function FinanceAttendanceCompletion() {
               <Clock3 className="size-4" />
             )}
             <span>
-              {received === "yes"
-                ? data.data?.openCash
-                  ? "O recebimento será lançado no caixa aberto e no financeiro."
-                  : "Abra o caixa antes de concluir um atendimento já recebido."
-                : "Será criada uma conta a receber; a taxa da forma de pagamento será calculada apenas quando o cliente pagar."}
+              {parseMoney(amount) === 0
+                ? "R$ 0,00 será finalizado sem gerar nova receita, comissão ou movimentação de caixa — mesmo com o caixa fechado."
+                : received === "yes"
+                  ? data.data?.openCash
+                    ? "O recebimento será lançado no caixa aberto e no financeiro."
+                    : "Abra o caixa antes de concluir um atendimento já recebido."
+                  : "Será criada uma conta a receber; a taxa da forma de pagamento será calculada apenas quando o cliente pagar."}
             </span>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
@@ -431,7 +444,7 @@ export function FinanceAttendanceCompletion() {
             </Button>
             <Button disabled={!selected || busy} onClick={() => void finalize()}>
               <ReceiptText className="mr-2 size-4" />{" "}
-              {busy ? "Registrando..." : "Registrar pagamento no financeiro"}
+              {busy ? "Registrando..." : parseMoney(amount) === 0 ? "Finalizar atendimento R$ 0,00" : "Registrar pagamento no financeiro"}
             </Button>
           </div>
         </div>
