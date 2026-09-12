@@ -411,6 +411,9 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated, editing = null
   const [professionals, setProfessionals] = useState<any[]>([]);
   const [links, setLinks] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
+  const [comboSessions, setComboSessions] = useState<any[]>([]);
+  const [comboSessionsLoading, setComboSessionsLoading] = useState(false);
+  const [selectedComboLinks, setSelectedComboLinks] = useState<string[]>([]);
   const [bookingSlots, setBookingSlots] = useState<any[]>([]);
   const [bookingSlotsLoading, setBookingSlotsLoading] = useState(false);
   const [bookingSlotsRefreshKey, setBookingSlotsRefreshKey] = useState(0);
@@ -445,6 +448,34 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated, editing = null
     });
     return () => { active = false; };
   }, [open]);
+
+  useEffect(() => {
+    if (!open || !selectedClientId) {
+      setComboSessions([]);
+      if (!editing) setSelectedComboLinks([]);
+      return;
+    }
+    let active = true;
+    setComboSessionsLoading(true);
+    void db.rpc("get_client_open_combo_sessions", {
+      _client_id: selectedClientId,
+      _appointment_id: editing?.id ?? null,
+    }).then((result: any) => {
+      if (!active) return;
+      if (result.error) {
+        toast.error("Não foi possível carregar os combos deste cliente.", { description: result.error.message });
+        setComboSessions([]);
+      } else {
+        const rows = Array.isArray(result.data) ? result.data : [];
+        setComboSessions(rows);
+        if (editing) {
+          setSelectedComboLinks(rows.filter((row: any) => row.linked_to_appointment).map((row: any) => `${row.budget_item_id}:${row.session_number}`));
+        }
+      }
+      setComboSessionsLoading(false);
+    });
+    return () => { active = false; };
+  }, [open, selectedClientId, editing?.id]);
 
   useEffect(() => {
     if (!open || !editing) return;
@@ -540,6 +571,14 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated, editing = null
   }, [services, serviceSearch]);
 
   const toggleService = (id: string) => {
+    const requiredByCombo = selectedComboLinks.some((key) => {
+      const row = comboSessions.find((item: any) => `${item.budget_item_id}:${item.session_number}` === key);
+      return row?.service_id === id;
+    });
+    if (serviceIds.includes(id) && requiredByCombo) {
+      toast.error("Esse serviço está vinculado a uma sessão de combo selecionada. Desmarque a sessão do combo primeiro.");
+      return;
+    }
     setProfessionalId("");
     setServiceIds((current) => {
       const next = current.includes(id) ? current.filter((item) => item !== id) : [...current, id];
@@ -561,6 +600,8 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated, editing = null
 
 
   const selectSavedClient = (clientId: string) => {
+    setSelectedComboLinks([]);
+    setComboSessions([]);
     setSelectedClientId(clientId);
     const client = clients.find((item) => item.id === clientId);
     if (!client) return;
@@ -570,13 +611,35 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated, editing = null
   };
 
   const clearSavedClient = () => {
+    setSelectedComboLinks([]);
+    setComboSessions([]);
     setSelectedClientId("");
     setPatientName("");
     setPatientPhone("");
     setPatientEmail("");
   };
 
-  const reset = () => { setSelectedClientId(""); setPatientName(""); setPatientEmail(""); setPatientPhone(""); setServiceIds([]); setServiceSearch(""); setAppointmentValue(""); setProfessionalId(""); setScheduledDate(todayIso()); setScheduledTime(""); setSessionCounts({}); setNotes(""); };
+  const toggleComboSession = (row: any) => {
+    const key = `${row.budget_item_id}:${row.session_number}`;
+    setSelectedComboLinks((current) => {
+      const exists = current.includes(key);
+      const next = exists
+        ? current.filter((item) => item !== key)
+        : [...current.filter((item) => !item.startsWith(`${row.budget_item_id}:`)), key];
+      const linkedRows = next.map((item) => comboSessions.find((candidate: any) => `${candidate.budget_item_id}:${candidate.session_number}` === item)).filter(Boolean);
+      const linkedServiceIds = [...new Set(linkedRows.map((item: any) => item.service_id).filter(Boolean))] as string[];
+      if (linkedServiceIds.length) {
+        setServiceIds((currentServices) => [...new Set([...currentServices, ...linkedServiceIds])]);
+        setSessionCounts((currentCounts) => Object.fromEntries([...new Set([...Object.keys(currentCounts), ...linkedServiceIds])].map((serviceId) => [serviceId, "1"])));
+      }
+      if (linkedRows.length > 0 && linkedRows.every((item: any) => item.budget_paid)) {
+        setAppointmentValue("0.00");
+      }
+      return next;
+    });
+  };
+
+  const reset = () => { setSelectedClientId(""); setSelectedComboLinks([]); setComboSessions([]); setPatientName(""); setPatientEmail(""); setPatientPhone(""); setServiceIds([]); setServiceSearch(""); setAppointmentValue(""); setProfessionalId(""); setScheduledDate(todayIso()); setScheduledTime(""); setSessionCounts({}); setNotes(""); };
   const handleOpenChange = (next: boolean) => { if (!next && !saving) reset(); onOpenChange(next); };
 
   const saveAppointment = async () => {
@@ -589,12 +652,9 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated, editing = null
     if (invalidLink) { toast.error("Esse profissional não atende todos os serviços selecionados."); return; }
     const parsedValue = Number(appointmentValue.replace(",", "."));
     if (!Number.isFinite(parsedValue) || parsedValue < 0) { toast.error("Informe um valor válido para o atendimento."); return; }
-    const serviceCountsPayload = Object.fromEntries(serviceIds.map((serviceId) => {
-      const service = services.find((item) => item.id === serviceId);
-      const parsed = Number(sessionCounts[serviceId] ?? serviceSessionCount(service));
-      return [serviceId, parsed];
-    }));
-    if (Object.values(serviceCountsPayload).some((value: any) => !Number.isInteger(value) || value < 1 || value > 50)) { toast.error("Informe entre 1 e 50 sessões para cada serviço."); return; }
+    // Cada agendamento representa uma única visita. A quantidade total de
+    // sessões pertence ao combo salvo na ficha do cliente, não ao agendamento.
+    const serviceCountsPayload = Object.fromEntries(serviceIds.map((serviceId) => [serviceId, 1]));
     const total = Math.round((parsedValue + Number.EPSILON) * 100) / 100;
     setSaving(true);
     let error: any = null;
@@ -642,6 +702,17 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated, editing = null
       });
       error = configured.error;
     }
+    if (!error && appointmentId && selectedClientId) {
+      const linksPayload = selectedComboLinks.map((key) => {
+        const [budgetItemId, sessionNumber] = key.split(":");
+        return { budget_item_id: budgetItemId, session_number: Number(sessionNumber) };
+      });
+      const linked = await db.rpc("set_appointment_budget_sessions", {
+        _appointment_id: appointmentId,
+        _links: linksPayload,
+      });
+      error = linked.error;
+    }
     setSaving(false);
     if (error) { toast.error(error.message); return; }
     setBookingSlotsRefreshKey((current) => current + 1);
@@ -660,6 +731,10 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated, editing = null
         <SelectContent>{clients.map((client) => <SelectItem key={client.id} value={client.id}>{client.name} · {client.whatsapp}</SelectItem>)}</SelectContent>
       </Select>
       <p className="text-[11px] text-muted-foreground">Ao selecionar, nome, WhatsApp e e-mail são preenchidos automaticamente.</p>
+      {selectedClientId ? <div className="mt-3 rounded-2xl border border-primary/15 bg-primary/[0.04] p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-xs font-semibold">Usar sessão de combo (opcional)</p><p className="mt-0.5 text-[11px] text-muted-foreground">Selecione a sessão que esta visita vai consumir. Se o combo já estiver pago, o atendimento fica automaticamente em R$ 0,00.</p></div>{comboSessionsLoading ? <span className="text-[11px] text-muted-foreground">Carregando...</span> : null}</div>
+        {!comboSessionsLoading && comboSessions.length === 0 ? <p className="mt-3 rounded-xl border border-dashed p-3 text-center text-[11px] text-muted-foreground">Nenhuma sessão de combo disponível para este cliente.</p> : <div className="mt-3 grid gap-2 sm:grid-cols-2">{comboSessions.map((row: any) => { const key = `${row.budget_item_id}:${row.session_number}`; const checked = selectedComboLinks.includes(key); return <button key={key} type="button" onClick={() => toggleComboSession(row)} className={`rounded-xl border p-3 text-left transition ${checked ? "border-primary bg-primary/10" : "border-border bg-background hover:bg-secondary/40"}`}><div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="truncate text-xs font-semibold">{row.service_name}</p><p className="mt-1 text-[11px] text-muted-foreground">{row.budget_title} · Sessão {row.session_number} de {row.total_sessions}</p></div><Badge variant={row.budget_paid ? "default" : "secondary"} className="shrink-0">{row.budget_paid ? "Pago" : "Não pago"}</Badge></div></button>; })}</div>}
+      </div> : null}
     </div>
     <div className="space-y-1.5 sm:col-span-2"><Label htmlFor="admin-patient-name">Nome do cliente *</Label><Input id="admin-patient-name" value={patientName} onChange={(e) => setPatientName(e.target.value)} disabled={saving} /></div>
     <div className="space-y-1.5"><Label htmlFor="admin-patient-phone">WhatsApp</Label><Input id="admin-patient-phone" inputMode="tel" value={patientPhone} onChange={(e) => setPatientPhone(e.target.value)} placeholder="(85) 99999-9999" disabled={saving} /></div>
@@ -680,7 +755,7 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated, editing = null
       <p className="text-[11px] text-muted-foreground">Você pode marcar vários procedimentos no mesmo agendamento. O profissional precisa atender todos os serviços escolhidos.</p>
     </div>
     <div className="space-y-1.5 sm:col-span-2"><Label htmlFor="admin-appointment-value">Valor total do atendimento *</Label><Input id="admin-appointment-value" type="number" min="0" step="0.01" inputMode="decimal" value={appointmentValue} onChange={(e) => setAppointmentValue(e.target.value)} disabled={saving || !serviceIds.length} /><p className="text-[11px] text-muted-foreground">A soma dos serviços é preenchida automaticamente. Altere aqui para aplicar desconto ou valor combinado sem mudar o catálogo.</p></div>
-    <div className="space-y-2 sm:col-span-2"><Label>Sessões por serviço *</Label><div className="grid gap-2 sm:grid-cols-2">{selectedServices.map((service: any) => <div key={service.id} className="rounded-xl border border-border bg-card p-3"><p className="truncate text-xs font-semibold">{service.name}</p><div className="mt-2 flex items-center gap-2"><Input type="number" min="1" max="50" step="1" inputMode="numeric" value={sessionCounts[service.id] ?? String(serviceSessionCount(service))} onChange={(e) => setSessionCounts((current) => ({ ...current, [service.id]: e.target.value }))} disabled={saving} /><span className="shrink-0 text-[11px] text-muted-foreground">sessão(ões)</span></div></div>)}</div><p className="text-[11px] text-muted-foreground">Cada serviço controla suas próprias sessões. Ex.: dois combos de 3 sessões geram 6 sessões independentes, 3 para cada combo.</p></div>
+    <div className="sm:col-span-2 rounded-xl border border-primary/10 bg-primary/[0.035] p-3 text-[11px] text-muted-foreground"><strong className="text-foreground">Cada agendamento representa uma visita.</strong> A quantidade total e o progresso das sessões ficam em <strong>Clientes → Orçamentos e combos</strong>. Para cliente com pacote já pago, selecione acima a sessão correspondente e o valor desta visita ficará em R$ 0,00.</div>
     <div className="space-y-1.5 sm:col-span-2"><Label>Profissional *</Label><Select value={professionalId} onValueChange={setProfessionalId} disabled={saving || !serviceIds.length || availableProfessionals.length === 0}><SelectTrigger><SelectValue placeholder={!serviceIds.length ? "Escolha primeiro os serviços" : availableProfessionals.length ? "Selecione o profissional" : "Nenhum profissional atende todos os serviços"} /></SelectTrigger><SelectContent>{availableProfessionals.map((professional) => <SelectItem key={professional.id} value={professional.id}>{professional.name}{professional.specialty ? ` · ${professional.specialty}` : ""}</SelectItem>)}</SelectContent></Select></div>
     <div className="space-y-1.5"><Label htmlFor="admin-scheduled-date">Data *</Label><Input id="admin-scheduled-date" type="date" min={todayIso()} value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} disabled={saving} /></div>
     <div className="space-y-1.5"><Label>Horário *</Label><Select value={scheduledTime} onValueChange={setScheduledTime} disabled={saving || loadingCatalog || bookingSlotsLoading || !professionalId || !scheduledDate}><SelectTrigger><SelectValue placeholder={bookingSlotsLoading ? "Carregando horários..." : bookingSlots.length ? "Selecione o horário" : "Sem horários disponíveis"} /></SelectTrigger><SelectContent>{bookingSlots.map((slot) => <SelectItem key={`${slot.slot}-${slot.source ?? "slot"}`} value={slot.slot}>{slot.slot}</SelectItem>)}</SelectContent></Select></div>
