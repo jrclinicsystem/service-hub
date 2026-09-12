@@ -35,11 +35,11 @@ jobs:
           old = '''    if (!Number.isFinite(value) || value < 0) {
                 toast.error("Informe um valor igual ou maior que zero.");
                 return;
-              }'''
+              }'''.replace('                toast', '      toast').replace('                return', '      return').replace('              }', '    }')
           new = '''    if (!amount.trim() || !Number.isFinite(value) || value < 0) {
                 toast.error("Informe um valor igual ou maior que zero.");
                 return;
-              }'''
+              }'''.replace('                toast', '      toast').replace('                return', '      return').replace('              }', '    }')
           if new not in text:
               if old not in text:
                   raise SystemExit('explicit zero guard anchor not found')
