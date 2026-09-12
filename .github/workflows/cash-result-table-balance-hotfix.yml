@@ -1,0 +1,48 @@
+name: Cash result table balance hotfix
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/scripts/cash_result_table_balance_patch.py'
+      - '.github/workflows/cash-result-table-balance-hotfix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Apply cash result table balance patch
+        run: python .github/scripts/cash_result_table_balance_patch.py
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck diagnostics
+        run: bunx tsc --noEmit
+
+      - name: Production build
+        run: bun run build
+
+      - name: Commit source changes
+        run: |
+          if git diff --quiet; then
+            echo "No source changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/finance-completion-suite.tsx
+          git commit -m "fix: match cash result table with current balance"
+          git push
