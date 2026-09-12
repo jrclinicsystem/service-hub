@@ -248,7 +248,7 @@ function exportReport(rows: any[], title: string, from: string, to: string) {
         `<tr><td>${escapeHtml(row.label)}</td><td>${escapeHtml(row.quantity)}</td><td>${escapeHtml(row.gross_amount)}</td><td>${escapeHtml(row.fee_amount)}</td><td>${escapeHtml(row.net_amount)}</td><td>${escapeHtml(row.commission_amount)}</td><td>${escapeHtml(row.clinic_amount)}</td><td>${escapeHtml(row.expense_amount)}</td><td>${escapeHtml(row.result_amount)}</td></tr>`,
     )
     .join("");
-  const html = `<!doctype html><html><meta charset="utf-8"><body><h2>JR Clinic - ${escapeHtml(title)}</h2><p>${escapeHtml(from)} a ${escapeHtml(to)}</p><table border="1"><tr><th>Grupo</th><th>Qtd.</th><th>Faturamento</th><th>Taxas</th><th>Líquido</th><th>Comissões</th><th>Clínica</th><th>Despesas</th><th>Resultado</th></tr>${tableRows}</table></body></html>`;
+  const html = `<!doctype html><html><meta charset="utf-8"><body><h2>JR Clinic - ${escapeHtml(title)}</h2><p>${escapeHtml(from)} a ${escapeHtml(to)}</p><table border="1"><tr><th>Grupo</th><th>Qtd.</th><th>Faturamento</th><th>Taxas</th><th>Líquido</th><th>Comissões</th><th>Clínica</th><th>Despesas</th><th>Resultado financeiro</th></tr>${tableRows}</table></body></html>`;
   const blob = new Blob(["\ufeff", html], { type: "application/vnd.ms-excel;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
@@ -267,7 +267,7 @@ function printReport(rows: any[], title: string, from: string, to: string) {
     .join("");
   printHtml(
     title,
-    `<h1>JR Clinic — ${escapeHtml(title)}</h1><p>Período: ${formatDate(from)} a ${formatDate(to)}</p><table><tr><th>Grupo</th><th>Qtd.</th><th>Faturamento</th><th>Taxas</th><th>Líquido</th><th>Comissões</th><th>Clínica</th><th>Despesas</th><th>Resultado</th></tr>${tableRows}</table>`,
+    `<h1>JR Clinic — ${escapeHtml(title)}</h1><p>Período: ${formatDate(from)} a ${formatDate(to)}</p><table><tr><th>Grupo</th><th>Qtd.</th><th>Faturamento</th><th>Taxas</th><th>Líquido</th><th>Comissões</th><th>Clínica</th><th>Despesas</th><th>Resultado financeiro</th></tr>${tableRows}</table>`,
   );
 }
 
@@ -362,13 +362,16 @@ export function FinanceCompletionSuite() {
   const cashTotals = useMemo(() => {
     const rows = cashRange.data ?? [];
     const closed = rows.filter((row: any) => row.status === "closed");
+    const open = rows.filter((row: any) => row.status === "open");
     return {
       sessions: rows.length,
       cashIn: rows.reduce((sum: number, row: any) => sum + Number(row.total_cash ?? 0), 0),
       cashOut: rows.reduce((sum: number, row: any) => sum + Number(row.total_cash_expenses ?? 0), 0),
       cashResult: rows.reduce((sum: number, row: any) => sum + Number(row.cash_result ?? (Number(row.total_cash ?? 0) - Number(row.total_cash_expenses ?? 0))), 0),
       difference: closed.reduce((sum: number, row: any) => sum + Number(row.difference_amount ?? 0), 0),
+      openExpected: open.reduce((sum: number, row: any) => sum + Number(row.expected_cash ?? 0), 0),
       closed: closed.length,
+      open: open.length,
     };
   }, [cashRange.data]);
   const reportCashResult = cashFilterActive
@@ -598,7 +601,7 @@ export function FinanceCompletionSuite() {
                 <th className="p-3">Comissões</th>
                 <th className="p-3">Clínica</th>
                 <th className="p-3">Despesas</th>
-                <th className="p-3">Resultado</th>
+                <th className="p-3">Resultado financeiro</th>
               </tr>
             </thead>
             <tbody>
@@ -633,24 +636,32 @@ export function FinanceCompletionSuite() {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h4 className="font-semibold text-foreground">Conciliação com abertura e fechamento de caixa</h4>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  O fundo inicial não entra no faturamento. O caixa esperado é calculado por dia como fundo inicial + entradas em dinheiro − saídas em dinheiro.
+                <p className="mt-1 max-w-3xl text-xs text-muted-foreground">
+                  Resultado financeiro e dinheiro físico em caixa são informações diferentes. O fundo inicial não entra no faturamento; para saber quanto deve existir fisicamente, consulte <strong>Caixa esperado agora</strong>.
                 </p>
               </div>
               {cashFilterActive && reconciliationGap != null ? (
-                <Badge variant={Math.abs(reconciliationGap) <= 0.01 ? "default" : "destructive"}>
-                  {Math.abs(reconciliationGap) <= 0.01 ? "Relatório e caixa conciliados" : `Divergência ${money(reconciliationGap)}`}
+                <Badge variant={Math.abs(reconciliationGap) <= 0.01 ? "default" : "outline"}>
+                  {Math.abs(reconciliationGap) <= 0.01 ? "Relatório e caixa conciliados" : `Diferença relatório × caixa: ${money(reconciliationGap)}`}
                 </Badge>
               ) : (
                 <Badge variant="secondary">{cashTotals.sessions} caixa(s) no período</Badge>
               )}
             </div>
 
-            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
               {cashFilterActive ? (
                 <div className="rounded-xl border border-border bg-card p-3">
-                  <span className="text-[11px] text-muted-foreground">Resultado do relatório · Dinheiro</span>
+                  <span className="text-[11px] text-muted-foreground">Resultado financeiro · Dinheiro</span>
                   <strong className="mt-1 block">{money(reportCashResult)}</strong>
+                  <p className="mt-1 text-[10px] text-muted-foreground">Não inclui o fundo de abertura.</p>
+                </div>
+              ) : null}
+              {cashTotals.open > 0 ? (
+                <div className="rounded-xl border border-primary/25 bg-primary/[0.06] p-3">
+                  <span className="text-[11px] font-medium text-foreground">Caixa esperado agora</span>
+                  <strong className="mt-1 block text-lg">{money(cashTotals.openExpected)}</strong>
+                  <p className="mt-1 text-[10px] text-muted-foreground">Inclui fundo inicial + entradas em dinheiro − saídas em dinheiro.</p>
                 </div>
               ) : null}
               <div className="rounded-xl border border-border bg-card p-3">
@@ -662,18 +673,22 @@ export function FinanceCompletionSuite() {
                 <strong className="mt-1 block">{money(cashTotals.cashOut)}</strong>
               </div>
               <div className="rounded-xl border border-border bg-card p-3">
-                <span className="text-[11px] text-muted-foreground">Movimento líquido no caixa</span>
+                <span className="text-[11px] text-muted-foreground">Movimento do caixa (sem abertura)</span>
                 <strong className="mt-1 block">{money(cashTotals.cashResult)}</strong>
               </div>
               <div className="rounded-xl border border-border bg-card p-3">
-                <span className="text-[11px] text-muted-foreground">Sobra / falta nos fechamentos</span>
+                <span className="text-[11px] text-muted-foreground">Sobra / falta em caixas já fechados</span>
                 <strong className={`mt-1 block ${Math.abs(cashTotals.difference) > 0.01 ? "text-destructive" : ""}`}>{money(cashTotals.difference)}</strong>
               </div>
             </div>
 
-            {!cashFilterActive && method === "" ? (
+            {cashFilterActive && reconciliationGap != null && Math.abs(reconciliationGap) > 0.01 ? (
+              <p className="mt-3 rounded-lg border border-border bg-muted/35 px-3 py-2 text-[11px] text-muted-foreground">
+                A diferença acima compara o <strong>relatório financeiro</strong> com os <strong>movimentos físicos de caixa</strong> do período. Ela não significa, sozinha, que está faltando dinheiro no caixa atual. Para o valor físico de hoje, use <strong>Caixa esperado agora</strong>.
+              </p>
+            ) : !cashFilterActive && method === "" ? (
               <p className="mt-3 text-[11px] text-muted-foreground">
-                Para comparar diretamente com a coluna Resultado acima, selecione <strong>Dinheiro</strong> em Forma de pagamento.
+                Para analisar apenas dinheiro, selecione <strong>Dinheiro</strong> em Forma de pagamento. O saldo físico do caixa continua sendo mostrado separadamente em <strong>Caixa esperado agora</strong>.
               </p>
             ) : null}
 
@@ -686,22 +701,22 @@ export function FinanceCompletionSuite() {
                     <th className="p-2.5">Abertura</th>
                     <th className="p-2.5">Entradas dinheiro</th>
                     <th className="p-2.5">Saídas dinheiro</th>
-                    <th className="p-2.5">Resultado dinheiro</th>
-                    <th className="p-2.5">Esperado no caixa</th>
+                    <th className="p-2.5">Movimento em dinheiro</th>
+                    <th className="p-2.5">Esperado no caixa (com abertura)</th>
                     <th className="p-2.5">Contado</th>
                     <th className="p-2.5">Sobra / falta</th>
                   </tr>
                 </thead>
                 <tbody>
                   {cashRows.map((row: any) => (
-                    <tr key={row.cash_session_id ?? row.id} className="border-t border-border">
+                    <tr key={row.cash_session_id ?? row.id} className={`border-t border-border ${row.status === "open" ? "bg-primary/[0.035]" : ""}`}>
                       <td className="p-2.5 font-medium">{formatDate(row.business_date)}</td>
                       <td className="p-2.5"><Badge variant={row.status === "closed" ? "default" : "secondary"}>{row.status === "closed" ? "Fechado" : "Aberto"}</Badge></td>
                       <td className="p-2.5">{money(row.opening_cash)}</td>
                       <td className="p-2.5">{money(row.total_cash)}</td>
                       <td className="p-2.5">{money(row.total_cash_expenses)}</td>
                       <td className="p-2.5 font-medium">{money(row.cash_result)}</td>
-                      <td className="p-2.5">{money(row.expected_cash)}</td>
+                      <td className={`p-2.5 ${row.status === "open" ? "font-semibold" : ""}`}>{money(row.expected_cash)}</td>
                       <td className="p-2.5">{row.counted_cash == null ? "—" : money(row.counted_cash)}</td>
                       <td className={`p-2.5 font-medium ${row.difference_amount != null && Math.abs(Number(row.difference_amount)) > 0.01 ? "text-destructive" : ""}`}>
                         {row.difference_amount == null ? "—" : money(row.difference_amount)}
@@ -808,11 +823,11 @@ export function FinanceCompletionSuite() {
                   <strong className="mt-1 block">{money(cash.data.total_received)}</strong>
                 </div>
                 <div className="rounded-xl bg-muted/50 p-3">
-                  <span className="text-xs text-muted-foreground">Esperado espécie</span>
+                  <span className="text-xs text-muted-foreground">Esperado no caixa (com abertura)</span>
                   <strong className="mt-1 block">{money(cash.data.expected_cash)}</strong>
                 </div>
                 <div className="rounded-xl bg-muted/50 p-3">
-                  <span className="text-xs text-muted-foreground">Diferença</span>
+                  <span className="text-xs text-muted-foreground">Sobra / falta após contagem</span>
                   <strong className="mt-1 block">{money(cash.data.difference_amount)}</strong>
                 </div>
               </div>
