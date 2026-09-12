@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarDays, FileText, FolderOpen, Image, Loader2, Paperclip, Plus, ReceiptText, Save, Trash2, Upload, UserRound } from "lucide-react";
+import { CalendarDays, FileText, FolderOpen, Image, Loader2, Paperclip, Pencil, Plus, ReceiptText, Save, Stethoscope, Trash2, Upload, UserRound } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -23,6 +23,8 @@ const dateLabel = (value?: string | null) => value ? new Date(`${value}T12:00:00
 const fileSize = (value?: number | null) => !value ? "" : value < 1024 * 1024 ? `${Math.max(1, Math.round(value / 1024))} KB` : `${(value / 1024 / 1024).toFixed(1).replace(".", ",")} MB`;
 const digits = (value?: string | null) => String(value ?? "").replace(/\D/g, "");
 const serviceSessionCount = (service: any) => {
+  const explicit = Number(service?.session_count ?? 0);
+  if (Number.isInteger(explicit) && explicit >= 1) return Math.min(50, explicit);
   const metadata = [
     service?.name,
     service?.summary,
@@ -67,14 +69,14 @@ async function loadClientWorkspace(clientId: string) {
   if (clientResult.error) throw clientResult.error;
   const client = clientResult.data;
 
-  const appointmentSelect = "id,client_id,patient_name,patient_phone,patient_email,notes,scheduled_date,scheduled_time,status,custom_price,service_price_snapshot,created_at,service:services!appointments_service_id_fkey(name,price),professional:professionals(name),appointment_sessions(id,session_number,scheduled_date,scheduled_time,status,completed_at),appointment_services(service_id,position,price_snapshot,status,service:services!appointment_services_service_id_fkey(name,price))";
+  const appointmentSelect = "id,client_id,patient_name,patient_phone,patient_email,notes,scheduled_date,scheduled_time,status,custom_price,service_price_snapshot,created_at,service:services!appointments_service_id_fkey(name,price,session_count),professional:professionals(name),appointment_sessions(id,service_id,service_name_snapshot,service_position,session_number,scheduled_date,scheduled_time,status,completed_at),appointment_services(service_id,position,price_snapshot,session_count,status,service:services!appointment_services_service_id_fkey(name,price,session_count))";
 
   const [directAppointments, legacyAppointments, documents, budgets, services] = await Promise.all([
     db.from("appointments").select(appointmentSelect).eq("client_id", clientId).order("scheduled_date", { ascending: false }).limit(100),
     db.from("appointments").select(appointmentSelect).ilike("patient_name", client.name).order("scheduled_date", { ascending: false }).limit(100),
     db.from("client_documents").select("id,client_id,category,file_name,storage_path,mime_type,size_bytes,notes,created_at").eq("client_id", clientId).order("created_at", { ascending: false }),
     db.from("client_budgets").select("id,client_id,title,notes,status,total_amount,valid_until,created_at,updated_at,client_budget_items(id,service_id,service_name_snapshot,unit_price,sessions,line_total,position,completed_session_numbers)").eq("client_id", clientId).order("created_at", { ascending: false }),
-    db.from("services").select("id,name,price,duration_min,summary,description,includes").eq("is_active", true).order("name"),
+    db.from("services").select("id,name,price,duration_min,summary,description,includes,session_count").eq("is_active", true).order("name"),
   ]);
   for (const result of [directAppointments, legacyAppointments, documents, budgets, services]) if (result.error) throw result.error;
 
@@ -124,11 +126,22 @@ export function ClientProfileDialog({ clientId, open, onOpenChange, onUpdated }:
   const [budgetSaving, setBudgetSaving] = useState(false);
   const [budgetSessionSaving, setBudgetSessionSaving] = useState("");
   const [appointmentSessionSaving, setAppointmentSessionSaving] = useState("");
+  const [appointmentSessionDrafts, setAppointmentSessionDrafts] = useState<Record<string, { date: string; time: string }>>({});
   const [activeTab, setActiveTab] = useState("profile");
 
   useEffect(() => {
     if (open) setActiveTab("profile");
   }, [clientId, open]);
+
+  useEffect(() => {
+    const drafts: Record<string, { date: string; time: string }> = {};
+    for (const appointment of query.data?.appointments ?? []) {
+      for (const session of appointment.appointment_sessions ?? []) {
+        drafts[session.id] = { date: session.scheduled_date ?? "", time: String(session.scheduled_time ?? "").slice(0, 5) };
+      }
+    }
+    setAppointmentSessionDrafts(drafts);
+  }, [query.data?.appointments]);
 
   useEffect(() => {
     if (!client) return;
@@ -307,6 +320,44 @@ export function ClientProfileDialog({ clientId, open, onOpenChange, onUpdated }:
     return undefined;
   };
 
+  const saveAppointmentSessionSchedule = async (session: any) => {
+    const draft = appointmentSessionDrafts[session.id] ?? { date: session.scheduled_date ?? "", time: String(session.scheduled_time ?? "").slice(0, 5) };
+    if (!draft.date || !draft.time) {
+      toast.error("Informe a data e o horário da sessão.");
+      return undefined;
+    }
+    setAppointmentSessionSaving(`date-${session.id}`);
+    const result = await db.rpc("update_appointment_session_schedule", {
+      _session_id: session.id,
+      _scheduled_date: draft.date,
+      _scheduled_time: draft.time,
+    });
+    setAppointmentSessionSaving("");
+    if (result.error) {
+      toast.error("Não foi possível salvar a próxima data.", { description: result.error.message });
+      return undefined;
+    }
+    toast.success(`Sessão ${session.session_number} agendada para ${dateLabel(draft.date)} às ${draft.time}.`);
+    await refresh();
+    await onUpdated?.();
+    return undefined;
+  };
+
+  const reopenAppointment = async (appointment: any) => {
+    if (!window.confirm("Reabrir este atendimento? O valor reconhecido no financeiro ficará pendente até a conclusão novamente.")) return undefined;
+    setAppointmentSessionSaving(`reopen-${appointment.id}`);
+    const result = await db.rpc("reopen_appointment", { _appointment_id: appointment.id });
+    setAppointmentSessionSaving("");
+    if (result.error) {
+      toast.error("Não foi possível reabrir o atendimento.", { description: result.error.message });
+      return undefined;
+    }
+    toast.success("Atendimento reaberto.");
+    await refresh();
+    await onUpdated?.();
+    return undefined;
+  };
+
   const setAppointmentSessionCompletion = async (appointment: any, session: any, completed: boolean) => {
     if (!completed && !window.confirm(`Reabrir a sessão ${session.session_number}? O valor deste pacote sairá dos resultados financeiros até todas as sessões serem concluídas novamente.`)) return undefined;
     if (completed && !session.scheduled_date) {
@@ -368,6 +419,13 @@ export function ClientProfileDialog({ clientId, open, onOpenChange, onUpdated }:
                   {benefitType === "custom" ? <div className="sm:col-span-2"><Label>Benefício personalizado</Label><Input className="mt-2" value={benefitCustom} onChange={(e) => setBenefitCustom(e.target.value)} /></div> : null}
                   <div className="sm:col-span-2"><Label>Observações da ficha</Label><Textarea className="mt-2 min-h-28" value={observation} onChange={(e) => setObservation(e.target.value)} placeholder="Preferências, observações internas, informações importantes sobre o cliente..." /></div>
                 </div>
+                <section className="rounded-2xl border border-primary/10 bg-card p-4 shadow-sm">
+                  <div className="flex items-center gap-2"><Stethoscope className="size-4 text-primary" /><h3 className="font-semibold">Serviços e combos na ficha</h3></div>
+                  <p className="mt-1 text-xs text-muted-foreground">Esta lista é alimentada automaticamente pelos agendamentos e combos deste cliente.</p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {(query.data?.appointments ?? []).length === 0 ? <div className="sm:col-span-2 rounded-xl border border-dashed p-4 text-center text-xs text-muted-foreground">Nenhum serviço vinculado ainda.</div> : (query.data?.appointments ?? []).slice(0, 12).map((appointment: any) => { const linked = [...(appointment.appointment_services ?? [])].sort((a: any,b: any) => Number(a.position)-Number(b.position)); const names = linked.length ? linked.map((item: any) => item.service?.name ?? "Serviço") : [appointment.service?.name ?? "Serviço"]; const sessions = appointment.appointment_sessions ?? []; return <div key={`profile-service-${appointment.id}`} className="rounded-xl border border-primary/10 bg-primary/[0.035] p-3"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="text-xs font-semibold">{names.join(" + ")}</p><p className="mt-1 text-[11px] text-muted-foreground">{dateLabel(appointment.scheduled_date)} · {statusLabel[appointment.status] ?? appointment.status}</p></div>{sessions.length > 1 ? <Badge variant="secondary" className="shrink-0">{sessions.filter((item: any) => item.status === "completed").length}/{sessions.length} sessões</Badge> : null}</div></div>; })}
+                  </div>
+                </section>
                 <div className="flex justify-end"><Button onClick={saveProfile} disabled={saving}><Save className="size-4" /> {saving ? "Salvando..." : "Salvar ficha"}</Button></div>
               </TabsContent>
 
@@ -402,7 +460,8 @@ export function ClientProfileDialog({ clientId, open, onOpenChange, onUpdated }:
                   return <article key={appointment.id} className="rounded-2xl border border-primary/10 bg-card p-4 shadow-sm">
                     <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex items-center gap-2"><CalendarDays className="size-4 text-primary" /><strong>{dateLabel(appointment.scheduled_date)} às {String(appointment.scheduled_time ?? "").slice(0,5)}</strong></div><p className="mt-1 text-sm text-muted-foreground">{appointment.service?.name ?? "Serviço"} · {appointment.professional?.name ?? "Profissional"}</p></div><Badge variant="outline">{statusLabel[appointment.status] ?? appointment.status}</Badge></div>
                     {services.length > 1 ? <div className="mt-3 rounded-xl border border-primary/10 bg-primary/[0.045] p-3"><p className="text-xs font-semibold">Serviços do combo</p><div className="mt-2 flex flex-wrap gap-2">{services.map((item: any) => <Badge key={`${appointment.id}-${item.service_id}`} variant="secondary">{item.service?.name ?? "Serviço"} · {money(item.price_snapshot ?? item.service?.price)}</Badge>)}</div></div> : null}
-                    {sessions.length > 1 ? <div className="mt-3 rounded-xl border border-primary/10 bg-primary/[0.045] p-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-semibold">Sessões do pacote</p><span className="text-[11px] text-muted-foreground">Desmarcar uma sessão retira o valor dos resultados até concluir todas novamente.</span></div><div className="mt-2 grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">{sessions.map((session: any) => { const done = session.status === "completed"; const canManage = ["confirmado", "atendido"].includes(appointment.status); return <label key={session.id} className={`flex cursor-pointer items-start gap-2 rounded-lg border px-2.5 py-2 text-xs ${done ? "border-emerald-200 bg-emerald-50/70" : "border-primary/10 bg-background"}`}><input type="checkbox" className="mt-0.5 size-4 accent-primary" checked={done} disabled={!canManage || appointmentSessionSaving === session.id} onChange={(event) => void setAppointmentSessionCompletion(appointment, session, event.target.checked)} /><span><strong>Sessão {session.session_number}</strong> · {done ? "Concluída" : "Pendente"}<br/><span className="text-muted-foreground">{session.scheduled_date ? dateLabel(session.scheduled_date) : "Data a definir"}</span></span></label>; })}</div></div> : null}
+                    {sessions.length > 1 ? <div className="mt-3 rounded-xl border border-primary/10 bg-primary/[0.045] p-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-semibold">Sessões dos serviços</p><span className="text-[11px] text-muted-foreground">Cada combo possui suas próprias sessões e próximas datas.</span></div><div className="mt-2 grid gap-2 sm:grid-cols-2">{sessions.map((session: any) => { const done = session.status === "completed"; const canManage = ["confirmado", "atendido"].includes(appointment.status); const draft = appointmentSessionDrafts[session.id] ?? { date: session.scheduled_date ?? "", time: String(session.scheduled_time ?? "").slice(0,5) }; const serviceName = session.service_name_snapshot ?? services.find((item: any) => item.service_id === session.service_id)?.service?.name ?? appointment.service?.name ?? "Serviço"; return <div key={session.id} className={`rounded-lg border p-2.5 text-xs ${done ? "border-emerald-200 bg-emerald-50/70" : "border-primary/10 bg-background"}`}><label className="flex cursor-pointer items-start gap-2"><input type="checkbox" className="mt-0.5 size-4 accent-primary" checked={done} disabled={!canManage || appointmentSessionSaving === session.id} onChange={(event) => void setAppointmentSessionCompletion(appointment, session, event.target.checked)} /><span className="min-w-0"><span className="block truncate text-[10px] font-semibold uppercase tracking-wide text-primary">{serviceName}</span><strong>Sessão {session.session_number}</strong> · {done ? "Concluída" : "Pendente"}</span></label>{!done ? <div className="mt-2 grid gap-1.5 grid-cols-[1fr_96px_auto]"><Input type="date" className="h-8 text-xs" value={draft.date} onChange={(event) => setAppointmentSessionDrafts((current) => ({ ...current, [session.id]: { ...draft, date: event.target.value } }))} disabled={!canManage || appointmentSessionSaving === `date-${session.id}`} /><Input type="time" className="h-8 text-xs" value={draft.time} onChange={(event) => setAppointmentSessionDrafts((current) => ({ ...current, [session.id]: { ...draft, time: event.target.value } }))} disabled={!canManage || appointmentSessionSaving === `date-${session.id}`} /><Button type="button" size="sm" variant="outline" className="h-8 px-2 text-[10px]" onClick={() => void saveAppointmentSessionSchedule(session)} disabled={!canManage || appointmentSessionSaving === `date-${session.id}`}>{appointmentSessionSaving === `date-${session.id}` ? "..." : "Salvar"}</Button></div> : <p className="mt-1.5 text-[11px] text-muted-foreground">{session.scheduled_date ? `${dateLabel(session.scheduled_date)}${session.scheduled_time ? ` às ${String(session.scheduled_time).slice(0,5)}` : ""}` : "Data não informada"}</p>}</div>; })}</div></div> : null}
+                    {appointment.status === "atendido" && sessions.length <= 1 ? <div className="mt-3"><Button type="button" size="sm" variant="outline" disabled={appointmentSessionSaving === `reopen-${appointment.id}`} onClick={() => void reopenAppointment(appointment)}><Pencil className="size-4" /> Reabrir atendimento</Button></div> : null}
                     {appointment.notes ? <p className="mt-3 text-xs text-muted-foreground"><strong>Observação:</strong> {appointment.notes}</p> : null}
                   </article>;
                 })}

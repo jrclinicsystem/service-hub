@@ -139,14 +139,14 @@ async function loadAdminOverview() {
     db
       .from("appointments")
       .select(
-        "id, client_id, service_id, professional_id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status, created_at, status_updated_at, payment_choice, payment_received, payment_method_code, service_price_snapshot, deposit_percent, deposit_amount, balance_amount, service:services!appointments_service_id_fkey(id, name, price, duration_min), appointment_services(service_id, position, price_snapshot, status, completed_at, completed_by, service:services!appointment_services_service_id_fkey(id, name, price, duration_min)), appointment_sessions(id, session_number, scheduled_date, scheduled_time, status, completed_at, completed_by), professional:professionals(id, name, specialty), payments(status, amount, kind, payment_method_id, provider, paid_at, created_at, status_detail)",
+        "id, client_id, service_id, professional_id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status, created_at, status_updated_at, payment_choice, payment_received, payment_method_code, service_price_snapshot, deposit_percent, deposit_amount, balance_amount, service:services!appointments_service_id_fkey(id, name, price, duration_min), appointment_services(service_id, position, price_snapshot, session_count, status, completed_at, completed_by, service:services!appointment_services_service_id_fkey(id, name, price, duration_min, session_count)), appointment_sessions(id, service_id, service_name_snapshot, service_position, session_number, scheduled_date, scheduled_time, status, completed_at, completed_by), professional:professionals(id, name, specialty), payments(status, amount, kind, payment_method_id, provider, paid_at, created_at, status_detail)",
       )
       .order("scheduled_date", { ascending: true })
       .order("scheduled_time", { ascending: true }),
     db
       .from("services")
       .select(
-        "id, slug, name, category_id, professional, professional_role, duration_min, price, rating, reviews_count, summary, description, includes, preparation, is_active",
+        "id, slug, name, category_id, professional, professional_role, duration_min, price, rating, reviews_count, summary, description, includes, preparation, session_count, is_active",
       )
       .order("name"),
     db.from("categories").select("id, name, description, sort_order").order("sort_order"),
@@ -675,6 +675,7 @@ function ServiceEditor({
   const [categoryId, setCategoryId] = useState(service?.category_id ?? categories[0]?.id ?? "");
   const [selectedProfessionalIds, setSelectedProfessionalIds] = useState<string[]>(fallbackProfessionalIds);
   const [duration, setDuration] = useState(String(service?.duration_min ?? 30));
+  const [sessionCount, setSessionCount] = useState(String(service?.session_count ?? 1));
   const [price, setPrice] = useState(String(service?.price ?? ""));
   const [summary, setSummary] = useState(service?.summary ?? "");
   const [descriptionText, setDescriptionText] = useState(service?.description ?? "");
@@ -716,6 +717,7 @@ function ServiceEditor({
       professional: professionalNames,
       professional_role: professionalRoles,
       duration_min: Number(duration) || 30,
+      session_count: Math.min(50, Math.max(1, Number(sessionCount) || 1)),
       price: Number(price.replace(",", ".")) || 0,
       summary: summary.trim(),
       description: descriptionText.trim(),
@@ -786,6 +788,7 @@ function ServiceEditor({
       setCategoryId(categories[0]?.id ?? "");
       setSelectedProfessionalIds([]);
       setDuration("30");
+      setSessionCount("1");
       setPrice("");
       setSummary("");
       setDescriptionText("");
@@ -871,6 +874,9 @@ function ServiceEditor({
 
           <Field label="Duração" hint="Tempo médio do atendimento, em minutos.">
             <Input type="number" min="1" value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="Ex.: 60" />
+          </Field>
+          <Field label="Sessões padrão" hint="Use 1 para serviço avulso. Ex.: combo com 3 sessões = 3.">
+            <Input type="number" min="1" max="50" value={sessionCount} onChange={(e) => setSessionCount(e.target.value)} placeholder="1" />
           </Field>
           <Field label="Valor do serviço" hint="Preço integral antes de promoções ou sinal de pagamento.">
             <Input inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Ex.: 150,00" />
