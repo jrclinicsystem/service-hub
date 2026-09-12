@@ -26,39 +26,8 @@ jobs:
       - name: Apply client combo session finance fix
         run: python .github/scripts/client_combo_session_finance_fix.py
 
-      - name: Apply finance safety follow-ups
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          path = Path('src/components/finance-staging-workspace.tsx')
-          text = path.read_text()
-          old = '''    if (!Number.isFinite(value) || value < 0) {
-                toast.error("Informe um valor igual ou maior que zero.");
-                return;
-              }'''.replace('                toast', '      toast').replace('                return', '      return').replace('              }', '    }')
-          new = '''    if (!amount.trim() || !Number.isFinite(value) || value < 0) {
-                toast.error("Informe um valor igual ou maior que zero.");
-                return;
-              }'''.replace('                toast', '      toast').replace('                return', '      return').replace('              }', '    }')
-          if new not in text:
-              if old not in text:
-                  raise SystemExit('explicit zero guard anchor not found')
-              text = text.replace(old, new, 1)
-              path.write_text(text)
-
-          path = Path('src/components/finance-attendance-completion.tsx')
-          text = path.read_text()
-          old = '''      if (sessions.length > 1) return sessions.every((session: any) => session.status === "completed");
-      return true;'''
-          new = '''      if (sessions.length > 1) return sessions.every((session: any) => session.status === "completed");
-      return row.status === "confirmado";'''
-          if new not in text:
-              if old not in text:
-                  raise SystemExit('single attendance finance queue anchor not found')
-              text = text.replace(old, new, 1)
-              path.write_text(text)
-          PY
+      - name: Keep single attended visits out of finance queue
+        run: python -c 'from pathlib import Path; p=Path("src/components/finance-attendance-completion.tsx"); s=p.read_text(); old="      if (sessions.length > 1) return sessions.every((session: any) => session.status === \"completed\");\n      return true;"; new="      if (sessions.length > 1) return sessions.every((session: any) => session.status === \"completed\");\n      return row.status === \"confirmado\";"; assert old in s or new in s, "finance queue anchor not found"; p.write_text(s if new in s else s.replace(old,new,1))'
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -78,5 +47,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src/components/client-profile-dialog.tsx src/components/admin-appointments-workspace.tsx src/components/finance-staging-workspace.tsx src/components/finance-attendance-completion.tsx
-          git commit -m "fix: track combo sessions and finance recognition"
+          git commit -m "fix: finalize combo finance session rules"
           git push
