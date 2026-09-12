@@ -73,7 +73,7 @@ async function loadClientWorkspace(clientId: string) {
     db.from("appointments").select(appointmentSelect).eq("client_id", clientId).order("scheduled_date", { ascending: false }).limit(100),
     db.from("appointments").select(appointmentSelect).ilike("patient_name", client.name).order("scheduled_date", { ascending: false }).limit(100),
     db.from("client_documents").select("id,client_id,category,file_name,storage_path,mime_type,size_bytes,notes,created_at").eq("client_id", clientId).order("created_at", { ascending: false }),
-    db.from("client_budgets").select("id,client_id,title,notes,status,total_amount,valid_until,created_at,updated_at,client_budget_items(id,service_id,service_name_snapshot,unit_price,sessions,line_total,position)").eq("client_id", clientId).order("created_at", { ascending: false }),
+    db.from("client_budgets").select("id,client_id,title,notes,status,total_amount,valid_until,created_at,updated_at,client_budget_items(id,service_id,service_name_snapshot,unit_price,sessions,line_total,position,completed_session_numbers)").eq("client_id", clientId).order("created_at", { ascending: false }),
     db.from("services").select("id,name,price,duration_min,summary,description,includes").eq("is_active", true).order("name"),
   ]);
   for (const result of [directAppointments, legacyAppointments, documents, budgets, services]) if (result.error) throw result.error;
@@ -122,6 +122,8 @@ export function ClientProfileDialog({ clientId, open, onOpenChange, onUpdated }:
   const [budgetValidUntil, setBudgetValidUntil] = useState("");
   const [budgetRows, setBudgetRows] = useState<BudgetRow[]>([{ serviceId: "", sessions: "1", unitPrice: "" }]);
   const [budgetSaving, setBudgetSaving] = useState(false);
+  const [budgetSessionSaving, setBudgetSessionSaving] = useState("");
+  const [appointmentSessionSaving, setAppointmentSessionSaving] = useState("");
   const [activeTab, setActiveTab] = useState("profile");
 
   useEffect(() => {
@@ -287,6 +289,48 @@ export function ClientProfileDialog({ clientId, open, onOpenChange, onUpdated }:
     return undefined;
   };
 
+  const setBudgetSessionCompletion = async (item: any, sessionNumber: number, completed: boolean) => {
+    const key = `${item.id}-${sessionNumber}`;
+    setBudgetSessionSaving(key);
+    const result = await db.rpc("set_client_budget_item_session_completion", {
+      _item_id: item.id,
+      _session_number: sessionNumber,
+      _completed: completed,
+    });
+    setBudgetSessionSaving("");
+    if (result.error) {
+      toast.error("Não foi possível atualizar a sessão do orçamento.", { description: result.error.message });
+      return undefined;
+    }
+    toast.success(completed ? `Sessão ${sessionNumber} marcada como concluída.` : `Sessão ${sessionNumber} reaberta.`);
+    await refresh();
+    return undefined;
+  };
+
+  const setAppointmentSessionCompletion = async (appointment: any, session: any, completed: boolean) => {
+    if (!completed && !window.confirm(`Reabrir a sessão ${session.session_number}? O valor deste pacote sairá dos resultados financeiros até todas as sessões serem concluídas novamente.`)) return undefined;
+    if (completed && !session.scheduled_date) {
+      toast.error("Defina a data desta sessão na Agenda antes de concluí-la.");
+      return undefined;
+    }
+    setAppointmentSessionSaving(session.id);
+    const result = await db.rpc("set_appointment_session_completion", {
+      _session_id: session.id,
+      _completed: completed,
+    });
+    setAppointmentSessionSaving("");
+    if (result.error) {
+      toast.error("Não foi possível atualizar a sessão.", { description: result.error.message });
+      return undefined;
+    }
+    toast.success(completed ? `Sessão ${session.session_number} concluída.` : `Sessão ${session.session_number} reaberta.`, {
+      description: completed ? "O financeiro só reconhece o pacote quando todas as sessões estiverem concluídas." : "O valor do pacote foi retirado dos resultados até a conclusão de todas as sessões.",
+    });
+    await refresh();
+    await onUpdated?.();
+    return undefined;
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="!z-[9001] grid h-[min(700px,90vh)] w-[calc(100vw-32px)] max-w-[1120px] grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden border-primary/15 !bg-[#fffdfa] p-0 shadow-2xl">
@@ -358,7 +402,7 @@ export function ClientProfileDialog({ clientId, open, onOpenChange, onUpdated }:
                   return <article key={appointment.id} className="rounded-2xl border border-primary/10 bg-card p-4 shadow-sm">
                     <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex items-center gap-2"><CalendarDays className="size-4 text-primary" /><strong>{dateLabel(appointment.scheduled_date)} às {String(appointment.scheduled_time ?? "").slice(0,5)}</strong></div><p className="mt-1 text-sm text-muted-foreground">{appointment.service?.name ?? "Serviço"} · {appointment.professional?.name ?? "Profissional"}</p></div><Badge variant="outline">{statusLabel[appointment.status] ?? appointment.status}</Badge></div>
                     {services.length > 1 ? <div className="mt-3 rounded-xl border border-primary/10 bg-primary/[0.045] p-3"><p className="text-xs font-semibold">Serviços do combo</p><div className="mt-2 flex flex-wrap gap-2">{services.map((item: any) => <Badge key={`${appointment.id}-${item.service_id}`} variant="secondary">{item.service?.name ?? "Serviço"} · {money(item.price_snapshot ?? item.service?.price)}</Badge>)}</div></div> : null}
-                    {sessions.length > 1 ? <div className="mt-3 rounded-xl border border-primary/10 bg-primary/[0.045] p-3"><p className="text-xs font-semibold">Sessões do pacote</p><div className="mt-2 grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">{sessions.map((session: any) => <div key={session.id} className="rounded-lg bg-background px-2.5 py-2 text-xs"><strong>Sessão {session.session_number}</strong> · {session.status === "completed" ? "Concluída" : "Pendente"}<br/><span className="text-muted-foreground">{session.scheduled_date ? dateLabel(session.scheduled_date) : "Data a definir"}</span></div>)}</div></div> : null}
+                    {sessions.length > 1 ? <div className="mt-3 rounded-xl border border-primary/10 bg-primary/[0.045] p-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-semibold">Sessões do pacote</p><span className="text-[11px] text-muted-foreground">Desmarcar uma sessão retira o valor dos resultados até concluir todas novamente.</span></div><div className="mt-2 grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">{sessions.map((session: any) => { const done = session.status === "completed"; const canManage = ["confirmado", "atendido"].includes(appointment.status); return <label key={session.id} className={`flex cursor-pointer items-start gap-2 rounded-lg border px-2.5 py-2 text-xs ${done ? "border-emerald-200 bg-emerald-50/70" : "border-primary/10 bg-background"}`}><input type="checkbox" className="mt-0.5 size-4 accent-primary" checked={done} disabled={!canManage || appointmentSessionSaving === session.id} onChange={(event) => void setAppointmentSessionCompletion(appointment, session, event.target.checked)} /><span><strong>Sessão {session.session_number}</strong> · {done ? "Concluída" : "Pendente"}<br/><span className="text-muted-foreground">{session.scheduled_date ? dateLabel(session.scheduled_date) : "Data a definir"}</span></span></label>; })}</div></div> : null}
                     {appointment.notes ? <p className="mt-3 text-xs text-muted-foreground"><strong>Observação:</strong> {appointment.notes}</p> : null}
                   </article>;
                 })}
@@ -372,15 +416,19 @@ export function ClientProfileDialog({ clientId, open, onOpenChange, onUpdated }:
                     Selecione cada serviço apenas uma vez. A quantidade de sessões do pacote é preenchida automaticamente pelo cadastro do serviço; adicione outra linha somente quando for outro serviço.
                   </div>
                   <div className="mt-3 space-y-2">
-                    {budgetRows.map((row, index) => <div key={index} className="grid gap-2 rounded-xl border p-3 sm:grid-cols-[minmax(0,1.6fr)_125px_140px_auto]">
-                      <Select value={row.serviceId} onValueChange={(value) => setBudgetService(index, value)}><SelectTrigger><SelectValue placeholder="Selecione o serviço" /></SelectTrigger><SelectContent>{(query.data?.services ?? []).map((service: any) => <SelectItem key={service.id} value={service.id}>{service.name} · {money(service.price)}</SelectItem>)}</SelectContent></Select>
-                      <div className="relative">
-                        <span className="pointer-events-none absolute left-3 top-1.5 z-10 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">Sessões</span>
-                        <Input className="pt-4 font-semibold" type="number" min="1" max="12" title="Sessões incluídas neste serviço" value={row.sessions} onChange={(e) => setBudgetRows((rows) => rows.map((item, i) => i === index ? { ...item, sessions: String(Math.min(12, Math.max(1, Number(e.target.value) || 1))) } : item))} />
-                      </div>
-                      <Input value={row.unitPrice} onChange={(e) => setBudgetRows((rows) => rows.map((item, i) => i === index ? { ...item, unitPrice: e.target.value } : item))} placeholder="Valor/sessão" />
-                      <Button type="button" size="icon" variant="ghost" disabled={budgetRows.length === 1} onClick={() => setBudgetRows((rows) => rows.filter((_, i) => i !== index))}><Trash2 className="size-4" /></Button>
-                    </div>)}
+                    {budgetRows.map((row, index) => {
+                      const sessionCount = Math.min(12, Math.max(1, Number(row.sessions) || 1));
+                      return <div key={index} className="grid gap-2 rounded-xl border p-3 sm:grid-cols-[minmax(0,1.6fr)_125px_140px_auto]">
+                        <Select value={row.serviceId} onValueChange={(value) => setBudgetService(index, value)}><SelectTrigger><SelectValue placeholder="Selecione o serviço" /></SelectTrigger><SelectContent>{(query.data?.services ?? []).map((service: any) => <SelectItem key={service.id} value={service.id}>{service.name} · {money(service.price)}</SelectItem>)}</SelectContent></Select>
+                        <div className="relative">
+                          <span className="pointer-events-none absolute left-3 top-1.5 z-10 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">Sessões</span>
+                          <Input className="pt-4 font-semibold" type="number" min="1" max="12" title="Sessões incluídas neste serviço" value={row.sessions} onChange={(e) => setBudgetRows((rows) => rows.map((item, i) => i === index ? { ...item, sessions: String(Math.min(12, Math.max(1, Number(e.target.value) || 1))) } : item))} />
+                        </div>
+                        <Input value={row.unitPrice} onChange={(e) => setBudgetRows((rows) => rows.map((item, i) => i === index ? { ...item, unitPrice: e.target.value } : item))} placeholder="Valor/sessão" />
+                        <Button type="button" size="icon" variant="ghost" disabled={budgetRows.length === 1} onClick={() => setBudgetRows((rows) => rows.filter((_, i) => i !== index))}><Trash2 className="size-4" /></Button>
+                        {row.serviceId ? <div className="sm:col-span-4 rounded-xl bg-primary/[0.04] p-3"><p className="text-[11px] font-semibold">Controle das sessões</p><div className="mt-2 flex flex-wrap gap-2">{Array.from({ length: sessionCount }, (_, sessionIndex) => <label key={sessionIndex} className="flex items-center gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs text-muted-foreground"><input type="checkbox" className="size-4" disabled /> Sessão {sessionIndex + 1}</label>)}</div><p className="mt-2 text-[10px] text-muted-foreground">As caixinhas ficam disponíveis para marcar depois que o orçamento for salvo.</p></div> : null}
+                      </div>;
+                    })}
                   </div>
                   <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => setBudgetRows((rows) => [...rows, { serviceId: "", sessions: "1", unitPrice: "" }])}><Plus className="size-4" /> Adicionar serviço ao combo</Button>
                   <div className="mt-4"><Label>Observações do orçamento</Label><Textarea className="mt-2" value={budgetNotes} onChange={(e) => setBudgetNotes(e.target.value)} placeholder="Condições, intervalos entre sessões, orientações..." /></div>
@@ -391,7 +439,7 @@ export function ClientProfileDialog({ clientId, open, onOpenChange, onUpdated }:
                   <div className="flex items-center gap-2"><FolderOpen className="size-4 text-primary" /><h3 className="font-semibold">Orçamentos salvos</h3></div>
                   {(query.data?.budgets ?? []).length === 0 ? <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">Nenhum orçamento salvo ainda.</div> : (query.data?.budgets ?? []).map((budget: any) => <article key={budget.id} className="rounded-2xl border border-primary/10 bg-card p-4 shadow-sm">
                     <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-semibold">{budget.title}</p><p className="mt-1 text-xs text-muted-foreground">Criado em {new Date(budget.created_at).toLocaleDateString("pt-BR")}{budget.valid_until ? ` · válido até ${dateLabel(budget.valid_until)}` : ""}</p></div><div className="flex items-center gap-2"><Badge variant="outline">{statusLabel[budget.status] ?? budget.status}</Badge><strong>{money(budget.total_amount)}</strong></div></div>
-                    <div className="mt-3 grid gap-2 sm:grid-cols-2">{[...(budget.client_budget_items ?? [])].sort((a: any,b: any) => Number(a.position)-Number(b.position)).map((item: any) => <div key={item.id} className="rounded-xl border border-primary/10 bg-primary/[0.04] p-3 text-sm"><strong>{item.service_name_snapshot}</strong><p className="mt-1 text-xs text-muted-foreground">{item.sessions} sessão(ões) × {money(item.unit_price)} = {money(item.line_total)}</p></div>)}</div>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">{[...(budget.client_budget_items ?? [])].sort((a: any,b: any) => Number(a.position)-Number(b.position)).map((item: any) => { const completedSessions = (Array.isArray(item.completed_session_numbers) ? item.completed_session_numbers : []).map(Number); const totalSessions = Math.max(1, Number(item.sessions) || 1); return <div key={item.id} className="rounded-xl border border-primary/10 bg-primary/[0.04] p-3 text-sm"><strong>{item.service_name_snapshot}</strong><p className="mt-1 text-xs text-muted-foreground">{item.sessions} sessão(ões) × {money(item.unit_price)} = {money(item.line_total)}</p><div className="mt-3 flex flex-wrap gap-2">{Array.from({ length: totalSessions }, (_, sessionIndex) => { const sessionNumber = sessionIndex + 1; const checked = completedSessions.includes(sessionNumber); const saving = budgetSessionSaving === `${item.id}-${sessionNumber}`; return <label key={sessionNumber} className={`flex cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs ${checked ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "bg-background"}`}><input type="checkbox" className="size-4 accent-primary" checked={checked} disabled={saving} onChange={(event) => void setBudgetSessionCompletion(item, sessionNumber, event.target.checked)} /> Sessão {sessionNumber}</label>; })}</div></div>; })}</div>
                     {budget.notes ? <p className="mt-3 text-sm text-muted-foreground">{budget.notes}</p> : null}
                     <div className="mt-3 flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => void updateBudgetStatus(budget.id, "approved")}>Marcar aprovado</Button><Button size="sm" variant="outline" onClick={() => void updateBudgetStatus(budget.id, "declined")}>Marcar recusado</Button><Button size="sm" variant="ghost" className="text-destructive" onClick={() => void removeBudget(budget.id)}><Trash2 className="size-4" /> Excluir</Button></div>
                   </article>)}

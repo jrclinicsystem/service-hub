@@ -3327,8 +3327,8 @@ function EntryList({ rows }: { rows: any[] }) {
       toast.error("Entrada financeira não identificada.");
       return;
     }
-    if (!Number.isFinite(value) || value <= 0) {
-      toast.error("Informe um valor maior que zero.");
+    if (!Number.isFinite(value) || value < 0) {
+      toast.error("Informe um valor igual ou maior que zero.");
       return;
     }
     if (!window.confirm(`Alterar o valor desta entrada para ${money(value)}? Taxas e comissão vinculada serão recalculadas quando aplicável.`)) return;
