@@ -26,10 +26,11 @@ jobs:
       - name: Apply client combo session finance fix
         run: python .github/scripts/client_combo_session_finance_fix.py
 
-      - name: Require explicit zero finance amount
+      - name: Apply finance safety follow-ups
         run: |
           python - <<'PY'
           from pathlib import Path
+
           path = Path('src/components/finance-staging-workspace.tsx')
           text = path.read_text()
           old = '''    if (!Number.isFinite(value) || value < 0) {
@@ -43,6 +44,18 @@ jobs:
           if new not in text:
               if old not in text:
                   raise SystemExit('explicit zero guard anchor not found')
+              text = text.replace(old, new, 1)
+              path.write_text(text)
+
+          path = Path('src/components/finance-attendance-completion.tsx')
+          text = path.read_text()
+          old = '''      if (sessions.length > 1) return sessions.every((session: any) => session.status === "completed");
+      return true;'''
+          new = '''      if (sessions.length > 1) return sessions.every((session: any) => session.status === "completed");
+      return row.status === "confirmado";'''
+          if new not in text:
+              if old not in text:
+                  raise SystemExit('single attendance finance queue anchor not found')
               text = text.replace(old, new, 1)
               path.write_text(text)
           PY
