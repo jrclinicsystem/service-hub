@@ -11,6 +11,7 @@ import {
   FileSpreadsheet,
   Landmark,
   Printer,
+  Paperclip,
   ReceiptText,
   Settings2,
   TrendingDown,
@@ -1659,26 +1660,63 @@ function FullFinanceWorkspace({
                 ))}
               </select>
             </div>
-            <div className="mt-3 rounded-2xl border border-dashed border-border p-4">
-              <Label>Comprovantes / anexos</Label>
+            <div className="mt-3 rounded-2xl border border-dashed border-border bg-muted/20 p-4">
+              <div className="flex items-center gap-2">
+                <span className="grid size-8 place-items-center rounded-xl bg-primary-soft text-primary">
+                  <Paperclip className="size-4" />
+                </span>
+                <div>
+                  <Label>Comprovantes / anexos</Label>
+                  <p className="text-[11px] text-muted-foreground">Opcional</p>
+                </div>
+              </div>
+
               <Input
                 key={expenseFileKey}
-                className="mt-2"
+                id="expense-attachments-input"
+                className="sr-only"
                 type="file"
                 multiple
                 accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
                 onChange={(e) => setExpenseFiles(Array.from(e.target.files ?? []))}
               />
-              <p className="mt-1 text-[11px] text-muted-foreground">
-                PDF ou imagem (JPG, PNG, WEBP), até 10 MB por arquivo. Opcional.
-              </p>
+
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <label
+                  htmlFor="expense-attachments-input"
+                  className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl border border-input bg-background px-4 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+                >
+                  <Paperclip className="size-4" />
+                  Escolher arquivos
+                </label>
+                <span className="text-sm text-muted-foreground">
+                  {expenseFiles.length === 0
+                    ? "Nenhum arquivo selecionado"
+                    : expenseFiles.length === 1
+                      ? "1 arquivo selecionado"
+                      : `${expenseFiles.length} arquivos selecionados`}
+                </span>
+              </div>
+
               {expenseFiles.length ? (
-                <div className="mt-2 flex flex-wrap gap-2">
+                <div className="mt-3 flex flex-wrap gap-2">
                   {expenseFiles.map((file) => (
-                    <Badge key={`${file.name}-${file.size}`} variant="outline">📎 {file.name}</Badge>
+                    <Badge
+                      key={`${file.name}-${file.size}`}
+                      variant="outline"
+                      className="max-w-full gap-1.5 bg-background px-3 py-1.5 font-normal"
+                      title={file.name}
+                    >
+                      <Paperclip className="size-3.5 shrink-0" />
+                      <span className="max-w-[240px] truncate">{file.name}</span>
+                    </Badge>
                   ))}
                 </div>
               ) : null}
+
+              <p className="mt-3 text-[11px] text-muted-foreground">
+                PDF ou imagem (JPG, PNG, WEBP), até 10 MB por arquivo.
+              </p>
             </div>
           </Panel>
           <Panel title="Despesas do período" collapsible>
