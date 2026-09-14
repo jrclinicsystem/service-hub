@@ -28,7 +28,7 @@ const mainItems = [
 const secondaryItems = [
   { to: "/admin/equipe", label: "Agenda da equipe", icon: Users, active: "team" as const },
   { to: "/admin/acessos", label: "Acessos", icon: ShieldCheck, active: "access" as const },
-  { to: "/admin/vendedores", label: "Vendedores", icon: BadgePercent, active: "sellers" as const },
+  { to: "/admin/vendedores", label: "Vendedores e comissões", icon: BadgePercent, active: "sellers" as const },
   {
     to: "/admin/financeiro",
     label: "Financeiro",

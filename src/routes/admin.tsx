@@ -18,6 +18,7 @@ import { toast } from "sonner";
 
 import logo from "@/assets/jr-clinic-logo.png";
 import { AdminAppointmentsWorkspace } from "@/components/admin-appointments-workspace";
+import { AdminSubpageSidebar } from "@/components/admin-subpage-sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -328,7 +329,8 @@ function Admin() {
     "Sem categoria";
 
   return (
-    <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-background">
+    <div className="relative min-h-screen w-full max-w-full overflow-x-hidden bg-background lg:pl-[252px]">
+      <AdminSubpageSidebar active="home" />
       <header className="sticky top-0 z-40 border-b border-border/80 bg-card/95 backdrop-blur-xl">
         <div className="mx-auto flex h-14 max-w-[1480px] items-center justify-between px-4 sm:h-17 sm:px-8">
           <div className="flex min-w-0 items-center gap-3 sm:gap-4">
@@ -413,19 +415,6 @@ function Admin() {
             value={String(uniquePatients)}
             hint="e-mails únicos"
           />
-        </div>
-
-        <div className="mt-3 flex flex-wrap gap-2 sm:mt-4">
-          <Button variant="outline" size="sm" className="rounded-xl" asChild>
-            <Link to="/admin/vendedores">
-              <BadgePercent className="size-4" /> Vendedores e comissões
-            </Link>
-          </Button>
-          <Button variant="outline" size="sm" className="rounded-xl" asChild>
-            <Link to="/admin/financeiro">
-              <CircleDollarSign className="size-4" /> Financeiro
-            </Link>
-          </Button>
         </div>
 
         <Tabs defaultValue="agendamentos" className="mt-5 w-full min-w-0 max-w-full sm:mt-10">
