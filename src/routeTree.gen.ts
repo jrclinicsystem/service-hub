@@ -26,6 +26,7 @@ import { Route as AdminClientesRouteImport } from './routes/admin_.clientes'
 import { Route as AdminDisponibilidadeRouteImport } from './routes/admin_.disponibilidade'
 import { Route as AdminEquipeRouteImport } from './routes/admin_.equipe'
 import { Route as AdminFinanceiroRouteImport } from './routes/admin_.financeiro'
+import { Route as AdminVendedoresRouteImport } from './routes/admin_.vendedores'
 import { Route as ServicoSlugRouteImport } from './routes/servico.$slug'
 
 const IndexRoute = IndexRouteImport.update({
@@ -112,6 +113,11 @@ const AdminFinanceiroRoute = AdminFinanceiroRouteImport.update({
   path: '/admin/financeiro',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminVendedoresRoute = AdminVendedoresRouteImport.update({
+  id: '/admin_/vendedores',
+  path: '/admin/vendedores',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ServicoSlugRoute = ServicoSlugRouteImport.update({
   id: '/servico/$slug',
   path: '/servico/$slug',
@@ -135,6 +141,7 @@ export interface FileRoutesByFullPath {
   '/admin/disponibilidade': typeof AdminDisponibilidadeRoute
   '/admin/equipe': typeof AdminEquipeRoute
   '/admin/financeiro': typeof AdminFinanceiroRoute
+  '/admin/vendedores': typeof AdminVendedoresRoute
   '/servico/$slug': typeof ServicoSlugRoute
 }
 export interface FileRoutesByTo {
@@ -154,6 +161,7 @@ export interface FileRoutesByTo {
   '/admin/disponibilidade': typeof AdminDisponibilidadeRoute
   '/admin/equipe': typeof AdminEquipeRoute
   '/admin/financeiro': typeof AdminFinanceiroRoute
+  '/admin/vendedores': typeof AdminVendedoresRoute
   '/servico/$slug': typeof ServicoSlugRoute
 }
 export interface FileRoutesById {
@@ -175,6 +183,7 @@ export interface FileRoutesById {
   '/admin_/disponibilidade': typeof AdminDisponibilidadeRoute
   '/admin_/equipe': typeof AdminEquipeRoute
   '/admin_/financeiro': typeof AdminFinanceiroRoute
+  '/admin_/vendedores': typeof AdminVendedoresRoute
   '/servico/$slug': typeof ServicoSlugRoute
 }
 export interface FileRouteTypes {
@@ -196,6 +205,7 @@ export interface FileRouteTypes {
     | '/admin/disponibilidade'
     | '/admin/equipe'
     | '/admin/financeiro'
+    | '/admin/vendedores'
     | '/servico/$slug'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -215,6 +225,7 @@ export interface FileRouteTypes {
     | '/admin/disponibilidade'
     | '/admin/equipe'
     | '/admin/financeiro'
+    | '/admin/vendedores'
     | '/servico/$slug'
   id:
     | '__root__'
@@ -235,6 +246,7 @@ export interface FileRouteTypes {
     | '/admin_/disponibilidade'
     | '/admin_/equipe'
     | '/admin_/financeiro'
+    | '/admin_/vendedores'
     | '/servico/$slug'
   fileRoutesById: FileRoutesById
 }
@@ -255,6 +267,7 @@ export interface RootRouteChildren {
   AdminDisponibilidadeRoute: typeof AdminDisponibilidadeRoute
   AdminEquipeRoute: typeof AdminEquipeRoute
   AdminFinanceiroRoute: typeof AdminFinanceiroRoute
+  AdminVendedoresRoute: typeof AdminVendedoresRoute
   ServicoSlugRoute: typeof ServicoSlugRoute
 }
 
@@ -379,6 +392,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminFinanceiroRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin_/vendedores': {
+      id: '/admin_/vendedores'
+      path: '/admin/vendedores'
+      fullPath: '/admin/vendedores'
+      preLoaderRoute: typeof AdminVendedoresRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/servico/$slug': {
       id: '/servico/$slug'
       path: '/servico/$slug'
@@ -417,6 +437,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminDisponibilidadeRoute: AdminDisponibilidadeRoute,
   AdminEquipeRoute: AdminEquipeRoute,
   AdminFinanceiroRoute: AdminFinanceiroRoute,
+  AdminVendedoresRoute: AdminVendedoresRoute,
   ServicoSlugRoute: ServicoSlugRoute,
 }
 export const routeTree = rootRouteImport
