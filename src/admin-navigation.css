@@ -378,8 +378,13 @@ body:has(a.admin-sidebar-presence-anchor) a.admin-sidebar-presence-anchor {
     bottom: auto !important;
   }
 
-  .admin-finance-shortcut {
+  .admin-seller-shortcut {
     top: 639px !important;
+    bottom: auto !important;
+  }
+
+  .admin-finance-shortcut {
+    top: 688px !important;
     bottom: auto !important;
   }
 }

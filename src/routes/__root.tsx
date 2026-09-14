@@ -9,6 +9,7 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import {
+  BadgePercent,
   Building2,
   CalendarDays,
   CircleDollarSign,
@@ -62,6 +63,11 @@ const AvailabilityInlinePage = lazy(async () => {
 
 const ClientsInlinePage = lazy(async () => {
   const module = await import("./admin_.clientes");
+  return { default: module.Route.options.component as ComponentType };
+});
+
+const SellersInlinePage = lazy(async () => {
+  const module = await import("./admin_.vendedores");
   return { default: module.Route.options.component as ComponentType };
 });
 
@@ -173,7 +179,7 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
-type InlineAdminSection = "availability" | "catalog" | "clients" | "rooms" | "team" | "access" | "finance" | null;
+type InlineAdminSection = "availability" | "catalog" | "clients" | "rooms" | "team" | "access" | "sellers" | "finance" | null;
 type MainAdminSection = "agendamentos" | "servicos" | "promocoes" | "horarios" | "acessos";
 
 const mainSectionLabels: Record<MainAdminSection, string> = {
@@ -290,6 +296,15 @@ function PersistentAdminSidebar({
 
         <button
           type="button"
+          className={`persistent-admin-sidebar-item${inlineSection === "sellers" ? " is-active" : ""}`}
+          onClick={() => onInlineSection("sellers")}
+        >
+          <BadgePercent className="size-4 shrink-0" />
+          <span>Vendedores e comissões</span>
+        </button>
+
+        <button
+          type="button"
           className={`persistent-admin-sidebar-item${inlineSection === "finance" ? " is-active" : ""}`}
           onClick={() => onInlineSection("finance")}
         >
@@ -318,7 +333,7 @@ function MobileAdminNav({
   onInlineSection: (section: Exclude<InlineAdminSection, null>) => void;
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
-  const moreActive = inlineSection === "availability" || inlineSection === "clients" || inlineSection === "rooms" || inlineSection === "team" || inlineSection === "access" || inlineSection === "finance";
+  const moreActive = inlineSection === "availability" || inlineSection === "clients" || inlineSection === "rooms" || inlineSection === "team" || inlineSection === "access" || inlineSection === "sellers" || inlineSection === "finance";
 
   const selectMain = (section: MainAdminSection) => {
     setMoreOpen(false);
@@ -363,6 +378,10 @@ function MobileAdminNav({
       <div className="admin-mobile-nav" aria-label="Navegação administrativa móvel">
         {moreOpen ? (
           <div id="admin-mobile-more-menu" className="admin-mobile-more-menu" role="menu" aria-label="Mais opções">
+            <button type="button" className="admin-mobile-more-option" role="menuitem" onClick={() => selectInline("sellers")}>
+              <span className="admin-mobile-more-option-icon"><BadgePercent /></span>
+              <span><strong>Vendedores e comissões</strong><small>Cadastros, vendas e comissões</small></span>
+            </button>
             <button type="button" className="admin-mobile-more-option" role="menuitem" onClick={() => selectInline("finance")}>
               <span className="admin-mobile-more-option-icon"><CircleDollarSign /></span>
               <span><strong>Financeiro</strong><small>Gestão financeira da clínica</small></span>
@@ -439,6 +458,7 @@ function SystemAccess() {
     void import("./admin_.disponibilidade");
     void import("./admin_.catalogo");
     void import("./admin_.clientes");
+    void import("./admin_.vendedores");
     void import("@/components/admin-room-reservations");
     void import("./admin_.equipe");
     void import("./admin_.acessos");
@@ -471,6 +491,10 @@ function SystemAccess() {
     }
     if (section === "acessos") {
       setInlineSection("access");
+      return undefined;
+    }
+    if (section === "vendedores") {
+      setInlineSection("sellers");
       return undefined;
     }
     if (section === "financeiro") {
@@ -528,7 +552,7 @@ function SystemAccess() {
 
   const openInlineSection = (section: Exclude<InlineAdminSection, null>) => {
     setInlineSection(section);
-    const hash = section === "availability" ? "disponibilidade" : section === "catalog" ? "catalogo" : section === "clients" ? "clientes" : section === "rooms" ? "salas" : section === "team" ? "equipe" : section === "access" ? "acessos" : "financeiro";
+    const hash = section === "availability" ? "disponibilidade" : section === "catalog" ? "catalogo" : section === "clients" ? "clientes" : section === "rooms" ? "salas" : section === "team" ? "equipe" : section === "access" ? "acessos" : section === "sellers" ? "vendedores" : "financeiro";
     window.history.replaceState(window.history.state, "", `/admin#${hash}`);
   };
 
@@ -545,6 +569,8 @@ function SystemAccess() {
               ? TeamInlinePage
             : inlineSection === "access"
               ? AccessInlinePage
+              : inlineSection === "sellers"
+                ? SellersInlinePage
               : inlineSection === "finance"
                 ? FinanceInlinePage
                 : null;
@@ -623,6 +649,15 @@ function SystemAccess() {
           >
             <ShieldCheck className="size-4 shrink-0 opacity-80" />
             <span>Acessos</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => openInlineSection("sellers")}
+            className={`admin-sidebar-shortcut admin-seller-shortcut${inlineSection === "sellers" ? " is-active" : ""}`}
+            aria-pressed={inlineSection === "sellers"}
+          >
+            <BadgePercent className="size-4 shrink-0 opacity-80" />
+            <span>Vendedores e comissões</span>
           </button>
           <button
             type="button"

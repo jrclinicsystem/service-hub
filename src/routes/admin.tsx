@@ -1,7 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import {
-  BadgePercent,
   CalendarDays,
   CircleDollarSign,
   Clock3,
@@ -18,7 +17,6 @@ import { toast } from "sonner";
 
 import logo from "@/assets/jr-clinic-logo.png";
 import { AdminAppointmentsWorkspace } from "@/components/admin-appointments-workspace";
-import { AdminSubpageSidebar } from "@/components/admin-subpage-sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -329,8 +327,7 @@ function Admin() {
     "Sem categoria";
 
   return (
-    <div className="relative min-h-screen w-full max-w-full overflow-x-hidden bg-background lg:pl-[252px]">
-      <AdminSubpageSidebar active="home" />
+    <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-background">
       <header className="sticky top-0 z-40 border-b border-border/80 bg-card/95 backdrop-blur-xl">
         <div className="mx-auto flex h-14 max-w-[1480px] items-center justify-between px-4 sm:h-17 sm:px-8">
           <div className="flex min-w-0 items-center gap-3 sm:gap-4">
