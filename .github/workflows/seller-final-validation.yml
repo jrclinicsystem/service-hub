@@ -25,29 +25,37 @@ jobs:
           bun-version: latest
       - name: Install dependencies
         run: bun install --frozen-lockfile
-      - name: Isolate lint failures
+      - name: Capture exact eslint messages
         run: |
-          set +e
-          : > .github/seller-lint-by-file.txt
-          for FILE in \
-            src/components/admin-sellers-workspace.tsx \
-            src/routes/admin_.vendedores.tsx \
-            src/components/admin-subpage-sidebar.tsx \
-            src/routes/admin.tsx \
-            src/components/admin-appointments-workspace.tsx \
-            src/routeTree.gen.ts
-          do
-            ./node_modules/.bin/eslint "$FILE" >/dev/null 2>&1
-            CODE=$?
-            printf '%s=%s\n' "$FILE" "$CODE" >> .github/seller-lint-by-file.txt
-          done
-          ./node_modules/.bin/eslint . >/dev/null 2>&1
-          printf 'ALL=%s\n' "$?" >> .github/seller-lint-by-file.txt
-          exit 0
+          node --input-type=module <<'NODE'
+          import { ESLint } from 'eslint';
+          import { writeFileSync } from 'node:fs';
+          const eslint = new ESLint();
+          const files = [
+            'src/components/admin-sellers-workspace.tsx',
+            'src/routes/admin_.vendedores.tsx',
+            'src/routes/admin.tsx',
+            'src/components/admin-appointments-workspace.tsx',
+          ];
+          const results = await eslint.lintFiles(files);
+          const report = results.map((result) => ({
+            filePath: result.filePath,
+            errorCount: result.errorCount,
+            warningCount: result.warningCount,
+            messages: result.messages.map((message) => ({
+              line: message.line,
+              column: message.column,
+              ruleId: message.ruleId,
+              severity: message.severity,
+              message: message.message,
+            })),
+          }));
+          writeFileSync('.github/seller-eslint-programmatic.json', JSON.stringify(report, null, 2));
+          NODE
       - name: Commit diagnostics
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .github/seller-lint-by-file.txt
-          git commit -m "chore: isolate seller lint failures"
+          git add .github/seller-eslint-programmatic.json
+          git commit -m "chore: capture exact eslint messages"
           git push origin HEAD:fix/seller-commissions-lint
