@@ -1,0 +1,51 @@
+name: Persistent admin sidebar hotfix
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/scripts/persistent_admin_sidebar_patch.py'
+      - '.github/workflows/persistent-admin-sidebar-hotfix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Apply persistent sidebar patch
+        run: python .github/scripts/persistent_admin_sidebar_patch.py
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Production build
+        run: bun run build
+
+      - name: Typecheck
+        run: bunx tsc --noEmit
+
+      - name: Commit source changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/routes/admin.tsx src/components/admin-subpage-sidebar.tsx
+          if git diff --cached --quiet; then
+            echo "No source changes to commit."
+            exit 0
+          fi
+          git commit -m "fix: keep vendedores e comissões in admin sidebar"
+          git push origin HEAD:main
