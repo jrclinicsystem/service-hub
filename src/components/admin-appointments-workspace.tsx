@@ -198,7 +198,7 @@ function playNotificationSound(audioRef: { current: AudioContext | null }) {
 }
 
 async function fetchAppointment(id: string) {
-  const { data, error } = await db.from("appointments").select("id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status, created_at, status_updated_at, payment_choice, payment_received, payment_method_code, service_price_snapshot, deposit_percent, deposit_amount, balance_amount, service:services!appointments_service_id_fkey(name, price, duration_min), appointment_services(service_id, position, price_snapshot, session_count, status, completed_at, completed_by, service:services!appointment_services_service_id_fkey(name, price, duration_min, session_count)), appointment_sessions(id, service_id, service_name_snapshot, service_position, session_number, scheduled_date, scheduled_time, status, completed_at, completed_by), professional:professionals(name, specialty), payments(status, amount, kind, payment_method_id, provider, paid_at, created_at, status_detail)").eq("id", id).maybeSingle();
+  const { data, error } = await db.from("appointments").select("id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status, created_at, status_updated_at, payment_choice, payment_received, payment_method_code, service_price_snapshot, deposit_percent, deposit_amount, balance_amount, service:services!appointments_service_id_fkey(name, price, duration_min), appointment_services(service_id, position, price_snapshot, session_count, status, completed_at, completed_by, service:services!appointment_services_service_id_fkey(name, price, duration_min, session_count)), appointment_sessions(id, service_id, service_name_snapshot, service_position, session_number, scheduled_date, scheduled_time, status, completed_at, completed_by), professional:professionals(name, specialty), payments(status, amount, kind, payment_method_id, provider, paid_at, created_at, status_detail), seller_assignment:appointment_sellers(seller_id, seller_name_snapshot, commission_percentage_snapshot, seller:sellers(id, name, commission_percentage, is_active, deleted_at))").eq("id", id).maybeSingle();
   if (error) return null;
   return data;
 }
@@ -281,7 +281,7 @@ export function AdminAppointmentsWorkspace({ appointments, onStatusChange, onRef
       if (scope === "history" && !history) return false;
       if (calendarDate && item.scheduled_date !== calendarDate) return false;
       if (!term) return true;
-      return [item.patient_name, item.patient_email, item.patient_phone, item.service?.name, item.professional?.name].some((value) => String(value ?? "").toLowerCase().includes(term));
+      return [item.patient_name, item.patient_email, item.patient_phone, item.service?.name, item.professional?.name, item.seller_assignment?.seller_name_snapshot].some((value) => String(value ?? "").toLowerCase().includes(term));
     }).sort((a, b) => {
       const left = `${a.scheduled_date} ${a.scheduled_time}`;
       const right = `${b.scheduled_date} ${b.scheduled_time}`;
@@ -393,7 +393,7 @@ function AdminAppointmentCard({ appointment, onOpen, onEdit, onDelete, onAttende
     {proximity === "urgent" && appointment.status !== "cancelado" ? <div className="mb-3 flex items-center gap-2 rounded-xl bg-amber-100 px-3 py-2 text-xs font-semibold text-amber-900"><AlertTriangle className="size-4" /> {days === 0 ? "Atendimento hoje" : "Atendimento amanhã — recontato recomendado"}</div> : proximity === "soon" ? <div className="mb-3 rounded-xl bg-amber-100/60 px-3 py-2 text-[11px] font-medium text-amber-900">Faltam {days} dias para este atendimento.</div> : null}
     <button type="button" onClick={onOpen} className="block w-full min-w-0 max-w-full overflow-hidden text-left">
       <div className="flex min-w-0 flex-wrap items-start justify-between gap-2"><div className="min-w-0 flex-1 basis-[150px]"><p className="truncate text-base font-semibold">{appointment.patient_name}</p><p className="mt-0.5 truncate text-xs text-muted-foreground">{appointment.patient_email || "Sem e-mail"}</p></div><div className="max-w-full shrink-0"><AdminStatusBadge status={appointment.status} /></div></div>
-      <div className="mt-3 rounded-xl bg-secondary/45 p-3"><p className="truncate text-sm font-medium">{appointmentServiceLabel(appointment)}</p><p className="mt-1 truncate text-xs text-muted-foreground">{appointment.professional?.name ?? "Profissional não definido"} · {appointment.professional?.specialty ?? "Equipe"}</p></div>
+      <div className="mt-3 rounded-xl bg-secondary/45 p-3"><p className="truncate text-sm font-medium">{appointmentServiceLabel(appointment)}</p><p className="mt-1 truncate text-xs text-muted-foreground">{appointment.professional?.name ?? "Profissional não definido"} · {appointment.professional?.specialty ?? "Equipe"}</p>{appointment.seller_assignment ? <p className="mt-1 truncate text-[11px] font-medium text-primary">Vendedor: {appointment.seller_assignment.seller_name_snapshot} · {Number(appointment.seller_assignment.commission_percentage_snapshot ?? 0).toLocaleString("pt-BR", { maximumFractionDigits: 4 })}%</p> : null}</div>
       {combo.isCombo ? <div className={`mt-2 rounded-xl border px-3 py-2 text-[11px] font-medium ${combo.allCompleted ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-border bg-background text-muted-foreground"}`}><div className="flex items-center justify-between gap-2"><span>Progresso do pacote</span><strong>{combo.completed} de {combo.total} sessões concluídas</strong></div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${combo.total ? (combo.completed / combo.total) * 100 : 0}%` }} /></div>{combo.allCompleted ? <p className="mt-1.5 font-semibold text-emerald-700">Todas as sessões concluídas</p> : null}</div> : null}
       <div className="mt-3 grid min-w-0 grid-cols-2 gap-2 min-[390px]:grid-cols-3"><SmallInfo label="Data" value={formatDate(appointment.scheduled_date)} /><SmallInfo label="Horário" value={appointment.scheduled_time} /><SmallInfo label="Pagamento" value={paymentLabel(appointment)} accent /></div>
     </button>
@@ -411,6 +411,7 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated, editing = null
   const [professionals, setProfessionals] = useState<any[]>([]);
   const [links, setLinks] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
+  const [sellers, setSellers] = useState<any[]>([]);
   const [comboSessions, setComboSessions] = useState<any[]>([]);
   const [comboSessionsLoading, setComboSessionsLoading] = useState(false);
   const [selectedComboLinks, setSelectedComboLinks] = useState<string[]>([]);
@@ -425,6 +426,7 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated, editing = null
   const [serviceSearch, setServiceSearch] = useState("");
   const [appointmentValue, setAppointmentValue] = useState("");
   const [professionalId, setProfessionalId] = useState("");
+  const [sellerId, setSellerId] = useState("");
   const [scheduledDate, setScheduledDate] = useState(todayIso());
   const [scheduledTime, setScheduledTime] = useState("");
   const [sessionCounts, setSessionCounts] = useState<Record<string, string>>({});
@@ -439,11 +441,12 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated, editing = null
       db.from("professionals").select("id, name, specialty, is_active, sort_order").eq("is_active", true).order("sort_order").order("name"),
       db.from("service_professionals").select("service_id, professional_id"),
       db.from("clients").select("id, name, whatsapp, email, is_active").eq("is_active", true).order("name"),
-    ]).then(([serviceResult, professionalResult, linkResult, clientResult]) => {
+      db.from("sellers").select("id, name, commission_percentage, is_active, deleted_at").order("name"),
+    ]).then(([serviceResult, professionalResult, linkResult, clientResult, sellerResult]) => {
       if (!active) return;
-      const firstError = [serviceResult, professionalResult, linkResult, clientResult].find((result) => result.error)?.error;
+      const firstError = [serviceResult, professionalResult, linkResult, clientResult, sellerResult].find((result) => result.error)?.error;
       if (firstError) toast.error(firstError.message);
-      else { setServices(serviceResult.data ?? []); setProfessionals(professionalResult.data ?? []); setLinks(linkResult.data ?? []); setClients(clientResult.data ?? []); }
+      else { setServices(serviceResult.data ?? []); setProfessionals(professionalResult.data ?? []); setLinks(linkResult.data ?? []); setClients(clientResult.data ?? []); setSellers(sellerResult.data ?? []); }
       setLoadingCatalog(false);
     });
     return () => { active = false; };
@@ -491,6 +494,7 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated, editing = null
     setServiceSearch("");
     setAppointmentValue(String(Number(editing.service_price_snapshot ?? editing.service?.price ?? 0)));
     setProfessionalId(editing.professional_id ?? editing.professional?.id ?? "");
+    setSellerId(editing.seller_assignment?.seller_id ?? "");
     setScheduledDate(editing.scheduled_date ?? todayIso());
     setScheduledTime(editing.scheduled_time ?? "");
     setSessionCounts(Object.fromEntries((editing.appointment_services ?? []).map((item: any) => {
@@ -639,7 +643,7 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated, editing = null
     });
   };
 
-  const reset = () => { setSelectedClientId(""); setSelectedComboLinks([]); setComboSessions([]); setPatientName(""); setPatientEmail(""); setPatientPhone(""); setServiceIds([]); setServiceSearch(""); setAppointmentValue(""); setProfessionalId(""); setScheduledDate(todayIso()); setScheduledTime(""); setSessionCounts({}); setNotes(""); };
+  const reset = () => { setSelectedClientId(""); setSelectedComboLinks([]); setComboSessions([]); setPatientName(""); setPatientEmail(""); setPatientPhone(""); setServiceIds([]); setServiceSearch(""); setAppointmentValue(""); setProfessionalId(""); setSellerId(""); setScheduledDate(todayIso()); setScheduledTime(""); setSessionCounts({}); setNotes(""); };
   const handleOpenChange = (next: boolean) => { if (!next && !saving) reset(); onOpenChange(next); };
 
   const saveAppointment = async () => {
@@ -692,6 +696,13 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated, editing = null
       });
       error = result.error;
       appointmentId = String(result.data ?? "");
+    }
+    if (!error && appointmentId) {
+      const sellerResult = await db.rpc("set_appointment_seller", {
+        _appointment_id: appointmentId,
+        _seller_id: sellerId || null,
+      });
+      error = sellerResult.error;
     }
     if (!error && appointmentId) {
       const configured = await db.rpc("configure_appointment_service_sessions", {
@@ -757,6 +768,7 @@ function CreateAppointmentDialog({ open, onOpenChange, onCreated, editing = null
     <div className="space-y-1.5 sm:col-span-2"><Label htmlFor="admin-appointment-value">Valor total do atendimento *</Label><Input id="admin-appointment-value" type="number" min="0" step="0.01" inputMode="decimal" value={appointmentValue} onChange={(e) => setAppointmentValue(e.target.value)} disabled={saving || !serviceIds.length} /><p className="text-[11px] text-muted-foreground">A soma dos serviços é preenchida automaticamente. Altere aqui para aplicar desconto ou valor combinado sem mudar o catálogo.</p></div>
     <div className="sm:col-span-2 rounded-xl border border-primary/10 bg-primary/[0.035] p-3 text-[11px] text-muted-foreground"><strong className="text-foreground">Cada agendamento representa uma visita.</strong> A quantidade total e o progresso das sessões ficam em <strong>Clientes → Orçamentos e combos</strong>. Para cliente com pacote já pago, selecione acima a sessão correspondente e o valor desta visita ficará em R$ 0,00.</div>
     <div className="space-y-1.5 sm:col-span-2"><Label>Profissional *</Label><Select value={professionalId} onValueChange={setProfessionalId} disabled={saving || !serviceIds.length || availableProfessionals.length === 0}><SelectTrigger><SelectValue placeholder={!serviceIds.length ? "Escolha primeiro os serviços" : availableProfessionals.length ? "Selecione o profissional" : "Nenhum profissional atende todos os serviços"} /></SelectTrigger><SelectContent>{availableProfessionals.map((professional) => <SelectItem key={professional.id} value={professional.id}>{professional.name}{professional.specialty ? ` · ${professional.specialty}` : ""}</SelectItem>)}</SelectContent></Select></div>
+    <div className="space-y-1.5 sm:col-span-2"><Label>Vendedor / indicação</Label><Select value={sellerId || "__none__"} onValueChange={(value) => setSellerId(value === "__none__" ? "" : value)} disabled={saving || loadingCatalog}><SelectTrigger><SelectValue placeholder="Sem vendedor" /></SelectTrigger><SelectContent><SelectItem value="__none__">Sem vendedor / indicação direta</SelectItem>{sellers.filter((seller) => (seller.is_active && !seller.deleted_at) || seller.id === sellerId).map((seller) => <SelectItem key={seller.id} value={seller.id}>{seller.name} · {Number(seller.commission_percentage ?? 0).toLocaleString("pt-BR", { maximumFractionDigits: 4 })}%{seller.deleted_at || !seller.is_active ? " · inativo" : ""}</SelectItem>)}</SelectContent></Select><p className="text-[11px] text-muted-foreground">Opcional. A porcentagem escolhida fica registrada neste agendamento e a comissão é calculada separadamente da comissão do profissional quando a venda entra no financeiro.</p></div>
     <div className="space-y-1.5"><Label htmlFor="admin-scheduled-date">Data *</Label><Input id="admin-scheduled-date" type="date" min={todayIso()} value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} disabled={saving} /></div>
     <div className="space-y-1.5"><Label>Horário *</Label><Select value={scheduledTime} onValueChange={setScheduledTime} disabled={saving || loadingCatalog || bookingSlotsLoading || !professionalId || !scheduledDate}><SelectTrigger><SelectValue placeholder={bookingSlotsLoading ? "Carregando horários..." : bookingSlots.length ? "Selecione o horário" : "Sem horários disponíveis"} /></SelectTrigger><SelectContent>{bookingSlots.map((slot) => <SelectItem key={`${slot.slot}-${slot.source ?? "slot"}`} value={slot.slot}>{slot.slot}</SelectItem>)}</SelectContent></Select></div>
     <div className="space-y-1.5 sm:col-span-2"><Label htmlFor="admin-notes">Observações</Label><Textarea id="admin-notes" value={notes} onChange={(e) => setNotes(e.target.value)} className="min-h-24" disabled={saving} /></div>

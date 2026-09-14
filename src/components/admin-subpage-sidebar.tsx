@@ -1,4 +1,5 @@
 import {
+  BadgePercent,
   CalendarDays,
   CircleDollarSign,
   Clock3,
@@ -14,7 +15,7 @@ import { Link } from "@tanstack/react-router";
 
 import logo from "@/assets/jr-clinic-logo.png";
 
-type ActiveSection = "home" | "team" | "catalog" | "finance" | "access" | "availability" | "clients";
+type ActiveSection = "home" | "team" | "catalog" | "finance" | "access" | "availability" | "clients" | "sellers";
 
 const mainItems = [
   { hash: "agendamentos", label: "Agendamentos", icon: CalendarDays },
@@ -26,6 +27,7 @@ const mainItems = [
 const secondaryItems = [
   { to: "/admin/equipe", label: "Agenda da equipe", icon: Users, active: "team" as const },
   { to: "/admin/acessos", label: "Acessos", icon: ShieldCheck, active: "access" as const },
+  { to: "/admin/vendedores", label: "Vendedores", icon: BadgePercent, active: "sellers" as const },
   { to: "/admin/financeiro", label: "Financeiro", icon: CircleDollarSign, active: "finance" as const },
 ] as const;
 

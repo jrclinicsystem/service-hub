@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import {
+  BadgePercent,
   CalendarDays,
   CircleDollarSign,
   Clock3,
@@ -139,7 +140,7 @@ async function loadAdminOverview() {
     db
       .from("appointments")
       .select(
-        "id, client_id, service_id, professional_id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status, created_at, status_updated_at, payment_choice, payment_received, payment_method_code, service_price_snapshot, deposit_percent, deposit_amount, balance_amount, service:services!appointments_service_id_fkey(id, name, price, duration_min), appointment_services(service_id, position, price_snapshot, session_count, status, completed_at, completed_by, service:services!appointment_services_service_id_fkey(id, name, price, duration_min, session_count)), appointment_sessions(id, service_id, service_name_snapshot, service_position, session_number, scheduled_date, scheduled_time, status, completed_at, completed_by), professional:professionals(id, name, specialty), payments(status, amount, kind, payment_method_id, provider, paid_at, created_at, status_detail)",
+        "id, client_id, service_id, professional_id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status, created_at, status_updated_at, payment_choice, payment_received, payment_method_code, service_price_snapshot, deposit_percent, deposit_amount, balance_amount, service:services!appointments_service_id_fkey(id, name, price, duration_min), appointment_services(service_id, position, price_snapshot, session_count, status, completed_at, completed_by, service:services!appointment_services_service_id_fkey(id, name, price, duration_min, session_count)), appointment_sessions(id, service_id, service_name_snapshot, service_position, session_number, scheduled_date, scheduled_time, status, completed_at, completed_by), professional:professionals(id, name, specialty), payments(status, amount, kind, payment_method_id, provider, paid_at, created_at, status_detail), seller_assignment:appointment_sellers(seller_id, seller_name_snapshot, commission_percentage_snapshot, seller:sellers(id, name, commission_percentage, is_active, deleted_at))",
       )
       .order("scheduled_date", { ascending: true })
       .order("scheduled_time", { ascending: true }),
@@ -345,6 +346,15 @@ function Admin() {
           <Metric icon={CircleDollarSign} label="Receita" value={formatPrice(revenue)} hint="realizada" />
           <Metric icon={Stethoscope} label="Serviços" value={String(activeServices)} hint="ativos" />
           <Metric icon={Users} label="Pacientes" value={String(uniquePatients)} hint="e-mails únicos" />
+        </div>
+
+        <div className="mt-3 flex flex-wrap gap-2 sm:mt-4">
+          <Button variant="outline" size="sm" className="rounded-xl" asChild>
+            <Link to="/admin/vendedores"><BadgePercent className="size-4" /> Vendedores e comissões</Link>
+          </Button>
+          <Button variant="outline" size="sm" className="rounded-xl" asChild>
+            <Link to="/admin/financeiro"><CircleDollarSign className="size-4" /> Financeiro</Link>
+          </Button>
         </div>
 
         <Tabs defaultValue="agendamentos" className="mt-5 w-full min-w-0 max-w-full sm:mt-10">
