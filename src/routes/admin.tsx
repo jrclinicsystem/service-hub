@@ -215,7 +215,9 @@ function Admin() {
     retry: 1,
   });
 
-  const refresh = () => { void queryClient.invalidateQueries({ queryKey: ["admin-overview"] }); };
+  const refresh = () => {
+    void queryClient.invalidateQueries({ queryKey: ["admin-overview"] });
+  };
 
   const signOut = async () => {
     await supabase.auth.signOut();
@@ -237,12 +239,16 @@ function Admin() {
     return (
       <div className="grid min-h-screen place-items-center bg-background px-5">
         <div className="max-w-md text-center">
-          <h1 className="text-xl font-semibold text-destructive">Não foi possível carregar o painel.</h1>
+          <h1 className="text-xl font-semibold text-destructive">
+            Não foi possível carregar o painel.
+          </h1>
           <p className="mt-2 text-sm text-muted-foreground">
             {error instanceof Error ? error.message : "Erro inesperado ao consultar o Supabase."}
           </p>
           <div className="mt-5 flex flex-col justify-center gap-2 sm:flex-row">
-            <Button variant="outline" onClick={() => refetch()}>Tentar novamente</Button>
+            <Button variant="outline" onClick={() => refetch()}>
+              Tentar novamente
+            </Button>
             <Button onClick={signOut}>Entrar novamente</Button>
           </div>
         </div>
@@ -259,10 +265,13 @@ function Admin() {
           </span>
           <h1 className="mt-5 text-2xl font-semibold">Acesso restrito</h1>
           <p className="mt-3 text-sm text-muted-foreground">
-            O e-mail {data?.currentEmail || "desta conta"} não está autorizado para administrar a JR Clinic.
+            O e-mail {data?.currentEmail || "desta conta"} não está autorizado para administrar a JR
+            Clinic.
           </p>
           <div className="mt-6 flex flex-col justify-center gap-2 sm:flex-row">
-            <Button variant="outline" asChild><Link to="/">Voltar ao site</Link></Button>
+            <Button variant="outline" asChild>
+              <Link to="/">Voltar ao site</Link>
+            </Button>
             <Button onClick={signOut}>Sair</Button>
           </div>
         </div>
@@ -272,30 +281,51 @@ function Admin() {
 
   const revenue = data.appointments
     .filter((item: any) => item.status === "atendido")
-    .reduce((total: number, item: any) => total + Number(item.service_price_snapshot ?? item.service?.price ?? 0), 0);
+    .reduce(
+      (total: number, item: any) =>
+        total + Number(item.service_price_snapshot ?? item.service?.price ?? 0),
+      0,
+    );
   const uniquePatients = new Set(data.appointments.map((item: any) => item.patient_email)).size;
   const activeServices = data.services.filter((item: any) => item.is_active).length;
 
-  const updateRow = async (table: string, idColumn: string, id: string, values: any, message?: string) => {
+  const updateRow = async (
+    table: string,
+    idColumn: string,
+    id: string,
+    values: any,
+    message?: string,
+  ) => {
     const { error } = await db.from(table).update(values).eq(idColumn, id);
-    if (error) { toast.error(error.message); return false; }
+    if (error) {
+      toast.error(error.message);
+      return false;
+    }
     if (message) toast.success(message);
     refresh();
     return true;
   };
 
-  const updateAppointmentStatus = async (id: string, status: "pendente" | "confirmado" | "cancelado") => {
+  const updateAppointmentStatus = async (
+    id: string,
+    status: "pendente" | "confirmado" | "cancelado",
+  ) => {
     return updateRow(
       "appointments",
       "id",
       id,
       { status },
-      status === "confirmado" ? "Agendamento confirmado." : status === "cancelado" ? "Agendamento recusado/cancelado." : "Status atualizado.",
+      status === "confirmado"
+        ? "Agendamento confirmado."
+        : status === "cancelado"
+          ? "Agendamento recusado/cancelado."
+          : "Status atualizado.",
     );
   };
 
   const categoryName = (service: any) =>
-    data.categories.find((category: any) => category.id === service.category_id)?.name ?? "Sem categoria";
+    data.categories.find((category: any) => category.id === service.category_id)?.name ??
+    "Sem categoria";
 
   return (
     <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-background">
@@ -306,14 +336,26 @@ function Admin() {
             <span className="hidden h-6 w-px bg-border sm:block" />
             <div className="hidden min-w-0 sm:block">
               <p className="text-sm font-semibold">Administração</p>
-              <p className="max-w-[220px] truncate text-[11px] text-muted-foreground">{data.currentEmail}</p>
+              <p className="max-w-[220px] truncate text-[11px] text-muted-foreground">
+                {data.currentEmail}
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-1 sm:gap-2">
-            <Button variant="ghost" size="sm" className="h-9 px-2.5 text-xs sm:px-3 sm:text-sm" asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-9 px-2.5 text-xs sm:px-3 sm:text-sm"
+              asChild
+            >
               <Link to="/">Ver site</Link>
             </Button>
-            <Button variant="outline" size="sm" className="h-9 rounded-full px-2.5 sm:px-3" onClick={signOut}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 rounded-full px-2.5 sm:px-3"
+              onClick={signOut}
+            >
               <LogOut className="size-3.5 sm:size-4" />
               <span className="hidden sm:inline">Sair</span>
             </Button>
@@ -323,13 +365,17 @@ function Admin() {
 
       <main className="mx-auto w-full min-w-0 max-w-[1480px] overflow-x-hidden px-4 pb-10 pt-5 sm:px-8 sm:py-10">
         <div className="sm:hidden">
-          <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Administração</p>
+          <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+            Administração
+          </p>
           <div className="mt-1 flex items-end justify-between gap-3">
             <div className="min-w-0">
               <h1 className="text-[26px] font-semibold leading-tight">Painel de controle</h1>
               <p className="mt-1 truncate text-xs text-muted-foreground">{data.currentEmail}</p>
             </div>
-            <span className="shrink-0 rounded-full bg-primary-soft px-2.5 py-1 text-[11px] font-medium text-primary">Online</span>
+            <span className="shrink-0 rounded-full bg-primary-soft px-2.5 py-1 text-[11px] font-medium text-primary">
+              Online
+            </span>
           </div>
         </div>
 
@@ -337,38 +383,81 @@ function Admin() {
           <span className="eyebrow text-muted-foreground">Controle da clínica</span>
           <h1 className="mt-2 text-4xl font-semibold">Painel de controle</h1>
           <p className="mt-3 max-w-[58ch] text-muted-foreground">
-            Gerencie agendamentos, catálogo, promoções, horários disponíveis e acessos administrativos.
+            Gerencie agendamentos, catálogo, promoções, horários disponíveis e acessos
+            administrativos.
           </p>
         </div>
 
         <div className="mt-5 grid grid-cols-2 gap-2.5 sm:mt-8 sm:gap-4 lg:grid-cols-4">
-          <Metric icon={CalendarDays} label="Agendamentos" value={String(data.appointments.length)} hint="no sistema" />
-          <Metric icon={CircleDollarSign} label="Receita" value={formatPrice(revenue)} hint="realizada" />
-          <Metric icon={Stethoscope} label="Serviços" value={String(activeServices)} hint="ativos" />
-          <Metric icon={Users} label="Pacientes" value={String(uniquePatients)} hint="e-mails únicos" />
+          <Metric
+            icon={CalendarDays}
+            label="Agendamentos"
+            value={String(data.appointments.length)}
+            hint="no sistema"
+          />
+          <Metric
+            icon={CircleDollarSign}
+            label="Receita"
+            value={formatPrice(revenue)}
+            hint="realizada"
+          />
+          <Metric
+            icon={Stethoscope}
+            label="Serviços"
+            value={String(activeServices)}
+            hint="ativos"
+          />
+          <Metric
+            icon={Users}
+            label="Pacientes"
+            value={String(uniquePatients)}
+            hint="e-mails únicos"
+          />
         </div>
 
         <div className="mt-3 flex flex-wrap gap-2 sm:mt-4">
           <Button variant="outline" size="sm" className="rounded-xl" asChild>
-            <Link to="/admin/vendedores"><BadgePercent className="size-4" /> Vendedores e comissões</Link>
+            <Link to="/admin/vendedores">
+              <BadgePercent className="size-4" /> Vendedores e comissões
+            </Link>
           </Button>
           <Button variant="outline" size="sm" className="rounded-xl" asChild>
-            <Link to="/admin/financeiro"><CircleDollarSign className="size-4" /> Financeiro</Link>
+            <Link to="/admin/financeiro">
+              <CircleDollarSign className="size-4" /> Financeiro
+            </Link>
           </Button>
         </div>
 
         <Tabs defaultValue="agendamentos" className="mt-5 w-full min-w-0 max-w-full sm:mt-10">
           <div className="sticky top-14 z-30 -mx-4 border-y border-border/70 bg-background/95 px-3 py-2 backdrop-blur-xl sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
             <TabsList className="grid h-auto w-full grid-cols-5 gap-1 rounded-2xl bg-secondary/70 p-1 sm:inline-flex sm:w-auto sm:justify-start sm:rounded-xl">
-              <MobileTab value="agendamentos" icon={CalendarDays} label="Agenda" desktopLabel="Agendamentos" />
-              <MobileTab value="servicos" icon={Stethoscope} label="Serviços" desktopLabel="Serviços" />
+              <MobileTab
+                value="agendamentos"
+                icon={CalendarDays}
+                label="Agenda"
+                desktopLabel="Agendamentos"
+              />
+              <MobileTab
+                value="servicos"
+                icon={Stethoscope}
+                label="Serviços"
+                desktopLabel="Serviços"
+              />
               <MobileTab value="promocoes" icon={Tag} label="Ofertas" desktopLabel="Promoções" />
               <MobileTab value="horarios" icon={Clock3} label="Horários" desktopLabel="Horários" />
-              <MobileTab value="acessos" icon={ShieldCheck} label="Acessos" desktopLabel="Acessos" />
+              <MobileTab
+                value="acessos"
+                icon={ShieldCheck}
+                label="Acessos"
+                desktopLabel="Acessos"
+              />
             </TabsList>
           </div>
 
-          <TabsContent value="agendamentos" className="mt-4 w-full min-w-0 max-w-full overflow-x-hidden sm:mt-5">
+          <TabsContent
+            value="agendamentos"
+            className="mt-4 w-full min-w-0 max-w-full overflow-x-hidden sm:mt-5"
+          >
             <AdminAppointmentsWorkspace
               appointments={data.appointments}
               onStatusChange={updateAppointmentStatus}
@@ -392,11 +481,16 @@ function Admin() {
 
             <div className="space-y-2.5 md:hidden">
               {data.services.map((service: any) => (
-                <div key={service.id} className="rounded-2xl border border-border bg-card p-4 shadow-soft">
+                <div
+                  key={service.id}
+                  className="rounded-2xl border border-border bg-card p-4 shadow-soft"
+                >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold">{service.name}</p>
-                      <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{categoryName(service)} · {service.professional || "Sem profissional"}</p>
+                      <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                        {categoryName(service)} · {service.professional || "Sem profissional"}
+                      </p>
                     </div>
                     <ServiceEditor
                       service={service}
@@ -408,15 +502,27 @@ function Admin() {
                   </div>
                   <div className="mt-3 flex items-center justify-between border-t border-border/70 pt-3">
                     <div>
-                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Valor</p>
-                      <p className="text-sm font-semibold text-primary">{formatPrice(service.price)}</p>
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                        Valor
+                      </p>
+                      <p className="text-sm font-semibold text-primary">
+                        {formatPrice(service.price)}
+                      </p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-muted-foreground">{service.is_active ? "Publicado" : "Oculto"}</span>
+                      <span className="text-[11px] text-muted-foreground">
+                        {service.is_active ? "Publicado" : "Oculto"}
+                      </span>
                       <Switch
                         checked={service.is_active}
                         onCheckedChange={(is_active) =>
-                          updateRow("services", "id", service.id, { is_active }, is_active ? "Serviço publicado." : "Serviço ocultado.")
+                          updateRow(
+                            "services",
+                            "id",
+                            service.id,
+                            { is_active },
+                            is_active ? "Serviço publicado." : "Serviço ocultado.",
+                          )
                         }
                       />
                     </div>
@@ -427,10 +533,15 @@ function Admin() {
 
             <div className="hidden md:block">
               <PanelTable>
-                <TableHeader><TableRow>
-                  <TableHead>Serviço</TableHead><TableHead>Categoria</TableHead>
-                  <TableHead>Valor</TableHead><TableHead>Publicado</TableHead><TableHead />
-                </TableRow></TableHeader>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Serviço</TableHead>
+                    <TableHead>Categoria</TableHead>
+                    <TableHead>Valor</TableHead>
+                    <TableHead>Publicado</TableHead>
+                    <TableHead />
+                  </TableRow>
+                </TableHeader>
                 <TableBody>
                   {data.services.map((service: any) => (
                     <TableRow key={service.id}>
@@ -438,13 +549,21 @@ function Admin() {
                         <p className="font-medium">{service.name}</p>
                         <p className="text-xs text-muted-foreground">{service.professional}</p>
                       </TableCell>
-                      <TableCell className="text-muted-foreground">{categoryName(service)}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {categoryName(service)}
+                      </TableCell>
                       <TableCell className="font-medium">{formatPrice(service.price)}</TableCell>
                       <TableCell>
                         <Switch
                           checked={service.is_active}
                           onCheckedChange={(is_active) =>
-                            updateRow("services", "id", service.id, { is_active }, is_active ? "Serviço publicado." : "Serviço ocultado.")
+                            updateRow(
+                              "services",
+                              "id",
+                              service.id,
+                              { is_active },
+                              is_active ? "Serviço publicado." : "Serviço ocultado.",
+                            )
                           }
                         />
                       </TableCell>
@@ -473,46 +592,74 @@ function Admin() {
             <div className="grid gap-2.5 sm:gap-4 md:grid-cols-2 xl:grid-cols-3">
               {data.promotions.length === 0 ? (
                 <EmptyCard icon={Tag} text="Nenhuma promoção cadastrada ainda." />
-              ) : data.promotions.map((promotion: any) => (
-                <div key={promotion.id} className="rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <Badge variant={promotion.is_active ? "default" : "secondary"} className="rounded-full px-2 py-0 text-[10px] sm:text-xs">
-                        {promotion.is_active ? "Ativa" : "Pausada"}
-                      </Badge>
-                      <h3 className="mt-2 truncate text-sm font-semibold sm:mt-3 sm:text-lg">{promotion.title}</h3>
+              ) : (
+                data.promotions.map((promotion: any) => (
+                  <div
+                    key={promotion.id}
+                    className="rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-5"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <Badge
+                          variant={promotion.is_active ? "default" : "secondary"}
+                          className="rounded-full px-2 py-0 text-[10px] sm:text-xs"
+                        >
+                          {promotion.is_active ? "Ativa" : "Pausada"}
+                        </Badge>
+                        <h3 className="mt-2 truncate text-sm font-semibold sm:mt-3 sm:text-lg">
+                          {promotion.title}
+                        </h3>
+                      </div>
+                      <Switch
+                        checked={promotion.is_active}
+                        onCheckedChange={(is_active) =>
+                          updateRow(
+                            "promotions",
+                            "id",
+                            promotion.id,
+                            { is_active },
+                            "Promoção atualizada.",
+                          )
+                        }
+                      />
                     </div>
-                    <Switch
-                      checked={promotion.is_active}
-                      onCheckedChange={(is_active) =>
-                        updateRow("promotions", "id", promotion.id, { is_active }, "Promoção atualizada.")
-                      }
-                    />
+                    {promotion.description ? (
+                      <p className="mt-1.5 line-clamp-2 text-xs text-muted-foreground sm:mt-2 sm:text-sm">
+                        {promotion.description}
+                      </p>
+                    ) : null}
+                    <p className="mt-3 text-sm font-semibold text-primary sm:mt-4">
+                      {promotion.promotional_price != null
+                        ? formatPrice(promotion.promotional_price)
+                        : promotion.discount_percent != null
+                          ? `${promotion.discount_percent}% de desconto`
+                          : "Oferta"}
+                    </p>
                   </div>
-                  {promotion.description ? <p className="mt-1.5 line-clamp-2 text-xs text-muted-foreground sm:mt-2 sm:text-sm">{promotion.description}</p> : null}
-                  <p className="mt-3 text-sm font-semibold text-primary sm:mt-4">
-                    {promotion.promotional_price != null
-                      ? formatPrice(promotion.promotional_price)
-                      : promotion.discount_percent != null
-                        ? `${promotion.discount_percent}% de desconto`
-                        : "Oferta"}
-                  </p>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </TabsContent>
 
           <TabsContent value="horarios" className="mt-4 sm:mt-5">
-            <SectionHeader title="Horários disponíveis" subtitle="Ative ou pause horários exibidos no agendamento." />
+            <SectionHeader
+              title="Horários disponíveis"
+              subtitle="Ative ou pause horários exibidos no agendamento."
+            />
             <CustomTimeSlotAdder onAdded={refresh} />
             <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
               {data.timeSlots.map((slot: any) => (
-                <div key={slot.id} className="flex min-h-[74px] items-center justify-between rounded-2xl border border-border bg-card px-3.5 py-3 shadow-soft sm:p-4">
+                <div
+                  key={slot.id}
+                  className="flex min-h-[74px] items-center justify-between rounded-2xl border border-border bg-card px-3.5 py-3 shadow-soft sm:p-4"
+                >
                   <div className="flex items-center gap-2 sm:gap-3">
                     <span className="grid size-7 place-items-center rounded-lg bg-primary-soft text-primary sm:size-8">
                       <Clock3 className="size-3.5 sm:size-4" />
                     </span>
-                    <span className="text-sm font-semibold lining-nums tabular-nums">{slot.slot}</span>
+                    <span className="text-sm font-semibold lining-nums tabular-nums">
+                      {slot.slot}
+                    </span>
                   </div>
                   <Switch
                     checked={slot.is_available}
@@ -535,16 +682,27 @@ function Admin() {
               {data.adminEmails.map((item: any) => {
                 const isCurrent = item.email === data.currentEmail;
                 return (
-                  <div key={item.email} className="flex items-center justify-between gap-3 border-b border-border px-4 py-3.5 last:border-b-0 sm:gap-4 sm:px-5 sm:py-4">
+                  <div
+                    key={item.email}
+                    className="flex items-center justify-between gap-3 border-b border-border px-4 py-3.5 last:border-b-0 sm:gap-4 sm:px-5 sm:py-4"
+                  >
                     <div className="min-w-0">
                       <p className="truncate text-xs font-semibold sm:text-sm">{item.email}</p>
-                      <p className="mt-0.5 text-[10px] text-muted-foreground sm:text-xs">{isCurrent ? "Seu acesso atual" : "Acesso administrativo"}</p>
+                      <p className="mt-0.5 text-[10px] text-muted-foreground sm:text-xs">
+                        {isCurrent ? "Seu acesso atual" : "Acesso administrativo"}
+                      </p>
                     </div>
                     <Switch
                       checked={item.enabled}
                       disabled={isCurrent}
                       onCheckedChange={(enabled) =>
-                        updateRow("admin_emails", "email", item.email, { enabled }, "Permissão atualizada.")
+                        updateRow(
+                          "admin_emails",
+                          "email",
+                          item.email,
+                          { enabled },
+                          "Permissão atualizada.",
+                        )
                       }
                     />
                   </div>
@@ -573,10 +731,7 @@ function CustomTimeSlotAdder({ onAdded }: { onAdded: () => void }) {
       const sortOrder = Number(time.replace(":", ""));
       const { error } = await db
         .from("time_slots")
-        .upsert(
-          { slot: time, is_available: true, sort_order: sortOrder },
-          { onConflict: "slot" },
-        );
+        .upsert({ slot: time, is_available: true, sort_order: sortOrder }, { onConflict: "slot" });
       if (error) throw error;
 
       setTime("");
@@ -630,7 +785,9 @@ function Metric({ icon: Icon, label, value, hint }: any) {
         </span>
         <p className="text-[10px] text-muted-foreground sm:mt-4 sm:text-sm">{label}</p>
       </div>
-      <p className="mt-2 truncate font-sans text-xl font-semibold tracking-tight lining-nums tabular-nums sm:mt-0 sm:text-2xl">{value}</p>
+      <p className="mt-2 truncate font-sans text-xl font-semibold tracking-tight lining-nums tabular-nums sm:mt-0 sm:text-2xl">
+        {value}
+      </p>
       <p className="mt-0.5 text-[10px] text-muted-foreground sm:mt-1 sm:text-xs">{hint}</p>
     </div>
   );
@@ -641,7 +798,9 @@ function SectionHeader({ title, subtitle, action }: any) {
     <div className="mb-3 flex items-center justify-between gap-3 sm:mb-4 sm:flex-wrap sm:items-end sm:gap-4">
       <div className="min-w-0">
         <h2 className="text-base font-semibold sm:text-lg">{title}</h2>
-        <p className="mt-0.5 line-clamp-1 text-[11px] text-muted-foreground sm:text-sm">{subtitle}</p>
+        <p className="mt-0.5 line-clamp-1 text-[11px] text-muted-foreground sm:text-sm">
+          {subtitle}
+        </p>
       </div>
       <div className="shrink-0">{action}</div>
     </div>
@@ -649,7 +808,11 @@ function SectionHeader({ title, subtitle, action }: any) {
 }
 
 function PanelTable({ children }: { children: React.ReactNode }) {
-  return <div className="overflow-x-auto rounded-2xl border border-border bg-card shadow-soft"><Table>{children}</Table></div>;
+  return (
+    <div className="overflow-x-auto rounded-2xl border border-border bg-card shadow-soft">
+      <Table>{children}</Table>
+    </div>
+  );
 }
 
 function EmptyCard({ icon: Icon, text }: any) {
@@ -683,7 +846,8 @@ function ServiceEditor({
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(service?.name ?? "");
   const [categoryId, setCategoryId] = useState(service?.category_id ?? categories[0]?.id ?? "");
-  const [selectedProfessionalIds, setSelectedProfessionalIds] = useState<string[]>(fallbackProfessionalIds);
+  const [selectedProfessionalIds, setSelectedProfessionalIds] =
+    useState<string[]>(fallbackProfessionalIds);
   const [duration, setDuration] = useState(String(service?.duration_min ?? 30));
   const [sessionCount, setSessionCount] = useState(String(service?.session_count ?? 1));
   const [price, setPrice] = useState(String(service?.price ?? ""));
@@ -716,9 +880,9 @@ function ServiceEditor({
       selectedProfessionalIds.includes(item.id),
     );
     const professionalNames = selectedProfessionals.map((item: any) => item.name).join(", ");
-    const professionalRoles = [...new Set(
-      selectedProfessionals.map((item: any) => item.specialty).filter(Boolean),
-    )].join(" · ");
+    const professionalRoles = [
+      ...new Set(selectedProfessionals.map((item: any) => item.specialty).filter(Boolean)),
+    ].join(" · ");
 
     const payload = {
       name: name.trim(),
@@ -769,7 +933,9 @@ function ServiceEditor({
     if (linkError) {
       if (!service?.id && serviceId) await db.from("services").delete().eq("id", serviceId);
       setBusy(false);
-      toast.error(`Serviço salvo, mas não foi possível vincular o profissional: ${linkError.message}`);
+      toast.error(
+        `Serviço salvo, mas não foi possível vincular o profissional: ${linkError.message}`,
+      );
       return;
     }
 
@@ -784,7 +950,9 @@ function ServiceEditor({
         .in("professional_id", removedProfessionalIds);
       if (unlinkError) {
         setBusy(false);
-        toast.error(`Serviço salvo, mas um vínculo antigo não pôde ser removido: ${unlinkError.message}`);
+        toast.error(
+          `Serviço salvo, mas um vínculo antigo não pôde ser removido: ${unlinkError.message}`,
+        );
         return;
       }
     }
@@ -811,12 +979,18 @@ function ServiceEditor({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {service ? (
-          <Button variant="ghost" size="icon" className="size-8 rounded-lg sm:size-9" aria-label={`Editar ${service.name}`}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8 rounded-lg sm:size-9"
+            aria-label={`Editar ${service.name}`}
+          >
             <Pencil className="size-3.5 sm:size-4" />
           </Button>
         ) : (
           <Button size="sm" className="h-9 rounded-full px-3 text-xs sm:h-10 sm:px-4 sm:text-sm">
-            <Plus className="size-3.5 sm:size-4" /> <span className="sm:hidden">Novo</span><span className="hidden sm:inline">Novo serviço</span>
+            <Plus className="size-3.5 sm:size-4" /> <span className="sm:hidden">Novo</span>
+            <span className="hidden sm:inline">Novo serviço</span>
           </Button>
         )}
       </DialogTrigger>
@@ -824,17 +998,30 @@ function ServiceEditor({
         <DialogHeader>
           <DialogTitle>{service ? "Editar serviço" : "Novo serviço"}</DialogTitle>
           <DialogDescription>
-            Preencha os dados abaixo. O profissional selecionado também será disponibilizado na etapa de agendamento.
+            Preencha os dados abaixo. O profissional selecionado também será disponibilizado na
+            etapa de agendamento.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-2 sm:grid-cols-2">
           <Field label="Nome do serviço" hint="Nome que o cliente verá no catálogo.">
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex.: Limpeza dental" />
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Ex.: Limpeza dental"
+            />
           </Field>
           <Field label="Categoria" hint="Define em qual seção do catálogo o serviço aparece.">
             <Select value={categoryId} onValueChange={setCategoryId}>
-              <SelectTrigger><SelectValue placeholder="Selecione a categoria" /></SelectTrigger>
-              <SelectContent>{categories.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione a categoria" />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map((c: any) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
             </Select>
           </Field>
 
@@ -855,7 +1042,9 @@ function ServiceEditor({
                       <label
                         key={item.id}
                         className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors ${
-                          checked ? "border-primary bg-primary-soft/60" : "border-border bg-background hover:bg-secondary/40"
+                          checked
+                            ? "border-primary bg-primary-soft/60"
+                            : "border-border bg-background hover:bg-secondary/40"
                         } ${item.is_active ? "" : "opacity-60"}`}
                       >
                         <Checkbox
@@ -866,7 +1055,8 @@ function ServiceEditor({
                         <span className="min-w-0">
                           <span className="block truncate text-sm font-medium">{item.name}</span>
                           <span className="mt-0.5 block text-[11px] text-muted-foreground">
-                            {item.specialty || "Profissional da clínica"}{item.is_active ? "" : " · inativo"}
+                            {item.specialty || "Profissional da clínica"}
+                            {item.is_active ? "" : " · inativo"}
                           </span>
                         </span>
                       </label>
@@ -876,20 +1066,46 @@ function ServiceEditor({
               </div>
               {selectedProfessionalIds.length > 0 ? (
                 <p className="mt-2 text-[11px] font-medium text-primary">
-                  {selectedProfessionalIds.length} profissional{selectedProfessionalIds.length > 1 ? "is" : ""} selecionado{selectedProfessionalIds.length > 1 ? "s" : ""}.
+                  {selectedProfessionalIds.length} profissional
+                  {selectedProfessionalIds.length > 1 ? "is" : ""} selecionado
+                  {selectedProfessionalIds.length > 1 ? "s" : ""}.
                 </p>
               ) : null}
             </Field>
           </div>
 
           <Field label="Duração" hint="Tempo médio do atendimento, em minutos.">
-            <Input type="number" min="1" value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="Ex.: 60" />
+            <Input
+              type="number"
+              min="1"
+              value={duration}
+              onChange={(e) => setDuration(e.target.value)}
+              placeholder="Ex.: 60"
+            />
           </Field>
-          <Field label="Sessões padrão" hint="Use 1 para serviço avulso. Ex.: combo com 3 sessões = 3.">
-            <Input type="number" min="1" max="50" value={sessionCount} onChange={(e) => setSessionCount(e.target.value)} placeholder="1" />
+          <Field
+            label="Sessões padrão"
+            hint="Use 1 para serviço avulso. Ex.: combo com 3 sessões = 3."
+          >
+            <Input
+              type="number"
+              min="1"
+              max="50"
+              value={sessionCount}
+              onChange={(e) => setSessionCount(e.target.value)}
+              placeholder="1"
+            />
           </Field>
-          <Field label="Valor do serviço" hint="Preço integral antes de promoções ou sinal de pagamento.">
-            <Input inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Ex.: 150,00" />
+          <Field
+            label="Valor do serviço"
+            hint="Preço integral antes de promoções ou sinal de pagamento."
+          >
+            <Input
+              inputMode="decimal"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              placeholder="Ex.: 150,00"
+            />
           </Field>
           <div className="sm:col-span-2">
             <Field label="Resumo" hint="Texto curto exibido no cartão do serviço no catálogo.">
@@ -901,7 +1117,10 @@ function ServiceEditor({
             </Field>
           </div>
           <div className="sm:col-span-2">
-            <Field label="Descrição completa" hint="Explique com mais detalhes o procedimento, benefícios e informações importantes.">
+            <Field
+              label="Descrição completa"
+              hint="Explique com mais detalhes o procedimento, benefícios e informações importantes."
+            >
               <Textarea
                 value={descriptionText}
                 onChange={(e) => setDescriptionText(e.target.value)}
@@ -911,7 +1130,11 @@ function ServiceEditor({
             </Field>
           </div>
         </div>
-        <DialogFooter><Button className="w-full sm:w-auto" disabled={busy} onClick={save}>{busy ? "Salvando..." : "Salvar serviço"}</Button></DialogFooter>
+        <DialogFooter>
+          <Button className="w-full sm:w-auto" disabled={busy} onClick={save}>
+            {busy ? "Salvando..." : "Salvar serviço"}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -929,7 +1152,10 @@ function PromotionEditor({ services, onSaved }: any) {
   const [busy, setBusy] = useState(false);
 
   const save = async () => {
-    if (!titleValue.trim() || (!discount && !promoPrice)) { toast.error("Informe o título e o desconto ou preço promocional."); return; }
+    if (!titleValue.trim() || (!discount && !promoPrice)) {
+      toast.error("Informe o título e o desconto ou preço promocional.");
+      return;
+    }
     setBusy(true);
     const { error } = await db.from("promotions").insert({
       title: titleValue.trim(),
@@ -942,7 +1168,10 @@ function PromotionEditor({ services, onSaved }: any) {
       is_active: true,
     });
     setBusy(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
     toast.success("Promoção criada.");
     setOpen(false);
     onSaved();
@@ -952,26 +1181,80 @@ function PromotionEditor({ services, onSaved }: any) {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button size="sm" className="h-9 rounded-full px-3 text-xs sm:h-10 sm:px-4 sm:text-sm">
-          <Plus className="size-3.5 sm:size-4" /> <span className="sm:hidden">Nova</span><span className="hidden sm:inline">Nova promoção</span>
+          <Plus className="size-3.5 sm:size-4" /> <span className="sm:hidden">Nova</span>
+          <span className="hidden sm:inline">Nova promoção</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="max-h-[92dvh] w-[calc(100%-1rem)] overflow-y-auto rounded-2xl p-5 sm:max-w-lg sm:p-6">
-        <DialogHeader><DialogTitle>Nova promoção</DialogTitle><DialogDescription>Defina a oferta e, se desejar, um período.</DialogDescription></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>Nova promoção</DialogTitle>
+          <DialogDescription>Defina a oferta e, se desejar, um período.</DialogDescription>
+        </DialogHeader>
         <div className="grid gap-4 py-2 sm:grid-cols-2">
-          <div className="sm:col-span-2"><Field label="Título"><Input value={titleValue} onChange={(e) => setTitleValue(e.target.value)} /></Field></div>
-          <div className="sm:col-span-2"><Field label="Descrição"><Textarea value={descriptionValue} onChange={(e) => setDescriptionValue(e.target.value)} /></Field></div>
-          <div className="sm:col-span-2"><Field label="Serviço">
-            <Select value={serviceId} onValueChange={setServiceId}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent><SelectItem value="all">Todos / institucional</SelectItem>{services.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
-            </Select>
-          </Field></div>
-          <Field label="Desconto (%)"><Input inputMode="decimal" value={discount} onChange={(e) => setDiscount(e.target.value)} /></Field>
-          <Field label="Preço promocional"><Input inputMode="decimal" value={promoPrice} onChange={(e) => setPromoPrice(e.target.value)} /></Field>
-          <Field label="Início"><Input type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} /></Field>
-          <Field label="Fim"><Input type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} /></Field>
+          <div className="sm:col-span-2">
+            <Field label="Título">
+              <Input value={titleValue} onChange={(e) => setTitleValue(e.target.value)} />
+            </Field>
+          </div>
+          <div className="sm:col-span-2">
+            <Field label="Descrição">
+              <Textarea
+                value={descriptionValue}
+                onChange={(e) => setDescriptionValue(e.target.value)}
+              />
+            </Field>
+          </div>
+          <div className="sm:col-span-2">
+            <Field label="Serviço">
+              <Select value={serviceId} onValueChange={setServiceId}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos / institucional</SelectItem>
+                  {services.map((s: any) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
+          <Field label="Desconto (%)">
+            <Input
+              inputMode="decimal"
+              value={discount}
+              onChange={(e) => setDiscount(e.target.value)}
+            />
+          </Field>
+          <Field label="Preço promocional">
+            <Input
+              inputMode="decimal"
+              value={promoPrice}
+              onChange={(e) => setPromoPrice(e.target.value)}
+            />
+          </Field>
+          <Field label="Início">
+            <Input
+              type="datetime-local"
+              value={startsAt}
+              onChange={(e) => setStartsAt(e.target.value)}
+            />
+          </Field>
+          <Field label="Fim">
+            <Input
+              type="datetime-local"
+              value={endsAt}
+              onChange={(e) => setEndsAt(e.target.value)}
+            />
+          </Field>
         </div>
-        <DialogFooter><Button className="w-full sm:w-auto" disabled={busy} onClick={save}>{busy ? "Criando..." : "Criar promoção"}</Button></DialogFooter>
+        <DialogFooter>
+          <Button className="w-full sm:w-auto" disabled={busy} onClick={save}>
+            {busy ? "Criando..." : "Criar promoção"}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -984,11 +1267,19 @@ function AdminEmailEditor({ onSaved }: any) {
 
   const save = async () => {
     const normalized = email.trim().toLowerCase();
-    if (!normalized.includes("@")) { toast.error("Digite um e-mail válido."); return; }
+    if (!normalized.includes("@")) {
+      toast.error("Digite um e-mail válido.");
+      return;
+    }
     setBusy(true);
-    const { error } = await db.from("admin_emails").upsert({ email: normalized, enabled: true }, { onConflict: "email" });
+    const { error } = await db
+      .from("admin_emails")
+      .upsert({ email: normalized, enabled: true }, { onConflict: "email" });
     setBusy(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
     toast.success("E-mail autorizado.");
     setEmail("");
     setOpen(false);
@@ -999,13 +1290,28 @@ function AdminEmailEditor({ onSaved }: any) {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button size="sm" className="h-9 rounded-full px-3 text-xs sm:h-10 sm:px-4 sm:text-sm">
-          <Plus className="size-3.5 sm:size-4" /> <span className="sm:hidden">Adicionar</span><span className="hidden sm:inline">Adicionar acesso</span>
+          <Plus className="size-3.5 sm:size-4" /> <span className="sm:hidden">Adicionar</span>
+          <span className="hidden sm:inline">Adicionar acesso</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="w-[calc(100%-1rem)] rounded-2xl p-5 sm:max-w-md sm:p-6">
-        <DialogHeader><DialogTitle>Autorizar e-mail</DialogTitle><DialogDescription>O usuário ainda precisará entrar na própria conta.</DialogDescription></DialogHeader>
-        <Field label="E-mail"><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="nome@empresa.com" /></Field>
-        <DialogFooter><Button className="w-full sm:w-auto" disabled={busy} onClick={save}>{busy ? "Salvando..." : "Autorizar"}</Button></DialogFooter>
+        <DialogHeader>
+          <DialogTitle>Autorizar e-mail</DialogTitle>
+          <DialogDescription>O usuário ainda precisará entrar na própria conta.</DialogDescription>
+        </DialogHeader>
+        <Field label="E-mail">
+          <Input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="nome@empresa.com"
+          />
+        </Field>
+        <DialogFooter>
+          <Button className="w-full sm:w-auto" disabled={busy} onClick={save}>
+            {busy ? "Salvando..." : "Autorizar"}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -1024,7 +1330,9 @@ function Field({
     <div>
       <Label className="mb-2 block">{label}</Label>
       {children}
-      {hint ? <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">{hint}</p> : null}
+      {hint ? (
+        <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">{hint}</p>
+      ) : null}
     </div>
   );
 }
