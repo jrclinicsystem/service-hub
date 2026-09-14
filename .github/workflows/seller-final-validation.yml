@@ -25,18 +25,29 @@ jobs:
           bun-version: latest
       - name: Install dependencies
         run: bun install --frozen-lockfile
-      - name: Capture eslint diagnostics
+      - name: Isolate lint failures
         run: |
           set +e
-          bunx eslint . --format json > .github/seller-eslint.json 2> .github/seller-eslint.stderr
-          CODE=$?
-          printf 'exit_code=%s\n' "$CODE" > .github/seller-eslint-exit.txt
-          wc -c .github/seller-eslint.json .github/seller-eslint.stderr .github/seller-eslint-exit.txt
+          : > .github/seller-lint-by-file.txt
+          for FILE in \
+            src/components/admin-sellers-workspace.tsx \
+            src/routes/admin_.vendedores.tsx \
+            src/components/admin-subpage-sidebar.tsx \
+            src/routes/admin.tsx \
+            src/components/admin-appointments-workspace.tsx \
+            src/routeTree.gen.ts
+          do
+            ./node_modules/.bin/eslint "$FILE" >/dev/null 2>&1
+            CODE=$?
+            printf '%s=%s\n' "$FILE" "$CODE" >> .github/seller-lint-by-file.txt
+          done
+          ./node_modules/.bin/eslint . >/dev/null 2>&1
+          printf 'ALL=%s\n' "$?" >> .github/seller-lint-by-file.txt
           exit 0
       - name: Commit diagnostics
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .github/seller-eslint.json .github/seller-eslint.stderr .github/seller-eslint-exit.txt
-          git commit -m "chore: capture eslint diagnostics"
+          git add .github/seller-lint-by-file.txt
+          git commit -m "chore: isolate seller lint failures"
           git push origin HEAD:fix/seller-commissions-lint
