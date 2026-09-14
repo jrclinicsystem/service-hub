@@ -393,27 +393,26 @@ export function AdminAppointmentsWorkspace({
   const removeAppointment = async (appointment: any) => {
     if (
       !window.confirm(
-        `Cancelar e arquivar o agendamento de ${appointment.patient_name}? Ele continuará no histórico e poderá ser reagendado depois.`,
+        `Excluir definitivamente o agendamento de ${appointment.patient_name}? Esta ação é irreversível e o registro não ficará no Histórico.`,
       )
     )
       return;
     setDeletingId(appointment.id);
-    const { error } = await db
-      .from("appointments")
-      .update({ status: "cancelado", status_updated_at: new Date().toISOString() })
-      .eq("id", appointment.id);
+    const { error } = await db.rpc("delete_appointment_permanently", {
+      _appointment_id: appointment.id,
+    });
     setDeletingId(null);
     if (error) {
-      toast.error(error.message);
+      toast.error("Não foi possível excluir o agendamento.", {
+        description: error.message,
+      });
       return;
     }
-    if (selected?.id === appointment.id)
-      setSelected((current: any) => (current ? { ...current, status: "cancelado" } : current));
+    if (selected?.id === appointment.id) setSelected(null);
     if (incoming?.id === appointment.id) setIncoming(null);
-    toast.success("Agendamento cancelado e arquivado.", {
-      description: "Ele pode ser editado e reagendado pelo Histórico.",
+    toast.success("Agendamento excluído definitivamente.", {
+      description: "O registro foi removido e não aparecerá mais no Histórico.",
     });
-    setScope("history");
     onRefresh();
   };
 
@@ -802,7 +801,7 @@ function AdminAppointmentCard({
           className="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
           onClick={onDelete}
           disabled={deleting || appointment.status === "atendido"}
-          title="Cancelar e arquivar agendamento"
+          title="Excluir agendamento definitivamente"
         >
           <Trash2 className="size-3.5" />
         </Button>
