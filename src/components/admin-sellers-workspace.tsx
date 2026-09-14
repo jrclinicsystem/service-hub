@@ -1,8 +1,13 @@
 import {
   BadgePercent,
+  CalendarDays,
   CircleDollarSign,
+  Eye,
+  Mail,
   Pencil,
+  Phone,
   Plus,
+  ReceiptText,
   Search,
   Trash2,
   UserRoundCheck,
@@ -62,6 +67,54 @@ function commissionStatus(status: string) {
   return { label: "Cancelada", className: "bg-secondary text-muted-foreground hover:bg-secondary" };
 }
 
+function sellerInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "V";
+  return `${parts[0]?.[0] ?? ""}${parts.length > 1 ? parts[parts.length - 1]?.[0] ?? "" : ""}`.toUpperCase();
+}
+
+async function loadAllSellerCommissions() {
+  const pageSize = 1000;
+  const rows: any[] = [];
+  let from = 0;
+
+  while (true) {
+    const result = await db
+      .from("seller_commissions")
+      .select(
+        "id, appointment_id, seller_id, seller_name_snapshot, percentage, base_amount, commission_amount, status, created_at, appointment:appointments!seller_commissions_appointment_id_fkey(patient_name, scheduled_date)",
+      )
+      .order("created_at", { ascending: false })
+      .range(from, from + pageSize - 1);
+
+    if (result.error) return { data: null, error: result.error };
+    const page = result.data ?? [];
+    rows.push(...page);
+    if (page.length < pageSize) break;
+    from += pageSize;
+  }
+
+  return { data: rows, error: null };
+}
+
+function sellerMetrics(history: any[]) {
+  const validSales = history.filter((item) => item.status !== "cancelled");
+  return {
+    salesCount: validSales.length,
+    totalSales: validSales.reduce((sum, item) => sum + Number(item.base_amount ?? 0), 0),
+    generatedCommission: validSales.reduce(
+      (sum, item) => sum + Number(item.commission_amount ?? 0),
+      0,
+    ),
+    payableCommission: history
+      .filter((item) => item.status === "pending")
+      .reduce((sum, item) => sum + Number(item.commission_amount ?? 0), 0),
+    waitingCommission: history
+      .filter((item) => item.status === "suspended")
+      .reduce((sum, item) => sum + Number(item.commission_amount ?? 0), 0),
+  };
+}
+
 export function AdminSellersWorkspace() {
   const [sellers, setSellers] = useState<any[]>([]);
   const [commissions, setCommissions] = useState<any[]>([]);
@@ -69,6 +122,7 @@ export function AdminSellersWorkspace() {
   const [saving, setSaving] = useState(false);
   const [archivingId, setArchivingId] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [profileSellerId, setProfileSellerId] = useState("");
   const [form, setForm] = useState<SellerForm>(emptyForm);
   const [search, setSearch] = useState("");
 
@@ -81,13 +135,7 @@ export function AdminSellersWorkspace() {
           "id, name, email, phone, commission_percentage, is_active, created_at, updated_at, deleted_at",
         )
         .order("name"),
-      db
-        .from("seller_commissions")
-        .select(
-          "id, appointment_id, seller_id, seller_name_snapshot, percentage, base_amount, commission_amount, status, created_at, appointment:appointments!seller_commissions_appointment_id_fkey(patient_name, scheduled_date)",
-        )
-        .order("created_at", { ascending: false })
-        .limit(150),
+      loadAllSellerCommissions(),
     ]);
 
     setLoading(false);
@@ -145,12 +193,31 @@ export function AdminSellersWorkspace() {
     );
   }, [sellers, search]);
 
+  const selectedSeller = useMemo(
+    () => sellers.find((seller) => seller.id === profileSellerId) ?? null,
+    [sellers, profileSellerId],
+  );
+
+  const selectedSellerHistory = useMemo(
+    () =>
+      selectedSeller
+        ? commissions.filter((item) => item.seller_id === selectedSeller.id)
+        : [],
+    [commissions, selectedSeller],
+  );
+
+  const selectedSellerMetrics = useMemo(
+    () => sellerMetrics(selectedSellerHistory),
+    [selectedSellerHistory],
+  );
+
   const openNew = () => {
     setForm(emptyForm);
     setDialogOpen(true);
   };
 
   const openEdit = (seller: any) => {
+    setProfileSellerId("");
     setForm({
       id: seller.id,
       name: seller.name ?? "",
@@ -213,7 +280,7 @@ export function AdminSellersWorkspace() {
       return;
     }
     toast.success("Vendedor removido da lista ativa.", {
-      description: "O histórico de comissões foi mantido.",
+      description: "O histórico de vendas e comissões foi mantido no perfil.",
     });
     await load();
   };
@@ -228,8 +295,8 @@ export function AdminSellersWorkspace() {
           </div>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight">Vendedores e comissões</h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Cadastre quem indica clientes, defina a porcentagem padrão e acompanhe a comissão gerada
-            por cada venda. Este módulo é exclusivo para administradores.
+            Cadastre quem indica clientes, defina a porcentagem padrão e acompanhe o histórico
+            individual de vendas e comissões. Este módulo é exclusivo para administradores.
           </p>
         </div>
         <Button type="button" className="h-11 shrink-0 rounded-xl" onClick={openNew}>
@@ -269,8 +336,8 @@ export function AdminSellersWorkspace() {
           <div>
             <h2 className="text-lg font-semibold">Cadastro de vendedores</h2>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Editar a porcentagem altera somente novas indicações; agendamentos já atribuídos
-              mantêm o percentual registrado no momento da atribuição.
+              Cada vendedor possui uma ficha própria com vendas, valores e comissões. Alterar a
+              porcentagem afeta somente novas indicações.
             </p>
           </div>
           <div className="relative w-full sm:w-[320px]">
@@ -297,17 +364,23 @@ export function AdminSellersWorkspace() {
             </p>
           </div>
         ) : (
-          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <div className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(250px,290px))] justify-start gap-3">
             {filteredSellers.map((seller) => {
               const active = seller.is_active && !seller.deleted_at;
+              const history = commissions.filter((item) => item.seller_id === seller.id);
+              const metrics = sellerMetrics(history);
+
               return (
                 <article
                   key={seller.id}
-                  className="rounded-2xl border border-border bg-background/65 p-4"
+                  className="w-full rounded-2xl border border-border bg-background/65 p-4"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="truncate font-semibold">{seller.name}</p>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                        Vendedor
+                      </p>
+                      <p className="mt-1 truncate text-base font-semibold">{seller.name}</p>
                       <p className="mt-1 truncate text-xs text-muted-foreground">
                         {seller.phone || seller.email || "Sem contato informado"}
                       </p>
@@ -319,15 +392,55 @@ export function AdminSellersWorkspace() {
                       {active ? "Ativo" : seller.deleted_at ? "Excluído" : "Inativo"}
                     </Badge>
                   </div>
-                  <div className="mt-4 rounded-xl bg-primary-soft/55 p-3">
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                      Comissão padrão
-                    </p>
-                    <p className="mt-1 text-xl font-semibold text-primary">
-                      {formatPercentage(seller.commission_percentage)}
-                    </p>
+
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+                    <div className="rounded-xl border border-border bg-card p-2.5">
+                      <p className="text-[9px] uppercase tracking-wide text-muted-foreground">
+                        Vendas
+                      </p>
+                      <p className="mt-1 text-base font-semibold">{metrics.salesCount}</p>
+                    </div>
+                    <div className="rounded-xl border border-border bg-card p-2.5">
+                      <p className="text-[9px] uppercase tracking-wide text-muted-foreground">
+                        Vendido
+                      </p>
+                      <p className="mt-1 truncate text-sm font-semibold">
+                        {formatPrice(metrics.totalSales)}
+                      </p>
+                    </div>
                   </div>
-                  <div className="mt-3 flex gap-2">
+
+                  <div className="mt-2 rounded-xl bg-primary-soft/55 p-3">
+                    <div className="flex items-end justify-between gap-3">
+                      <div>
+                        <p className="text-[9px] uppercase tracking-wide text-muted-foreground">
+                          Comissão padrão
+                        </p>
+                        <p className="mt-1 text-lg font-semibold text-primary">
+                          {formatPercentage(seller.commission_percentage)}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[9px] uppercase tracking-wide text-muted-foreground">
+                          Gerada
+                        </p>
+                        <p className="mt-1 text-xs font-semibold">
+                          {formatPrice(metrics.generatedCommission)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="mt-3 w-full rounded-xl"
+                    onClick={() => setProfileSellerId(seller.id)}
+                  >
+                    <Eye className="size-3.5" /> Ver ficha do vendedor
+                  </Button>
+
+                  <div className="mt-2 flex gap-2">
                     <Button
                       type="button"
                       variant="outline"
@@ -362,8 +475,8 @@ export function AdminSellersWorkspace() {
         <div>
           <h2 className="text-lg font-semibold">Comissões geradas</h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            A comissão é independente da comissão do profissional e acompanha automaticamente o
-            status financeiro da venda.
+            Visão geral de todas as comissões. O histórico completo de cada vendedor também fica
+            disponível na ficha individual.
           </p>
         </div>
         {commissions.length === 0 ? (
@@ -372,7 +485,7 @@ export function AdminSellersWorkspace() {
           </div>
         ) : (
           <div className="mt-4 space-y-2">
-            {commissions.map((item) => {
+            {commissions.slice(0, 150).map((item) => {
               const status = commissionStatus(item.status);
               return (
                 <div
@@ -422,7 +535,211 @@ export function AdminSellersWorkspace() {
             })}
           </div>
         )}
+        {commissions.length > 150 ? (
+          <p className="mt-3 text-center text-[11px] text-muted-foreground">
+            Exibindo as 150 comissões mais recentes nesta visão geral. O histórico completo continua
+            disponível nas fichas individuais dos vendedores.
+          </p>
+        ) : null}
       </div>
+
+      <Dialog
+        open={Boolean(selectedSeller)}
+        onOpenChange={(open) => {
+          if (!open) setProfileSellerId("");
+        }}
+      >
+        <DialogContent className="max-h-[92vh] w-[calc(100%-1rem)] overflow-y-auto rounded-3xl sm:max-w-4xl">
+          {selectedSeller ? (
+            <>
+              <DialogHeader>
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-primary-soft text-sm font-bold text-primary">
+                      {sellerInitials(selectedSeller.name ?? "Vendedor")}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                        Ficha do vendedor
+                      </p>
+                      <DialogTitle className="mt-1 truncate text-xl">
+                        {selectedSeller.name}
+                      </DialogTitle>
+                      <DialogDescription className="mt-1">
+                        Histórico individual de vendas e comissões registradas para este vendedor.
+                      </DialogDescription>
+                    </div>
+                  </div>
+                  <Badge
+                    variant={
+                      selectedSeller.is_active && !selectedSeller.deleted_at
+                        ? "default"
+                        : "secondary"
+                    }
+                    className={
+                      selectedSeller.is_active && !selectedSeller.deleted_at
+                        ? "w-fit bg-emerald-600 text-white hover:bg-emerald-600"
+                        : "w-fit"
+                    }
+                  >
+                    {selectedSeller.is_active && !selectedSeller.deleted_at
+                      ? "Ativo"
+                      : selectedSeller.deleted_at
+                        ? "Excluído"
+                        : "Inativo"}
+                  </Badge>
+                </div>
+              </DialogHeader>
+
+              <div className="grid gap-3 md:grid-cols-3">
+                <ProfileInfo
+                  icon={Phone}
+                  label="Telefone"
+                  value={selectedSeller.phone || "Não informado"}
+                />
+                <ProfileInfo
+                  icon={Mail}
+                  label="E-mail"
+                  value={selectedSeller.email || "Não informado"}
+                />
+                <ProfileInfo
+                  icon={BadgePercent}
+                  label="Comissão padrão"
+                  value={formatPercentage(selectedSeller.commission_percentage)}
+                />
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                <ProfileMetric
+                  label="Vendas"
+                  value={String(selectedSellerMetrics.salesCount)}
+                  hint="não canceladas"
+                />
+                <ProfileMetric
+                  label="Total vendido"
+                  value={formatPrice(selectedSellerMetrics.totalSales)}
+                  hint="volume atribuído"
+                />
+                <ProfileMetric
+                  label="Comissão gerada"
+                  value={formatPrice(selectedSellerMetrics.generatedCommission)}
+                  hint="histórico válido"
+                />
+                <ProfileMetric
+                  label="A pagar"
+                  value={formatPrice(selectedSellerMetrics.payableCommission)}
+                  hint="recebidas"
+                />
+                <ProfileMetric
+                  label="Aguardando"
+                  value={formatPrice(selectedSellerMetrics.waitingCommission)}
+                  hint="entrada financeira"
+                />
+              </div>
+
+              <div className="rounded-2xl border border-border">
+                <div className="flex flex-col gap-2 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <ReceiptText className="size-4 text-primary" />
+                      <h3 className="text-sm font-semibold">Histórico de vendas</h3>
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Cada venda permanece vinculada ao vendedor com o percentual registrado no
+                      momento da indicação.
+                    </p>
+                  </div>
+                  <p className="text-xs font-medium text-muted-foreground">
+                    {selectedSellerHistory.length} registro(s)
+                  </p>
+                </div>
+
+                {selectedSellerHistory.length === 0 ? (
+                  <div className="p-8 text-center">
+                    <ReceiptText className="mx-auto size-5 text-muted-foreground" />
+                    <p className="mt-2 text-sm font-medium">Nenhuma venda registrada ainda.</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Quando este vendedor for associado a um agendamento e a comissão for gerada,
+                      a venda aparecerá aqui.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-border">
+                    {selectedSellerHistory.map((item) => {
+                      const status = commissionStatus(item.status);
+                      return (
+                        <div
+                          key={item.id}
+                          className="grid gap-3 p-4 sm:grid-cols-[minmax(0,1.25fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_auto] sm:items-center"
+                        >
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="truncate text-sm font-semibold">
+                                {item.appointment?.patient_name ?? "Cliente"}
+                              </p>
+                              <Badge variant="secondary" className={status.className}>
+                                {status.label}
+                              </Badge>
+                            </div>
+                            <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                              <CalendarDays className="size-3.5" />
+                              <span>
+                                {item.appointment?.scheduled_date
+                                  ? formatDate(item.appointment.scheduled_date)
+                                  : "Data não informada"}
+                              </span>
+                            </div>
+                          </div>
+                          <div>
+                            <p className="text-[9px] uppercase tracking-wide text-muted-foreground">
+                              Valor da venda
+                            </p>
+                            <p className="mt-1 text-sm font-semibold">
+                              {formatPrice(Number(item.base_amount ?? 0))}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-[9px] uppercase tracking-wide text-muted-foreground">
+                              Percentual
+                            </p>
+                            <p className="mt-1 text-sm font-semibold">
+                              {formatPercentage(item.percentage)}
+                            </p>
+                          </div>
+                          <div className="sm:text-right">
+                            <p className="text-[9px] uppercase tracking-wide text-muted-foreground">
+                              Comissão
+                            </p>
+                            <p className="mt-1 text-base font-semibold text-primary">
+                              {formatPrice(Number(item.commission_amount ?? 0))}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => openEdit(selectedSeller)}
+                  className="rounded-xl"
+                >
+                  <Pencil className="size-4" /> Editar vendedor
+                </Button>
+                <Button
+                  onClick={() => setProfileSellerId("")}
+                  className="rounded-xl"
+                >
+                  Fechar ficha
+                </Button>
+              </div>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={dialogOpen}
@@ -535,6 +852,30 @@ function SummaryCard({ icon: Icon, label, value, hint }: any) {
       </div>
       <p className="mt-3 text-xl font-semibold tracking-tight">{value}</p>
       <p className="mt-1 text-[11px] text-muted-foreground">{hint}</p>
+    </div>
+  );
+}
+
+function ProfileInfo({ icon: Icon, label, value }: any) {
+  return (
+    <div className="rounded-2xl border border-border bg-background/65 p-3">
+      <div className="flex items-center gap-2 text-muted-foreground">
+        <Icon className="size-3.5" />
+        <p className="text-[9px] font-semibold uppercase tracking-[0.12em]">{label}</p>
+      </div>
+      <p className="mt-2 truncate text-sm font-semibold">{value}</p>
+    </div>
+  );
+}
+
+function ProfileMetric({ label, value, hint }: any) {
+  return (
+    <div className="rounded-2xl border border-border bg-card p-3">
+      <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+        {label}
+      </p>
+      <p className="mt-2 text-lg font-semibold tracking-tight">{value}</p>
+      <p className="mt-1 text-[10px] text-muted-foreground">{hint}</p>
     </div>
   );
 }
