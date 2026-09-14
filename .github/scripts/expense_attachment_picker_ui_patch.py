@@ -1,3 +1,4 @@
+# Triggered by GitHub Actions to patch the expense attachment picker UI.
 from pathlib import Path
 
 path = Path('src/components/finance-staging-workspace.tsx')
