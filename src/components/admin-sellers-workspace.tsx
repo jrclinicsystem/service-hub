@@ -183,8 +183,9 @@ export function AdminSellersWorkspace() {
 
   const filteredSellers = useMemo(() => {
     const term = search.trim().toLocaleLowerCase("pt-BR");
-    if (!term) return sellers;
-    return sellers.filter((seller) =>
+    const visibleSellers = sellers.filter((seller) => !seller.deleted_at);
+    if (!term) return visibleSellers;
+    return visibleSellers.filter((seller) =>
       [seller.name, seller.email, seller.phone].some((value) =>
         String(value ?? "")
           .toLocaleLowerCase("pt-BR")
@@ -280,7 +281,7 @@ export function AdminSellersWorkspace() {
       return;
     }
     toast.success("Vendedor removido da lista ativa.", {
-      description: "O histórico de vendas e comissões foi mantido no perfil.",
+      description: "O histórico de vendas e comissões foi preservado internamente.",
     });
     await load();
   };
