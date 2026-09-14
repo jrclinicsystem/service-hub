@@ -1,0 +1,44 @@
+name: Hide deleted sellers hotfix
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/scripts/hide_deleted_sellers.py'
+      - '.github/workflows/hide-deleted-sellers-hotfix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Apply patch
+        run: python .github/scripts/hide_deleted_sellers.py
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+      - run: bun run build
+      - run: bunx tsc --noEmit
+
+      - name: Commit source changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/admin-sellers-workspace.tsx
+          if git diff --cached --quiet; then
+            echo "No source changes to commit."
+            exit 0
+          fi
+          git commit -m "fix: hide deleted seller cards"
+          git push origin HEAD:main
