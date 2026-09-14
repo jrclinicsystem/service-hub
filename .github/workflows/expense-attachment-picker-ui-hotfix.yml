@@ -22,6 +22,17 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - name: Apply expense attachment picker UI patch
         run: python .github/scripts/expense_attachment_picker_ui_patch.py
+      - name: Commit expense attachment picker UI
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/finance-staging-workspace.tsx
+          if git diff --cached --quiet; then
+            echo "No UI changes to commit"
+          else
+            git commit -m "finance: polish expense attachment picker"
+            git push origin main
+          fi
       - name: Install dependencies
         run: bun install --frozen-lockfile
       - name: Typecheck
@@ -30,14 +41,3 @@ jobs:
         run: bunx eslint src/components/finance-staging-workspace.tsx
       - name: Production build
         run: bun run build
-      - name: Commit expense attachment picker UI
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/components/finance-staging-workspace.tsx
-          if git diff --cached --quiet; then
-            echo "No UI changes to commit"
-            exit 0
-          fi
-          git commit -m "finance: polish expense attachment picker"
-          git push origin main
