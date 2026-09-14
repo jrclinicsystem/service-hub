@@ -262,6 +262,11 @@ async function loadFullOverview(from: string, to: string) {
       .order("expense_date", { ascending: false })
       .limit(500),
     db
+      .from("financial_expense_attachments")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(1000),
+    db
       .from("accounts_payable_with_status")
       .select("*")
       .order("due_date", { ascending: true })
@@ -315,6 +320,7 @@ async function loadFullOverview(from: string, to: string) {
     cash,
     entries,
     expenses,
+    expenseAttachments,
     payables,
     payableAttachments,
     receivables,
@@ -382,6 +388,7 @@ async function loadFullOverview(from: string, to: string) {
     cash: cash.data ?? [],
     entries: enrichedEntries,
     expenses: expenses.data ?? [],
+    expenseAttachments: expenseAttachments.data ?? [],
     payables: payables.data ?? [],
     payableAttachments: payableAttachments.data ?? [],
     receivables: receivables.data ?? [],
@@ -647,6 +654,9 @@ function FullFinanceWorkspace({
     category: "",
     center: "",
   });
+  const [expenseFiles, setExpenseFiles] = useState<File[]>([]);
+  const [expenseFileKey, setExpenseFileKey] = useState(0);
+  const [expenseAttachmentKey, setExpenseAttachmentKey] = useState(0);
   const [payable, setPayable] = useState({
     title: "",
     supplier: "",
@@ -868,6 +878,88 @@ function FullFinanceWorkspace({
   const resetExpenseEditor = () => {
     setEditingExpenseId("");
     setExpenseEditAmount("");
+  };
+
+  const expenseAttachmentsFor = (row: any) =>
+    (data?.expenseAttachments ?? []).filter(
+      (attachment: any) => attachment.expense_id === row.expense_id,
+    );
+
+  const openExpenseAttachment = async (attachment: any) => {
+    const result = await supabase.storage
+      .from("finance-expense-attachments")
+      .createSignedUrl(attachment.file_path, 120);
+    if (result.error || !result.data?.signedUrl) {
+      toast.error("Não foi possível abrir o comprovante.", { description: result.error?.message });
+      return;
+    }
+    window.open(result.data.signedUrl, "_blank", "noopener,noreferrer");
+  };
+
+  const deleteExpenseAttachment = async (attachment: any) => {
+    if (!window.confirm(`Excluir o comprovante "${attachment.original_name}"?`)) return;
+    try {
+      const storageResult = await supabase.storage
+        .from("finance-expense-attachments")
+        .remove([attachment.file_path]);
+      if (storageResult.error) throw storageResult.error;
+      const metadataResult = await db
+        .from("financial_expense_attachments")
+        .delete()
+        .eq("id", attachment.id);
+      if (metadataResult.error) throw metadataResult.error;
+      toast.success("Comprovante excluído.");
+      await refresh();
+    } catch (error: any) {
+      toast.error("Não foi possível excluir o comprovante.", { description: error?.message });
+    }
+  };
+
+  const uploadExpenseFiles = async (expenseId: string, files: File[]) => {
+    const acceptedTypes = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp"]);
+    let uploaded = 0;
+    for (const file of files) {
+      if (!acceptedTypes.has(file.type)) {
+        toast.error(`Arquivo não suportado: ${file.name}`);
+        continue;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error(`Arquivo maior que 10 MB: ${file.name}`);
+        continue;
+      }
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, "-");
+      const filePath = `${access.user.id}/${expenseId}/${crypto.randomUUID()}-${safeName}`;
+      const upload = await supabase.storage
+        .from("finance-expense-attachments")
+        .upload(filePath, file, { contentType: file.type, upsert: false });
+      if (upload.error) {
+        toast.error(`Falha ao enviar ${file.name}.`, { description: upload.error.message });
+        continue;
+      }
+      const metadata = await db.from("financial_expense_attachments").insert({
+        expense_id: expenseId,
+        file_path: filePath,
+        original_name: file.name,
+        mime_type: file.type,
+        file_size: file.size,
+        uploaded_by: access.user.id,
+      });
+      if (metadata.error) {
+        await supabase.storage.from("finance-expense-attachments").remove([filePath]);
+        toast.error(`Falha ao registrar ${file.name}.`, { description: metadata.error.message });
+        continue;
+      }
+      uploaded += 1;
+    }
+    return uploaded;
+  };
+
+  const addExpenseAttachments = async (expenseId: string, files: File[]) => {
+    if (!files.length) return;
+    const uploaded = await uploadExpenseFiles(expenseId, files);
+    if (uploaded) toast.success(uploaded === 1 ? "Comprovante anexado." : `${uploaded} comprovantes anexados.`);
+    setExpenseAttachmentKey((current) => current + 1);
+    await refresh();
   };
 
   const payableSeriesLabel = (row: any) => {
@@ -1511,19 +1603,28 @@ function FullFinanceWorkspace({
                       const amount = parseMoney(expense.amount);
                       if (!expense.description.trim() || !Number.isFinite(amount) || amount <= 0)
                         throw new Error("Descrição e valor são obrigatórios.");
-                      const result = await db.from("financial_expenses").insert({
-                        expense_date: expense.date,
-                        description: expense.description.trim(),
-                        amount,
-                        payment_method_id: methodId(expense.method),
-                        category_id: expense.category || null,
-                        cost_center_id: expense.center || null,
-                        paid: true,
-                        paid_at: new Date().toISOString(),
-                        created_by: access.user.id,
-                      });
+                      const result = await db
+                        .from("financial_expenses")
+                        .insert({
+                          expense_date: expense.date,
+                          description: expense.description.trim(),
+                          amount,
+                          payment_method_id: methodId(expense.method),
+                          category_id: expense.category || null,
+                          cost_center_id: expense.center || null,
+                          paid: true,
+                          paid_at: new Date().toISOString(),
+                          created_by: access.user.id,
+                        })
+                        .select("id")
+                        .single();
                       if (result.error) throw result.error;
+                      if (result.data?.id && expenseFiles.length) {
+                        await uploadExpenseFiles(String(result.data.id), expenseFiles);
+                      }
                       setExpense({ ...expense, description: "", amount: "" });
+                      setExpenseFiles([]);
+                      setExpenseFileKey((current) => current + 1);
                     },
                     "Despesa registrada.",
                   )
@@ -1558,6 +1659,27 @@ function FullFinanceWorkspace({
                 ))}
               </select>
             </div>
+            <div className="mt-3 rounded-2xl border border-dashed border-border p-4">
+              <Label>Comprovantes / anexos</Label>
+              <Input
+                key={expenseFileKey}
+                className="mt-2"
+                type="file"
+                multiple
+                accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
+                onChange={(e) => setExpenseFiles(Array.from(e.target.files ?? []))}
+              />
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                PDF ou imagem (JPG, PNG, WEBP), até 10 MB por arquivo. Opcional.
+              </p>
+              {expenseFiles.length ? (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {expenseFiles.map((file) => (
+                    <Badge key={`${file.name}-${file.size}`} variant="outline">📎 {file.name}</Badge>
+                  ))}
+                </div>
+              ) : null}
+            </div>
           </Panel>
           <Panel title="Despesas do período" collapsible>
             <div className="space-y-3">
@@ -1576,12 +1698,50 @@ function FullFinanceWorkspace({
                   key={row.expense_id}
                   className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border p-4"
                 >
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <strong className="text-sm">{row.description}</strong>
                     <p className="text-xs text-muted-foreground">
                       {formatDate(row.expense_date)} · {row.category_name || "Sem categoria"} ·{" "}
                       {row.cost_center_name || "Sem centro"}
                     </p>
+                    {expenseAttachmentsFor(row).length ? (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {expenseAttachmentsFor(row).map((attachment: any) => (
+                          <div key={attachment.id} className="flex items-center rounded-lg border border-border bg-muted/30">
+                            <button
+                              type="button"
+                              className="max-w-[230px] truncate px-2.5 py-1.5 text-[11px] font-medium text-primary hover:underline"
+                              onClick={() => void openExpenseAttachment(attachment)}
+                              title={attachment.original_name}
+                            >
+                              📎 {attachment.original_name}
+                            </button>
+                            <button
+                              type="button"
+                              className="border-l border-border px-2 py-1.5 text-[11px] text-destructive"
+                              onClick={() => void deleteExpenseAttachment(attachment)}
+                              title="Excluir comprovante"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                    <label className="mt-2 inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-[11px] font-medium hover:bg-muted/60">
+                      📎 Adicionar anexo
+                      <input
+                        key={`${row.expense_id}-${expenseAttachmentKey}`}
+                        type="file"
+                        multiple
+                        className="hidden"
+                        accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
+                        onChange={(event) => {
+                          const files = Array.from(event.target.files ?? []);
+                          void addExpenseAttachments(String(row.expense_id), files);
+                        }}
+                      />
+                    </label>
                   </div>
                   <div className="text-right">
                     <strong>{money(row.amount)}</strong>
