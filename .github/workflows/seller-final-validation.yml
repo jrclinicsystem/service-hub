@@ -25,37 +25,35 @@ jobs:
           bun-version: latest
       - name: Install dependencies
         run: bun install --frozen-lockfile
-      - name: Capture exact eslint messages
+      - name: Summarize remaining eslint errors
         run: |
           node --input-type=module <<'NODE'
           import { ESLint } from 'eslint';
           import { writeFileSync } from 'node:fs';
           const eslint = new ESLint();
-          const files = [
-            'src/components/admin-sellers-workspace.tsx',
-            'src/routes/admin_.vendedores.tsx',
-            'src/routes/admin.tsx',
-            'src/components/admin-appointments-workspace.tsx',
-          ];
-          const results = await eslint.lintFiles(files);
-          const report = results.map((result) => ({
-            filePath: result.filePath,
-            errorCount: result.errorCount,
-            warningCount: result.warningCount,
-            messages: result.messages.map((message) => ({
-              line: message.line,
-              column: message.column,
-              ruleId: message.ruleId,
-              severity: message.severity,
-              message: message.message,
-            })),
-          }));
-          writeFileSync('.github/seller-eslint-programmatic.json', JSON.stringify(report, null, 2));
+          const results = await eslint.lintFiles(['.']);
+          const rules = new Map();
+          const samples = [];
+          let errors = 0;
+          let warnings = 0;
+          for (const result of results) {
+            errors += result.errorCount;
+            warnings += result.warningCount;
+            for (const message of result.messages) {
+              if (message.severity !== 2) continue;
+              const key = message.ruleId ?? 'unknown';
+              rules.set(key, (rules.get(key) ?? 0) + 1);
+              if (samples.length < 40) {
+                samples.push({ file: result.filePath.replace(process.cwd() + '/', ''), line: message.line, column: message.column, ruleId: key, message: message.message });
+              }
+            }
+          }
+          writeFileSync('.github/seller-eslint-summary.json', JSON.stringify({ errors, warnings, rules: Object.fromEntries(rules), samples }, null, 2));
           NODE
       - name: Commit diagnostics
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .github/seller-eslint-programmatic.json
-          git commit -m "chore: capture exact eslint messages"
+          git add .github/seller-eslint-summary.json
+          git commit -m "chore: summarize remaining eslint errors"
           git push origin HEAD:fix/seller-commissions-lint
