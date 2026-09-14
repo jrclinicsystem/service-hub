@@ -36,7 +36,10 @@ export const Route = createFileRoute("/admin_/vendedores")({
   head: () => ({
     meta: [
       { title: "Vendedores e comissões — JR Clinic" },
-      { name: "description", content: "Gestão administrativa de vendedores e comissões da JR Clinic." },
+      {
+        name: "description",
+        content: "Gestão administrativa de vendedores e comissões da JR Clinic.",
+      },
     ],
   }),
   component: SellersPage,
@@ -49,7 +52,9 @@ function SellersPage() {
       <main className="min-h-screen min-w-0 overflow-x-hidden p-3 pb-24 sm:p-5 lg:ml-[252px] lg:p-8">
         <div className="mx-auto mb-3 w-full max-w-[1500px] lg:hidden">
           <Button asChild variant="ghost" size="sm" className="rounded-xl">
-            <Link to="/admin"><ArrowLeft className="size-4" /> Painel administrativo</Link>
+            <Link to="/admin">
+              <ArrowLeft className="size-4" /> Painel administrativo
+            </Link>
           </Button>
         </div>
         <AdminSellersWorkspace />
