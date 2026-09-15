@@ -1,0 +1,43 @@
+name: Late cash closing flow hotfix
+
+on:
+  push:
+    paths:
+      - '.github/scripts/cash_late_close_flow_patch.py'
+      - '.github/workflows/cash-late-close-flow-hotfix.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+      - name: Apply late cash closing flow patch
+        run: python .github/scripts/cash_late_close_flow_patch.py
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Typecheck
+        run: bunx tsc --noEmit
+      - name: Lint changed component
+        run: bunx eslint src/components/finance-staging-workspace.tsx
+      - name: Production build
+        run: bun run build
+      - name: Commit late cash closing flow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/finance-staging-workspace.tsx
+          if git diff --cached --quiet; then
+            echo "No UI changes to commit"
+          else
+            git commit -m "finance: allow closing forgotten cash sessions"
+            git push origin main
+          fi
