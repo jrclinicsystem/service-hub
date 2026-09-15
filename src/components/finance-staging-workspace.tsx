@@ -121,6 +121,15 @@ function statusVariant(status: string): "default" | "secondary" | "destructive" 
   return "secondary";
 }
 
+function payableDueUrgency(dueDate?: string | null) {
+  const due = String(dueDate ?? "").slice(0, 10);
+  if (!due) return null;
+  const today = fortalezaIso();
+  if (due === today) return "today";
+  if (due === addDaysIso(today, 1)) return "tomorrow";
+  return null;
+}
+
 function commissionEntry(row: any) {
   const value = row?.financial_entry;
   return Array.isArray(value) ? (value[0] ?? null) : (value ?? null);
@@ -2157,6 +2166,19 @@ function FullFinanceWorkspace({
                     <div className="text-right">
                       <strong>{money(row.amount)}</strong>
                       <div className="mt-2 flex flex-wrap justify-end gap-2">
+                        {row.status === "pending" && payableDueUrgency(row.due_date) === "tomorrow" ? (
+                          <Badge
+                            variant="outline"
+                            className="border-amber-300 bg-amber-50 font-semibold text-amber-800"
+                          >
+                            Vence em 1 dia
+                          </Badge>
+                        ) : null}
+                        {row.status === "pending" && payableDueUrgency(row.due_date) === "today" ? (
+                          <Badge variant="destructive" className="font-semibold uppercase tracking-wide shadow-sm">
+                            Vence hoje
+                          </Badge>
+                        ) : null}
                         <Badge variant={statusVariant(row.display_status)}>
                           {statusLabel(row.display_status)}
                         </Badge>
