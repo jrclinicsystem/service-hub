@@ -71,6 +71,11 @@ function FinancePage() {
               display: none;
             }
 
+            /* The global period selector is relevant only to Entradas, Despesas and Relatórios. */
+            .finance-page:has([role="tablist"] > [role="tab"][data-state="active"]:not(:nth-child(3)):not(:nth-child(4)):not(:nth-child(7))) > section:first-of-type + section + div > header {
+              display: none;
+            }
+
             .finance-page:has([role="tablist"] > [role="tab"][data-state="active"]:not(:first-child)) > section:first-of-type + section + div > section:first-of-type {
               display: none;
             }
