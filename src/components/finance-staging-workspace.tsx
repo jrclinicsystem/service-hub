@@ -778,6 +778,33 @@ function FullFinanceWorkspace({
     }
     return [...map.entries()].sort((a,b)=>b[0].localeCompare(a[0]));
   }, [data?.expenses]);
+  const filteredEntriesTotal = useMemo(
+    () =>
+      filteredEntries.reduce(
+        (sum: number, row: any) =>
+          sum + Number(row.net_amount ?? row.charged_amount ?? 0),
+        0,
+      ),
+    [filteredEntries],
+  );
+  const expensesTotal = useMemo(
+    () =>
+      (data?.expenses ?? []).reduce(
+        (sum: number, row: any) => sum + Number(row.amount ?? 0),
+        0,
+      ),
+    [data?.expenses],
+  );
+  const orderedPayables = useMemo(
+    () =>
+      [...(data?.payables ?? [])].sort((a: any, b: any) => {
+        const aPaid = a.status === "paid" ? 1 : 0;
+        const bPaid = b.status === "paid" ? 1 : 0;
+        if (aPaid !== bPaid) return aPaid - bPaid;
+        return String(a.due_date ?? "").localeCompare(String(b.due_date ?? ""));
+      }),
+    [data?.payables],
+  );
 
   const historicalCommissionCandidates = useMemo(
     () =>
@@ -1673,6 +1700,7 @@ function FullFinanceWorkspace({
                   ? "Valores pendentes ficam em contas a receber e só entram na receita quando forem pagos."
                   : undefined
             }
+            total={money(filteredEntriesTotal)}
             collapsible
           >
             <div className="space-y-3">
@@ -1847,7 +1875,7 @@ function FullFinanceWorkspace({
               </p>
             </div>
           </Panel>
-          <Panel title="Despesas do período" collapsible>
+          <Panel title="Despesas do período" total={money(expensesTotal)} collapsible>
             <div className="space-y-3">
               {groupedExpenses.map(([date, dayRows]) => { const dayTotal=(dayRows as any[]).reduce((sum,row)=>sum+Number(row.amount ?? 0),0); return (
               <details key={date} className="group rounded-2xl border border-border bg-card">
@@ -2241,7 +2269,7 @@ function FullFinanceWorkspace({
                 ))}
               </select>
               <div className="space-y-2">
-                {(data.payables ?? []).map((row: any) => (
+                {orderedPayables.map((row: any) => (
                   <div
                     key={row.id}
                     className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border p-4"
@@ -3862,11 +3890,13 @@ function Panel({
   title,
   subtitle,
   children,
+  total,
   collapsible = false,
 }: {
   title: string;
   subtitle?: string | undefined;
   children: any;
+  total?: string;
   collapsible?: boolean;
 }) {
   if (collapsible) {
@@ -3877,9 +3907,14 @@ function Panel({
             <h2 className="text-xl font-bold tracking-tight text-foreground">{title}</h2>
             {subtitle ? <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p> : null}
           </div>
-          <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-secondary text-muted-foreground transition-colors group-open:bg-primary-soft group-open:text-primary">
-            <ChevronDown className="size-4 transition-transform duration-200 group-open:rotate-180" />
-          </span>
+          <div className="flex shrink-0 items-center gap-3">
+            {total ? (
+              <strong className="whitespace-nowrap text-base font-semibold text-primary sm:text-lg">{total}</strong>
+            ) : null}
+            <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-secondary text-muted-foreground transition-colors group-open:bg-primary-soft group-open:text-primary">
+              <ChevronDown className="size-4 transition-transform duration-200 group-open:rotate-180" />
+            </span>
+          </div>
         </summary>
         <div className="border-t border-border p-5 sm:p-6">{children}</div>
       </details>
