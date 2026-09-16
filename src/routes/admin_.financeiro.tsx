@@ -71,7 +71,6 @@ function FinancePage() {
               display: none;
             }
 
-            .finance-page:has([role="tablist"] > [role="tab"][data-state="active"]:not(:first-child)) > section:first-of-type + section + div > header,
             .finance-page:has([role="tablist"] > [role="tab"][data-state="active"]:not(:first-child)) > section:first-of-type + section + div > section:first-of-type {
               display: none;
             }
