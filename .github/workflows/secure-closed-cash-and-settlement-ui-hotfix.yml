@@ -1,0 +1,43 @@
+name: Secure closed cash and settlement UI hotfix
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/scripts/secure_closed_cash_and_settlement_ui_patch.py'
+      - '.github/workflows/secure-closed-cash-and-settlement-ui-hotfix.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+      - name: Apply secure finance UI patch
+        run: python .github/scripts/secure_closed_cash_and_settlement_ui_patch.py
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Typecheck diagnostics
+        continue-on-error: true
+        run: bunx tsc --noEmit
+      - name: Production build
+        run: bun run build
+      - name: Commit application changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/finance-staging-workspace.tsx
+          if git diff --cached --quiet; then
+            echo "No application changes to commit"
+            exit 0
+          fi
+          git commit -m "finance: secure closed cash edits and paid settlements"
+          git push origin main
