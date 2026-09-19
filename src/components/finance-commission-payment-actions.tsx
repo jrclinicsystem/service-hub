@@ -100,6 +100,10 @@ export function FinanceCommissionPaymentActions() {
   const queryClient = useQueryClient();
   const [amounts, setAmounts] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [batchMode, setBatchMode] = useState<"pix" | "cash" | "mixed">("pix");
+  const [batchCash, setBatchCash] = useState("");
+  const [batchPix, setBatchPix] = useState("");
   const [expandedProfessionals, setExpandedProfessionals] = useState<Set<string>>(
     () => new Set(),
   );
@@ -144,6 +148,21 @@ export function FinanceCommissionPaymentActions() {
     };
   }, [query.data?.commissions]);
 
+  const payableRows = useMemo(
+    () => (query.data?.commissions ?? []).filter((row: any) => remainingAmount(row) > 0),
+    [query.data?.commissions],
+  );
+
+  const selectedRows = useMemo(
+    () => payableRows.filter((row: any) => selectedIds.has(String(row.id))),
+    [payableRows, selectedIds],
+  );
+
+  const selectedTotal = useMemo(
+    () => Math.round(selectedRows.reduce((sum: number, row: any) => sum + remainingAmount(row), 0) * 100) / 100,
+    [selectedRows],
+  );
+
   if (!query.data?.allowed) return null;
 
   const refresh = async () => {
@@ -163,6 +182,90 @@ export function FinanceCommissionPaymentActions() {
       else next.add(professionalId);
       return next;
     });
+  };
+
+  const toggleCommissionSelection = (id: string) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleGroupSelection = (rows: any[]) => {
+    const ids = rows.map((row) => String(row.id));
+    const allSelected = ids.every((id) => selectedIds.has(id));
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      for (const id of ids) {
+        if (allSelected) next.delete(id);
+        else next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const selectAllPending = () => {
+    const allIds = payableRows.map((row: any) => String(row.id));
+    const allSelected = allIds.length > 0 && allIds.every((id) => selectedIds.has(id));
+    setSelectedIds(allSelected ? new Set() : new Set(allIds));
+  };
+
+  const paySelected = async () => {
+    if (!selectedRows.length) {
+      toast.error("Selecione pelo menos uma comissão.");
+      return;
+    }
+
+    let cash = batchMode === "pix" ? 0 : parseMoney(batchCash || "0");
+    let pix = batchMode === "cash" ? 0 : parseMoney(batchPix || "0");
+
+    if (batchMode === "cash") cash = selectedTotal;
+    if (batchMode === "pix") pix = selectedTotal;
+
+    if (!Number.isFinite(cash) || !Number.isFinite(pix) || cash < 0 || pix < 0) {
+      toast.error("Informe valores válidos para Dinheiro e PIX.");
+      return;
+    }
+
+    if (batchMode === "mixed" && (cash <= 0 || pix <= 0)) {
+      toast.error("No pagamento misto, informe uma parte em Dinheiro e outra em PIX.");
+      return;
+    }
+
+    const total = Math.round((cash + pix) * 100) / 100;
+    if (Math.abs(total - selectedTotal) > 0.009) {
+      toast.error(`Dinheiro + PIX deve totalizar exatamente ${money(selectedTotal)}.`);
+      return;
+    }
+
+    if (!window.confirm(`Confirmar o pagamento de ${selectedRows.length} comissão(ões), totalizando ${money(selectedTotal)}?`)) return;
+
+    setBusyId("batch");
+    try {
+      const result = await db.rpc("pay_commissions_batch_split", {
+        _commission_ids: selectedRows.map((row: any) => row.id),
+        _cash_amount: cash,
+        _pix_amount: pix,
+      });
+      if (result.error) throw result.error;
+
+      setSelectedIds(new Set());
+      setBatchCash("");
+      setBatchPix("");
+      setBatchMode("pix");
+      toast.success("Comissões pagas em lote.", {
+        description: `${money(cash)} em dinheiro · ${money(pix)} em PIX.`,
+      });
+      await refresh();
+    } catch (error: any) {
+      toast.error("Não foi possível pagar as comissões em lote.", {
+        description: error?.message || "Tente novamente.",
+      });
+    } finally {
+      setBusyId(null);
+    }
   };
 
   const registerPayment = async (row: any, amount: number) => {
@@ -239,6 +342,76 @@ export function FinanceCommissionPaymentActions() {
           </div>
         </div>
 
+        <div className="mt-5 rounded-3xl border border-primary/15 bg-primary-soft/20 p-4 sm:p-5">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pagamento em lote</p>
+              <h3 className="mt-1 text-lg font-semibold text-foreground">Pagar várias comissões de uma vez</h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Selecione profissionais ou comissões, confira o total e escolha como o valor saiu da clínica.
+              </p>
+            </div>
+            <Button type="button" variant="outline" size="sm" onClick={selectAllPending} disabled={!payableRows.length || busyId === "batch"}>
+              {payableRows.length > 0 && payableRows.every((row: any) => selectedIds.has(String(row.id))) ? "Limpar seleção" : "Selecionar todas pendentes"}
+            </Button>
+          </div>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border border-border bg-card p-4">
+              <p className="text-xs text-muted-foreground">Selecionadas</p>
+              <p className="mt-1 text-xl font-bold">{selectedRows.length}</p>
+            </div>
+            <div className="rounded-2xl border border-border bg-card p-4">
+              <p className="text-xs text-muted-foreground">Total a pagar</p>
+              <p className="mt-1 text-xl font-bold">{money(selectedTotal)}</p>
+            </div>
+            <div className="rounded-2xl border border-border bg-card p-4">
+              <p className="text-xs text-muted-foreground">Forma de pagamento</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {(["pix", "cash", "mixed"] as const).map((mode) => (
+                  <Button
+                    key={mode}
+                    type="button"
+                    size="sm"
+                    variant={batchMode === mode ? "default" : "outline"}
+                    onClick={() => {
+                      setBatchMode(mode);
+                      setBatchCash("");
+                      setBatchPix("");
+                    }}
+                    disabled={busyId === "batch"}
+                  >
+                    {mode === "pix" ? "PIX" : mode === "cash" ? "Dinheiro" : "Dinheiro + PIX"}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {batchMode === "mixed" ? (
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div>
+                <p className="mb-1 text-xs font-medium text-muted-foreground">Dinheiro</p>
+                <Input inputMode="decimal" value={batchCash} onChange={(e) => setBatchCash(e.target.value)} placeholder="0,00" disabled={busyId === "batch"} />
+              </div>
+              <div>
+                <p className="mb-1 text-xs font-medium text-muted-foreground">PIX</p>
+                <Input inputMode="decimal" value={batchPix} onChange={(e) => setBatchPix(e.target.value)} placeholder="0,00" disabled={busyId === "batch"} />
+              </div>
+            </div>
+          ) : null}
+
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs text-muted-foreground">
+              {batchMode === "pix" ? `Pagamento integral de ${money(selectedTotal)} via PIX.` : batchMode === "cash" ? `Pagamento integral de ${money(selectedTotal)} em dinheiro.` : `A soma de Dinheiro + PIX precisa ser ${money(selectedTotal)}.`}
+            </p>
+            <Button type="button" disabled={!selectedRows.length || selectedTotal <= 0 || busyId === "batch"} onClick={() => void paySelected()}>
+              <CircleDollarSign className="mr-2 size-4" />
+              {busyId === "batch" ? "Pagando..." : "Pagar selecionadas"}
+            </Button>
+          </div>
+        </div>
+
         <div className="mt-6 space-y-3">
           {query.isLoading ? (
             <p className="text-sm text-muted-foreground">Carregando comissões...</p>
@@ -266,6 +439,17 @@ export function FinanceCommissionPaymentActions() {
                     onClick={() => toggleProfessional(group.professionalId)}
                   >
                     <div className="flex min-w-0 items-center gap-3">
+                      <input
+                        type="checkbox"
+                        className="size-4 shrink-0 accent-primary"
+                        checked={group.rows.every((row: any) => selectedIds.has(String(row.id)))}
+                        onChange={(event) => {
+                          event.stopPropagation();
+                          toggleGroupSelection(group.rows);
+                        }}
+                        onClick={(event) => event.stopPropagation()}
+                        aria-label={`Selecionar comissões de ${group.name}`}
+                      />
                       <ChevronDown
                         className={`size-4 shrink-0 text-muted-foreground transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
                       />
@@ -308,7 +492,15 @@ export function FinanceCommissionPaymentActions() {
                         return (
                           <div key={row.id} className="p-4 sm:p-5">
                             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                              <div className="min-w-0">
+                              <div className="flex min-w-0 items-start gap-3">
+                                <input
+                                  type="checkbox"
+                                  className="mt-0.5 size-4 shrink-0 accent-primary"
+                                  checked={selectedIds.has(String(row.id))}
+                                  onChange={() => toggleCommissionSelection(String(row.id))}
+                                  aria-label="Selecionar comissão"
+                                />
+                                <div className="min-w-0">
                                 <p className="text-sm font-semibold">
                                   {entry?.patient_name_snapshot || "Paciente não identificado"}
                                 </p>
@@ -326,6 +518,7 @@ export function FinanceCommissionPaymentActions() {
                                     ? ` · ${money(row.fixed_amount)} por paciente`
                                     : ""}
                                 </p>
+                                </div>
                               </div>
 
                               <div className="min-w-[250px]">
