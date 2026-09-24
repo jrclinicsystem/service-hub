@@ -341,8 +341,10 @@ export function AdminRoomReservations() {
     }
 
     const parsedAmount = amount.trim() ? Number(amount.replace(",", ".")) : null;
-    if (parsedAmount !== null && (!Number.isFinite(parsedAmount) || parsedAmount < 0)) {
-      toast.error("Informe um valor válido.");
+    if (parsedAmount === null || !Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      toast.error("Informe o valor do aluguel.", {
+        description: "O valor é obrigatório porque gera automaticamente a conta a receber da reserva.",
+      });
       return;
     }
 
@@ -357,8 +359,7 @@ export function AdminRoomReservations() {
         rental_type: rentalType,
         start_time: startTime,
         end_time: endTime,
-        amount:
-          parsedAmount === null ? null : Math.round((parsedAmount + Number.EPSILON) * 100) / 100,
+        amount: Math.round((parsedAmount + Number.EPSILON) * 100) / 100,
         notes: notes.trim() || null,
       };
       const result = editingReservationId
@@ -390,6 +391,8 @@ export function AdminRoomReservations() {
         queryClient.invalidateQueries({ queryKey: ["professional-client-booking-tools"] }),
         queryClient.invalidateQueries({ queryKey: ["professional-date-slots"] }),
         queryClient.invalidateQueries({ queryKey: ["admin-date-availability-slots"] }),
+        queryClient.invalidateQueries({ queryKey: ["finance-full-v2"] }),
+        queryClient.invalidateQueries({ queryKey: ["finance-reception-v2"] }),
       ]);
     } catch (err: any) {
       toast.error(
@@ -553,8 +556,8 @@ export function AdminRoomReservations() {
                 {editingReservationId ? "Editar reserva" : "Nova reserva"}
               </h2>
               <p className="mt-1 text-xs text-muted-foreground">
-                O sistema impede reservas sobrepostas e também bloqueia reservas quando já existe
-                atendimento na sala.
+                O sistema impede reservas sobrepostas, bloqueia conflitos de agenda e gera
+                automaticamente uma conta a receber a partir do valor do aluguel.
               </p>
             </div>
             <Button type="button" size="icon" variant="ghost" onClick={resetReservation}>
@@ -667,7 +670,7 @@ export function AdminRoomReservations() {
               </div>
             ) : (
               <div>
-                <Label>Valor do aluguel (opcional)</Label>
+                <Label>Valor do aluguel</Label>
                 <Input
                   className="mt-2"
                   type="number"
@@ -700,7 +703,7 @@ export function AdminRoomReservations() {
             </div>
             {rentalType === "shift" ? (
               <div>
-                <Label>Valor do aluguel (opcional)</Label>
+                <Label>Valor do aluguel</Label>
                 <Input
                   className="mt-2"
                   type="number"
