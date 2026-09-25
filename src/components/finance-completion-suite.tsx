@@ -363,11 +363,15 @@ export function FinanceCompletionSuite() {
     const rows = cashRange.data ?? [];
     const closed = rows.filter((row: any) => row.status === "closed");
     const open = rows.filter((row: any) => row.status === "open");
+    const latestClosed = closed[0] ?? null;
     return {
       sessions: rows.length,
       cashIn: rows.reduce((sum: number, row: any) => sum + Number(row.total_cash ?? 0), 0),
       cashOut: rows.reduce((sum: number, row: any) => sum + Number(row.total_cash_expenses ?? 0), 0),
       cashResult: rows.reduce((sum: number, row: any) => sum + Number(row.cash_result ?? (Number(row.total_cash ?? 0) - Number(row.total_cash_expenses ?? 0))), 0),
+      currentCash: open.length > 0
+        ? open.reduce((sum: number, row: any) => sum + Number(row.expected_cash ?? 0), 0)
+        : Number(latestClosed?.counted_cash ?? latestClosed?.expected_cash ?? 0),
       difference: closed.reduce((sum: number, row: any) => sum + Number(row.difference_amount ?? 0), 0),
       openExpected: open.reduce((sum: number, row: any) => sum + Number(row.expected_cash ?? 0), 0),
       closed: closed.length,
@@ -615,7 +619,7 @@ export function FinanceCompletionSuite() {
                   <td className="p-3">{money(row.commission_amount)}</td>
                   <td className="p-3">{money(row.clinic_amount)}</td>
                   <td className="p-3">{money(row.expense_amount)}</td>
-                  <td className="p-3 font-semibold">{cashFilterActive ? money(cashTotals.open > 0 ? cashTotals.openExpected : cashTotals.cashResult) : money(row.result_amount)}</td>
+                  <td className="p-3 font-semibold">{cashFilterActive ? money(cashTotals.currentCash) : money(row.result_amount)}</td>
                 </tr>
               ))}
               {!selectedRows.length ? (
@@ -647,8 +651,8 @@ export function FinanceCompletionSuite() {
               {cashFilterActive ? (
                 <div className="rounded-xl border border-primary/25 bg-primary/[0.06] p-3">
                   <span className="text-[11px] font-medium text-foreground">Saldo atual em dinheiro</span>
-                  <strong className="mt-1 block text-lg">{money(cashTotals.open > 0 ? cashTotals.openExpected : cashTotals.cashResult)}</strong>
-                  <p className="mt-1 text-[10px] text-muted-foreground">Inclui o fundo de abertura + entradas em dinheiro − saídas em dinheiro.</p>
+                  <strong className="mt-1 block text-lg">{money(cashTotals.currentCash)}</strong>
+                  <p className="mt-1 text-[10px] text-muted-foreground">Valor esperado no caixa aberto ou valor contado no último fechamento.</p>
                 </div>
               ) : null}
               {cashTotals.open > 0 ? (
