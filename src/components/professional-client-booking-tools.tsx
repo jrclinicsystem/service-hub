@@ -56,7 +56,7 @@ export function ProfessionalClientBookingTools({ professionalId, onAppointmentCr
 
   const [clientSearch, setClientSearch] = useState("");
   const [selectedClientId, setSelectedClientId] = useState("");
-  const [serviceId, setServiceId] = useState("");
+  const [serviceIds, setServiceIds] = useState<string[]>([]);
   const [appointmentValue, setAppointmentValue] = useState("");
   const [date, setDate] = useState(todayIso());
   const [time, setTime] = useState("");
@@ -67,7 +67,9 @@ export function ProfessionalClientBookingTools({ professionalId, onAppointmentCr
   const [savingAppointment, setSavingAppointment] = useState(false);
 
   const selectedClient = clients.find((client: any) => client.id === selectedClientId) ?? null;
-  const selectedService = services.find((service: any) => service.id === serviceId) ?? null;
+  const selectedServices = serviceIds
+    .map((id) => services.find((service: any) => service.id === id))
+    .filter(Boolean);
 
   const filteredClients = useMemo(() => {
     const term = clientSearch.trim().toLowerCase();
@@ -161,9 +163,23 @@ export function ProfessionalClientBookingTools({ professionalId, onAppointmentCr
     setClientSearch(client.name);
   };
 
+  const toggleService = (id: string) => {
+    if (!serviceIds.includes(id) && serviceIds.length >= 10) {
+      toast.error("É possível escolher até 10 serviços por agendamento.");
+      return;
+    }
+    const next = serviceIds.includes(id) ? serviceIds.filter((item) => item !== id) : [...serviceIds, id];
+    setServiceIds(next);
+    const sum = next.reduce(
+      (total, serviceId) => total + Number(services.find((service: any) => service.id === serviceId)?.price ?? 0),
+      0,
+    );
+    setAppointmentValue(next.length ? sum.toFixed(2) : "");
+  };
+
   const createAppointment = async () => {
     if (!selectedClient) { toast.error("Selecione um cliente cadastrado."); return; }
-    if (!selectedService) { toast.error("Selecione o serviço."); return; }
+    if (!selectedServices.length) { toast.error("Selecione ao menos um serviço."); return; }
     if (!date || date < todayIso()) { toast.error("Selecione uma data válida."); return; }
     if (!time) { toast.error("Selecione um horário disponível."); return; }
 
@@ -172,29 +188,42 @@ export function ProfessionalClientBookingTools({ professionalId, onAppointmentCr
       const parsedValue = Number(appointmentValue.replace(",", "."));
       if (!Number.isFinite(parsedValue) || parsedValue < 0) { toast.error("Informe um valor válido para o atendimento."); return; }
       const total = Math.round((parsedValue + Number.EPSILON) * 100) / 100;
-      const { error } = await db.from("appointments").insert({
-        user_id: null,
-        client_id: selectedClient.id,
-        professional_id: professionalId,
-        service_id: selectedService.id,
-        patient_name: selectedClient.name,
-        patient_email: selectedClient.email ?? "",
-        patient_phone: selectedClient.whatsapp,
-        scheduled_date: date,
-        scheduled_time: time,
-        notes: notes.trim(),
-        status: "pendente",
-        payment_choice: "onsite",
-        service_price_snapshot: total,
-        deposit_percent: 0,
-        deposit_amount: 0,
-        balance_amount: total,
-      });
+      // Keep the current single-service workflow unchanged. For multiple
+      // services, a scoped database function validates this professional's own
+      // schedule and stores all linked services atomically in one appointment.
+      const { error } = serviceIds.length > 1
+        ? await db.rpc("create_staff_multi_service_appointment", {
+            _client_id: selectedClient.id,
+            _service_ids: serviceIds,
+            _professional_id: professionalId,
+            _scheduled_date: date,
+            _scheduled_time: time,
+            _notes: notes.trim(),
+            _total: total,
+          })
+        : await db.from("appointments").insert({
+            user_id: null,
+            client_id: selectedClient.id,
+            professional_id: professionalId,
+            service_id: serviceIds[0],
+            patient_name: selectedClient.name,
+            patient_email: selectedClient.email ?? "",
+            patient_phone: selectedClient.whatsapp,
+            scheduled_date: date,
+            scheduled_time: time,
+            notes: notes.trim(),
+            status: "pendente",
+            payment_choice: "onsite",
+            service_price_snapshot: total,
+            deposit_percent: 0,
+            deposit_amount: 0,
+            balance_amount: total,
+          });
       if (error) throw error;
 
       setSelectedClientId("");
       setClientSearch("");
-      setServiceId("");
+      setServiceIds([]);
       setAppointmentValue("");
       setDate(todayIso());
       setTime("");
@@ -237,11 +266,41 @@ export function ProfessionalClientBookingTools({ professionalId, onAppointmentCr
             {!selectedClientId ? <div className="mt-2 max-h-36 space-y-1 overflow-y-auto rounded-xl border border-border p-1.5">{filteredClients.length ? filteredClients.map((client: any) => <button key={client.id} type="button" onClick={() => selectClient(client)} className="flex w-full items-center justify-between gap-3 rounded-lg px-2.5 py-2 text-left hover:bg-secondary/60"><span className="min-w-0"><span className="block truncate text-xs font-medium">{client.name}</span><span className="block truncate text-[9px] text-muted-foreground">{client.whatsapp}{client.email ? ` · ${client.email}` : ""}</span></span></button>) : <p className="px-2 py-3 text-center text-[10px] text-muted-foreground">Nenhum cliente encontrado.</p>}</div> : <div className="mt-2 flex items-center justify-between rounded-xl bg-primary-soft px-3 py-2"><div className="min-w-0"><p className="truncate text-xs font-semibold text-primary">{selectedClient?.name}</p><p className="truncate text-[9px] text-muted-foreground">{selectedClient?.whatsapp}</p></div><Check className="size-4 text-primary" /></div>}
           </div>
 
-          <div className="mt-3"><Label>Serviço</Label><Select value={serviceId} onValueChange={(value) => { setServiceId(value); const service = services.find((item: any) => item.id === value); setAppointmentValue(service ? String(Number(service.price ?? 0).toFixed(2)) : ""); }}><SelectTrigger className="mt-1.5"><SelectValue placeholder="Selecione o serviço" /></SelectTrigger><SelectContent>{services.map((service: any) => <SelectItem key={service.id} value={service.id}>{service.name} · {formatPrice(Number(service.price ?? 0))}</SelectItem>)}</SelectContent></Select></div>
-          <div className="mt-3"><Label>Valor do atendimento</Label><Input className="mt-1.5" type="number" min="0" step="0.01" inputMode="decimal" value={appointmentValue} onChange={(event) => setAppointmentValue(event.target.value)} placeholder="0,00" disabled={!serviceId} /><p className="mt-1 text-[10px] text-muted-foreground">O preço padrão é preenchido automaticamente, mas você pode alterar livremente para aplicar desconto ou valor combinado.</p></div>
+          <div className="mt-3">
+            <Label>Serviços do atendimento</Label>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Selecione um ou mais procedimentos para a mesma cliente e o mesmo horário.
+            </p>
+            <div className="mt-2 max-h-52 space-y-1 overflow-y-auto rounded-xl border border-border bg-card p-1.5" role="group" aria-label="Selecionar serviços">
+              {services.map((service: any) => {
+                const checked = serviceIds.includes(service.id);
+                return (
+                  <button
+                    key={service.id}
+                    type="button"
+                    role="checkbox"
+                    aria-checked={checked}
+                    onClick={() => toggleService(service.id)}
+                    className={`flex w-full items-center gap-2 rounded-lg border px-2.5 py-2 text-left transition-colors ${checked ? "border-primary/45 bg-primary-soft/50" : "border-transparent hover:bg-secondary/50"}`}
+                  >
+                    <span className={`grid size-4 shrink-0 place-items-center rounded border ${checked ? "border-primary bg-primary text-primary-foreground" : "border-border"}`}>
+                      {checked ? <Check className="size-3" /> : null}
+                    </span>
+                    <span className="min-w-0 flex-1 break-words text-xs font-medium">{service.name}</span>
+                    <span className="shrink-0 text-[11px] text-muted-foreground">{formatPrice(Number(service.price ?? 0))}</span>
+                  </button>
+                );
+              })}
+              {!services.length ? <p className="px-2 py-3 text-xs text-muted-foreground">Nenhum serviço vinculado à sua agenda.</p> : null}
+            </div>
+            <p className="mt-1.5 text-[11px] text-muted-foreground" aria-live="polite">
+              {serviceIds.length ? `${serviceIds.length} serviço(s) · Preço de catálogo: ${formatPrice(selectedServices.reduce((sum: number, service: any) => sum + Number(service.price ?? 0), 0))}` : "Nenhum serviço selecionado."}
+            </p>
+          </div>
+          <div className="mt-3"><Label>Valor do atendimento</Label><Input className="mt-1.5" type="number" min="0" step="0.01" inputMode="decimal" value={appointmentValue} onChange={(event) => setAppointmentValue(event.target.value)} placeholder="0,00" disabled={!serviceIds.length} /><p className="mt-1 text-[10px] text-muted-foreground">O preço padrão é preenchido automaticamente, mas você pode alterar livremente para aplicar desconto ou valor combinado.</p></div>
           <div className="mt-3 grid gap-3 sm:grid-cols-2"><div><Label>Data</Label><Input className="mt-1.5" type="date" min={todayIso()} value={date} onChange={(event) => setDate(event.target.value)} /></div><div><Label>Horário</Label><Select value={time} onValueChange={setTime} disabled={slotsLoading}><SelectTrigger className="mt-1.5"><SelectValue placeholder={slotsLoading ? "Carregando..." : slots.length ? "Selecione" : "Sem horário"} /></SelectTrigger><SelectContent>{slots.map((slot: any) => <SelectItem key={`${slot.slot}-${slot.source ?? "slot"}`} value={slot.slot}>{slot.slot}</SelectItem>)}</SelectContent></Select></div></div>
           <div className="mt-3"><Label>Observações</Label><Textarea className="mt-1.5 min-h-20" value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Opcional" /></div>
-          <Button type="button" className="mt-4 w-full rounded-xl" onClick={() => void createAppointment()} disabled={savingAppointment || slotsLoading || !selectedClientId || !serviceId || !time}>{savingAppointment ? "Salvando..." : "Criar agendamento"}</Button>
+          <Button type="button" className="mt-4 w-full rounded-xl" onClick={() => void createAppointment()} disabled={savingAppointment || slotsLoading || !selectedClientId || !serviceIds.length || !time}>{savingAppointment ? "Salvando..." : "Criar agendamento"}</Button>
         </div>
       </div>
     </section>
