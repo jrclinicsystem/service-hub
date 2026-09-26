@@ -172,14 +172,13 @@ async function loadProfessionalAgenda() {
     throw new Error(`Falha ao carregar a disponibilidade: ${availability.error.message}`);
 
   const appointmentRows = appointments.data ?? [];
-  const serviceIds = [
-    ...new Set(appointmentRows.map((row: any) => row.service_id).filter(Boolean)),
-  ] as string[];
   const appointmentIds = appointmentRows.map((row: any) => row.id).filter(Boolean) as string[];
-
-  const [servicesResult, responsesResult] = await Promise.all([
-    serviceIds.length
-      ? db.from("services").select("id, name, price, duration_min").in("id", serviceIds)
+  const [linkedServicesResult, responsesResult] = await Promise.all([
+    appointmentIds.length
+      ? db.from("appointment_services")
+          .select("appointment_id, service_id, position")
+          .in("appointment_id", appointmentIds)
+          .order("position")
       : Promise.resolve({ data: [], error: null }),
     appointmentIds.length
       ? db
@@ -188,15 +187,30 @@ async function loadProfessionalAgenda() {
           .in("appointment_id", appointmentIds)
       : Promise.resolve({ data: [], error: null }),
   ]);
-
-  if (servicesResult.error)
-    throw new Error(`Falha ao carregar os serviços da agenda: ${servicesResult.error.message}`);
+  if (linkedServicesResult.error)
+    throw new Error(`Falha ao carregar os serviços vinculados: ${linkedServicesResult.error.message}`);
   if (responsesResult.error)
     throw new Error(`Falha ao carregar as confirmações da agenda: ${responsesResult.error.message}`);
+
+  const serviceIds = [...new Set([
+    ...appointmentRows.map((row: any) => row.service_id),
+    ...(linkedServicesResult.data ?? []).map((row: any) => row.service_id),
+  ].filter(Boolean))] as string[];
+  const servicesResult = serviceIds.length
+    ? await db.from("services").select("id, name, price, duration_min").in("id", serviceIds)
+    : { data: [], error: null };
+  if (servicesResult.error)
+    throw new Error(`Falha ao carregar os serviços da agenda: ${servicesResult.error.message}`);
 
   const servicesById = new Map<string, any>(
     (servicesResult.data ?? []).map((row: any) => [row.id, row]),
   );
+  const serviceIdsByAppointment = new Map<string, string[]>();
+  for (const row of linkedServicesResult.data ?? []) {
+    const current = serviceIdsByAppointment.get(row.appointment_id) ?? [];
+    current.push(row.service_id);
+    serviceIdsByAppointment.set(row.appointment_id, current);
+  }
   const responsesByAppointment = new Map<string, any[]>();
   for (const row of responsesResult.data ?? []) {
     const current = responsesByAppointment.get(row.appointment_id) ?? [];
@@ -211,6 +225,9 @@ async function loadProfessionalAgenda() {
     appointments: appointmentRows.map((row: any) => ({
       ...row,
       service: servicesById.get(row.service_id) ?? null,
+      serviceNames: (serviceIdsByAppointment.get(row.id) ?? [row.service_id])
+        .map((id: string) => servicesById.get(id)?.name)
+        .filter(Boolean),
       professional_response: responsesByAppointment.get(row.id) ?? [],
     })),
     slots: slots.data ?? [],
@@ -771,7 +788,7 @@ function ProfessionalAppointmentCard({ appointment, onSaved }: any) {
             ) : null}
           </div>
           <p className="mt-1 break-words text-xs text-muted-foreground">
-            {appointment.service?.name || "Procedimento"} · {formatPrice(total)}
+            {(appointment.serviceNames?.length ? appointment.serviceNames.join(" + ") : appointment.service?.name) || "Procedimento"} · {formatPrice(total)}
           </p>
         </div>
         <div className="shrink-0 text-right">
