@@ -4204,7 +4204,16 @@ function EntryList({ rows }: { rows: any[] }) {
             <div className="text-xs text-muted-foreground">
               {row.payment_method_name || "Pagamento"}
               <br />
+              {row.status === "received" ? "Recebido em: " : "Data: "}
               {formatDate(row.business_date || row.occurred_at)}
+              {row.status === "received" &&
+              row.received_at &&
+              row.occurred_at &&
+              fortalezaIso(new Date(row.received_at)) !== fortalezaIso(new Date(row.occurred_at)) ? (
+                <span className="mt-1 block text-[11px] text-muted-foreground">
+                  Procedimento: {formatDate(row.occurred_at)}
+                </span>
+              ) : null}
             </div>
             <div className="text-xs">
               <span className="text-muted-foreground">Bruto:</span> {money(row.charged_amount)}
