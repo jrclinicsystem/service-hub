@@ -20,7 +20,7 @@ import {
   UsersRound,
   WalletCards,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { CashSessionReconciliation } from "@/components/cash-session-reconciliation";
@@ -4056,25 +4056,40 @@ function Panel({
   total?: string;
   collapsible?: boolean;
 }) {
+  // Keep expand/collapse in React state instead of relying on native <details>
+  // toggling, which can be disrupted by the finance tab layout.
+  const [expanded, setExpanded] = useState(false);
+  const contentId = useId();
+
   if (collapsible) {
     return (
-      <details className="group rounded-3xl border border-border bg-card shadow-soft">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 rounded-3xl p-5 transition-colors hover:bg-secondary/30 sm:p-6">
-          <div className="min-w-0">
-            <h2 className="text-xl font-bold tracking-tight text-foreground">{title}</h2>
-            {subtitle ? <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p> : null}
-          </div>
-          <div className="flex shrink-0 items-center gap-3">
-            {total ? (
-              <strong className="whitespace-nowrap text-base font-semibold text-primary sm:text-lg">{total}</strong>
-            ) : null}
-            <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-secondary text-muted-foreground transition-colors group-open:bg-primary-soft group-open:text-primary">
-              <ChevronDown className="size-4 transition-transform duration-200 group-open:rotate-180" />
+      <section className="rounded-3xl border border-border bg-card shadow-soft">
+        <h2>
+          <button
+            type="button"
+            aria-expanded={expanded}
+            aria-controls={contentId}
+            onClick={() => setExpanded((current) => !current)}
+            className="flex w-full cursor-pointer items-center justify-between gap-4 rounded-3xl p-5 text-left transition-colors hover:bg-secondary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary sm:p-6"
+          >
+            <span className="min-w-0">
+              <span className="block text-xl font-bold tracking-tight text-foreground">{title}</span>
+              {subtitle ? <span className="mt-1 block text-xs font-normal text-muted-foreground">{subtitle}</span> : null}
             </span>
-          </div>
-        </summary>
-        <div className="border-t border-border p-5 sm:p-6">{children}</div>
-      </details>
+            <span className="flex shrink-0 items-center gap-3">
+              {total ? (
+                <strong className="whitespace-nowrap text-base font-semibold text-primary sm:text-lg">{total}</strong>
+              ) : null}
+              <span className={`grid size-9 shrink-0 place-items-center rounded-xl text-muted-foreground transition-colors ${expanded ? "bg-primary-soft text-primary" : "bg-secondary"}`}>
+                <ChevronDown className={`size-4 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`} />
+              </span>
+            </span>
+          </button>
+        </h2>
+        <div id={contentId} hidden={!expanded} className="border-t border-border p-5 sm:p-6">
+          {children}
+        </div>
+      </section>
     );
   }
 
