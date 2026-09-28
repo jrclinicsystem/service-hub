@@ -23,6 +23,7 @@ import {
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { CashSessionReconciliation } from "@/components/cash-session-reconciliation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1385,12 +1386,12 @@ function FullFinanceWorkspace({
                 <div>
                   <Label>Dinheiro contado</Label>
                   <Input
-                    value={countedCash === "" ? String(todayCash.expected_cash ?? 0) : countedCash}
+                    value={countedCash}
                     onChange={(e) => setCountedCash(e.target.value)}
                     placeholder="0,00"
                   />
                   <p className="mt-1 text-[11px] text-muted-foreground">
-                    Preenchido automaticamente com o valor esperado em espécie. Altere apenas se a contagem física for diferente.
+                    Informe o valor contado fisicamente. O valor esperado aparece na conferência abaixo, mas não substitui a contagem.
                   </p>
                 </div>
                 <div>
@@ -1404,16 +1405,14 @@ function FullFinanceWorkspace({
                 <div className="flex items-end">
                   <Button
                     className="w-full"
-                    disabled={busy === "close-cash"}
+                    disabled={busy === "close-cash" || !countedCash.trim()}
                     onClick={() =>
                       run(
                         "close-cash",
                         async () => {
-                          const value = parseMoney(
-                            countedCash === "" ? String(todayCash.expected_cash ?? 0) : countedCash,
-                          );
-                          if (!Number.isFinite(value) || value < 0)
-                            throw new Error("Valor contado inválido.");
+                          const value = parseMoney(countedCash);
+                          if (!countedCash.trim() || !Number.isFinite(value) || value < 0)
+                            throw new Error("Informe o dinheiro contado fisicamente.");
                           const result = await db.rpc("close_cash_session", {
                             _session_id: todayCash.id,
                             _counted_cash: value,
@@ -1446,6 +1445,13 @@ function FullFinanceWorkspace({
               </div>
             )}
           </Panel>
+          {todayCash ? (
+            <CashSessionReconciliation
+              sessionId={String(todayCash.id)}
+              openingCash={Number(todayCash.opening_cash ?? 0)}
+              expectedCash={Number(todayCash.expected_cash ?? 0)}
+            />
+          ) : null}
           <Panel
             title="Histórico de caixas"
             subtitle="Se um caixa ficar aberto por esquecimento, ele pode ser fechado depois diretamente por aqui, sem alterar o caixa do dia atual."
@@ -3683,11 +3689,11 @@ function ReceptionWorkspace({ data, loading, error, refresh }: any) {
               <div>
                 <Input
                   placeholder="Dinheiro contado"
-                  value={counted === "" ? String(todayCash.expected_cash ?? 0) : counted}
+                  value={counted}
                   onChange={(e) => setCounted(e.target.value)}
                 />
                 <p className="mt-1 text-[11px] text-muted-foreground">
-                  Valor preenchido automaticamente. Altere somente se a contagem física for diferente.
+                  Informe o valor que foi contado fisicamente, mesmo que seja diferente do esperado.
                 </p>
               </div>
               <Input
@@ -3696,16 +3702,14 @@ function ReceptionWorkspace({ data, loading, error, refresh }: any) {
                 onChange={(e) => setNote(e.target.value)}
               />
               <Button
-                disabled={busy === "close"}
+                disabled={busy === "close" || !counted.trim()}
                 onClick={() =>
                   run(
                     "close",
                     async () => {
                       const result = await db.rpc("close_cash_session", {
                         _session_id: todayCash.id,
-                        _counted_cash: parseMoney(
-                          counted === "" ? String(todayCash.expected_cash ?? 0) : counted,
-                        ),
+                        _counted_cash: parseMoney(counted),
                         _note: note || null,
                       });
                       if (result.error) throw result.error;
@@ -3797,6 +3801,13 @@ function ReceptionWorkspace({ data, loading, error, refresh }: any) {
             </div>
           )}
         </Panel>
+        {todayCash ? (
+          <CashSessionReconciliation
+            sessionId={String(todayCash.id)}
+            openingCash={Number(todayCash.opening_cash ?? 0)}
+            expectedCash={Number(todayCash.expected_cash ?? 0)}
+          />
+        ) : null}
         <Panel
           title="Histórico de caixas"
           subtitle="Caixas esquecidos em aberto podem ser regularizados aqui, inclusive em outro dia."
