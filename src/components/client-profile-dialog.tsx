@@ -4,6 +4,7 @@ import { CalendarDays, FileText, FolderOpen, Image, Loader2, Paperclip, Pencil, 
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { ClientFinancialHistory } from "@/components/client-financial-history";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -416,7 +417,7 @@ export function ClientProfileDialog({ clientId, open, onOpenChange, onUpdated }:
             <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-primary/15 text-primary ring-1 ring-primary/15"><UserRound className="size-5" /></span>
             <div className="min-w-0">
               <DialogTitle className="truncate text-xl">{client?.name ?? "Ficha do cliente"}</DialogTitle>
-              <DialogDescription className="mt-1">Cadastro, anamnese e arquivos, agendamentos e orçamentos/combos em um só lugar.</DialogDescription>
+              <DialogDescription className="mt-1">Cadastro, arquivos, agendamentos, combos e histórico financeiro em um só lugar.</DialogDescription>
             </div>
           </div>
         </DialogHeader>
@@ -429,6 +430,7 @@ export function ClientProfileDialog({ clientId, open, onOpenChange, onUpdated }:
                 <TabsTrigger type="button" value="documents" onClick={(event) => event.stopPropagation()} className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Anamnese e arquivos</TabsTrigger>
                 <TabsTrigger type="button" value="appointments" onClick={(event) => event.stopPropagation()} className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Agendamentos</TabsTrigger>
                 <TabsTrigger type="button" value="budgets" onClick={(event) => event.stopPropagation()} className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Orçamentos e combos</TabsTrigger>
+                <TabsTrigger type="button" value="finance" onClick={(event) => event.stopPropagation()} className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><ReceiptText className="mr-1.5 size-3.5" /> Financeiro</TabsTrigger>
               </TabsList>
             </div>
 
@@ -532,6 +534,10 @@ export function ClientProfileDialog({ clientId, open, onOpenChange, onUpdated }:
                     <div className="mt-3 flex flex-wrap items-end gap-2">{!budget.is_paid ? <><div className="min-w-48"><Label className="text-[11px]">Forma de pagamento do combo</Label><Select value={budgetPaymentMethods[budget.id] || query.data?.paymentMethods?.[0]?.code || ""} onValueChange={(value) => setBudgetPaymentMethods((current) => ({ ...current, [budget.id]: value }))}><SelectTrigger className="mt-1 h-9"><SelectValue placeholder="Forma de pagamento" /></SelectTrigger><SelectContent>{(query.data?.paymentMethods ?? []).map((method: any) => <SelectItem key={method.id} value={method.code}>{method.name}</SelectItem>)}</SelectContent></Select></div><Button size="sm" disabled={budgetPaymentSaving === budget.id} onClick={() => void recordBudgetPayment(budget)}>{budgetPaymentSaving === budget.id ? <Loader2 className="size-4 animate-spin" /> : <ReceiptText className="size-4" />} {budgetPaymentSaving === budget.id ? "Registrando..." : "Registrar pagamento"}</Button></> : <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800"><strong>Pagamento registrado</strong>{budget.paid_at ? ` · ${new Date(budget.paid_at).toLocaleDateString("pt-BR")}` : ""}{budget.payment_method_code ? ` · ${String(budget.payment_method_code).toUpperCase()}` : ""}</div>}<Button size="sm" variant="outline" onClick={() => void updateBudgetStatus(budget.id, "approved")}>Marcar aprovado</Button><Button size="sm" variant="outline" onClick={() => void updateBudgetStatus(budget.id, "declined")}>Marcar recusado</Button><Button size="sm" variant="ghost" className="text-destructive" onClick={() => void removeBudget(budget.id)}><Trash2 className="size-4" /> Excluir</Button></div>
                   </article>)}
                 </section>
+              </TabsContent>
+
+              <TabsContent value="finance" className="mt-0 space-y-4">
+                <ClientFinancialHistory clientId={clientId as string} clientName={client.name ?? "Cliente"} />
               </TabsContent>
             </div>
           </Tabs>
