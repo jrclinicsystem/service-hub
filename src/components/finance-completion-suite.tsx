@@ -185,6 +185,18 @@ async function loadCashRange(from: string, to: string) {
   return result.data ?? [];
 }
 
+// Continuous cash balance: latest sessions up to `to`, regardless of month/year boundaries.
+async function loadLatestCashUpTo(to: string) {
+  const result = await db
+    .from("financial_cash_report")
+    .select("*")
+    .lte("business_date", to)
+    .order("business_date", { ascending: false })
+    .limit(20);
+  if (result.error) throw result.error;
+  return result.data ?? [];
+}
+
 function AlertList({ title, rows, kind }: { title: string; rows: any[]; kind: "pay" | "receive" }) {
   const active = rows.filter((row) => row.alert_status && row.alert_status !== "none");
   return (
@@ -331,6 +343,11 @@ export function FinanceCompletionSuite() {
     queryFn: () => loadCashRange(from, to),
     enabled: Boolean(access.data?.full && from && to),
   });
+  const latestCash = useQuery({
+    queryKey: ["finance-cash-latest", to],
+    queryFn: () => loadLatestCashUpTo(to),
+    enabled: Boolean(access.data?.full && to),
+  });
 
   const professionals = useMemo(() => {
     const map = new Map<string, string>();
@@ -363,21 +380,25 @@ export function FinanceCompletionSuite() {
     const rows = cashRange.data ?? [];
     const closed = rows.filter((row: any) => row.status === "closed");
     const open = rows.filter((row: any) => row.status === "open");
-    const latestClosed = closed[0] ?? null;
+    // Current cash must not reset at month/year turnover: use the most recent
+    // sessions up to the period end, even if they belong to a previous month.
+    const history = latestCash.data ?? [];
+    const historyOpen = history.filter((row: any) => row.status === "open");
+    const historyClosed = history.find((row: any) => row.status === "closed") ?? null;
     return {
       sessions: rows.length,
       cashIn: rows.reduce((sum: number, row: any) => sum + Number(row.total_cash ?? 0), 0),
       cashOut: rows.reduce((sum: number, row: any) => sum + Number(row.total_cash_expenses ?? 0), 0),
       cashResult: rows.reduce((sum: number, row: any) => sum + Number(row.cash_result ?? (Number(row.total_cash ?? 0) - Number(row.total_cash_expenses ?? 0))), 0),
-      currentCash: open.length > 0
-        ? open.reduce((sum: number, row: any) => sum + Number(row.expected_cash ?? 0), 0)
-        : Number(latestClosed?.counted_cash ?? latestClosed?.expected_cash ?? 0),
+      currentCash: historyOpen.length > 0
+        ? historyOpen.reduce((sum: number, row: any) => sum + Number(row.expected_cash ?? 0), 0)
+        : Number(historyClosed?.counted_cash ?? historyClosed?.expected_cash ?? 0),
       difference: closed.reduce((sum: number, row: any) => sum + Number(row.difference_amount ?? 0), 0),
       openExpected: open.reduce((sum: number, row: any) => sum + Number(row.expected_cash ?? 0), 0),
       closed: closed.length,
       open: open.length,
     };
-  }, [cashRange.data]);
+  }, [cashRange.data, latestCash.data]);
   const reportCashResult = cashFilterActive
     ? selectedRows.reduce((sum: number, row: any) => sum + Number(row.result_amount ?? 0), 0)
     : null;
