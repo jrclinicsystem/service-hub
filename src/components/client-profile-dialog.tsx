@@ -296,21 +296,27 @@ export function ClientProfileDialog({ clientId, open, onOpenChange, onUpdated }:
 
   const recordBudgetPayment = async (budget: any) => {
     const methods = query.data?.paymentMethods ?? [];
+    const professionals = query.data?.professionals ?? [];
     const methodCode = budgetPaymentMethods[budget.id] || methods[0]?.code || "";
     const method = methods.find((item: any) => item.code === methodCode);
+    const professionalId = budgetPaymentProfessionals[budget.id] || "";
+    const professional = professionals.find((item: any) => item.id === professionalId);
     if (!methodCode) { toast.error("Cadastre ou selecione uma forma de pagamento."); return undefined; }
-    if (!window.confirm(`Registrar o pagamento integral de ${money(budget.total_amount)} do combo “${budget.title}” via ${method?.name ?? methodCode}? Esse valor será lançado uma única vez no financeiro${method?.is_cash ? " e no caixa aberto" : ""}.`)) return undefined;
+    if (!professionalId || !professional) { toast.error("Selecione a profissional responsável."); return undefined; }
+    if (!window.confirm(`Registrar o pagamento integral de ${money(budget.total_amount)} do combo “${budget.title}” via ${method?.name ?? methodCode}, com ${professional.name} como profissional responsável? Esse valor será lançado uma única vez no financeiro${method?.is_cash ? " e no caixa aberto" : ""} e a comissão de ${professional.name} será gerada automaticamente.`)) return undefined;
     setBudgetPaymentSaving(budget.id);
     const result = await db.rpc("record_client_budget_payment", {
       _budget_id: budget.id,
       _payment_method_code: methodCode,
       _installments: 1,
       _occurred_at: new Date().toISOString(),
+      _professional_id: professionalId,
     });
     setBudgetPaymentSaving("");
     if (result.error) { toast.error("Não foi possível registrar o pagamento do combo.", { description: result.error.message }); return undefined; }
     const cashCreated = Boolean(result.data?.cash_movement_created);
-    toast.success("Pagamento do combo registrado.", { description: cashCreated ? "Receita registrada no financeiro e no caixa. As próximas visitas vinculadas a este combo ficam em R$ 0,00." : "Receita registrada no financeiro. As próximas visitas vinculadas a este combo ficam em R$ 0,00." });
+    const commissionAmount = result.data?.commission_amount;
+    toast.success("Pagamento do combo registrado.", { description: `${cashCreated ? "Receita registrada no financeiro e no caixa." : "Receita registrada no financeiro."}${commissionAmount ? ` Comissão gerada: ${money(commissionAmount)}.` : ""} As próximas visitas vinculadas a este combo ficam em R$ 0,00.` });
     await refresh();
     await onUpdated?.();
     return undefined;
