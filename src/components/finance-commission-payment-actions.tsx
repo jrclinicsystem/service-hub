@@ -208,7 +208,7 @@ export function FinanceCommissionPaymentActions() {
 
   const selectAllPending = () => {
     const allIds = payableRows.map((row: any) => String(row.id));
-    const allSelected = allIds.length > 0 && allIds.every((id) => selectedIds.has(id));
+    const allSelected = allIds.length > 0 && allIds.every((id: string) => selectedIds.has(id));
     setSelectedIds(allSelected ? new Set() : new Set(allIds));
   };
 
