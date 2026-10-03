@@ -72,15 +72,16 @@ async function loadClientWorkspace(clientId: string) {
 
   const appointmentSelect = "id,client_id,patient_name,patient_phone,patient_email,notes,scheduled_date,scheduled_time,status,custom_price,service_price_snapshot,created_at,service:services!appointments_service_id_fkey(name,price,session_count),professional:professionals(name),appointment_sessions(id,service_id,service_name_snapshot,service_position,session_number,scheduled_date,scheduled_time,status,completed_at),appointment_services(service_id,position,price_snapshot,session_count,status,service:services!appointment_services_service_id_fkey(name,price,session_count))";
 
-  const [directAppointments, legacyAppointments, documents, budgets, services, paymentMethods] = await Promise.all([
+  const [directAppointments, legacyAppointments, documents, budgets, services, paymentMethods, professionals] = await Promise.all([
     db.from("appointments").select(appointmentSelect).eq("client_id", clientId).order("scheduled_date", { ascending: false }).limit(100),
     db.from("appointments").select(appointmentSelect).ilike("patient_name", client.name).order("scheduled_date", { ascending: false }).limit(100),
     db.from("client_documents").select("id,client_id,category,file_name,storage_path,mime_type,size_bytes,notes,created_at").eq("client_id", clientId).order("created_at", { ascending: false }),
     db.from("client_budgets").select("id,client_id,title,notes,status,total_amount,valid_until,is_paid,paid_amount,paid_at,payment_method_code,financial_entry_id,created_at,updated_at,client_budget_items(id,service_id,service_name_snapshot,unit_price,sessions,line_total,package_total,position,completed_session_numbers)").eq("client_id", clientId).order("created_at", { ascending: false }),
     db.from("services").select("id,name,price,duration_min,summary,description,includes,session_count").eq("is_active", true).order("name"),
     db.from("payment_methods").select("id,code,name,is_cash").eq("is_active", true).order("sort_order"),
+    db.from("professionals").select("id,name").eq("is_active", true).is("deleted_at", null).order("sort_order").order("name"),
   ]);
-  for (const result of [directAppointments, legacyAppointments, documents, budgets, services, paymentMethods]) if (result.error) throw result.error;
+  for (const result of [directAppointments, legacyAppointments, documents, budgets, services, paymentMethods, professionals]) if (result.error) throw result.error;
 
   const wantedPhone = digits(client.whatsapp);
   const appointmentMap = new Map<string, any>();
@@ -97,6 +98,7 @@ async function loadClientWorkspace(clientId: string) {
     budgets: budgets.data ?? [],
     services: services.data ?? [],
     paymentMethods: paymentMethods.data ?? [],
+    professionals: professionals.data ?? [],
   };
 }
 
@@ -129,6 +131,7 @@ export function ClientProfileDialog({ clientId, open, onOpenChange, onUpdated }:
   const [budgetSaving, setBudgetSaving] = useState(false);
   const [budgetPaymentSaving, setBudgetPaymentSaving] = useState("");
   const [budgetPaymentMethods, setBudgetPaymentMethods] = useState<Record<string, string>>({});
+  const [budgetPaymentProfessionals, setBudgetPaymentProfessionals] = useState<Record<string, string>>({});
   const [budgetSessionSaving, setBudgetSessionSaving] = useState("");
   const [appointmentSessionSaving, setAppointmentSessionSaving] = useState("");
   const [appointmentSessionDrafts, setAppointmentSessionDrafts] = useState<Record<string, { date: string; time: string }>>({});
