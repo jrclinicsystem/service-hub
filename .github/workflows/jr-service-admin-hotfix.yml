@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - '.github/scripts/jr_service_admin_hotfix.py'
+      - '.github/hotfix-triggers/jr-service-admin.txt'
   workflow_dispatch:
 
 permissions:
