@@ -147,7 +147,7 @@ async function loadAdminOverview() {
     db
       .from("services")
       .select(
-        "id, slug, name, category_id, professional, professional_role, duration_min, price, rating, reviews_count, summary, description, includes, preparation, session_count, is_active",
+        "id, slug, name, category_id, professional, professional_role, duration_min, price, rating, reviews_count, summary, description, includes, preparation, session_count, is_active, archived_at",
       )
       .order("name"),
     db.from("categories").select("id, name, description, sort_order").order("sort_order"),
@@ -287,7 +287,8 @@ function Admin() {
       0,
     );
   const uniquePatients = new Set(data.appointments.map((item: any) => item.patient_email)).size;
-  const activeServices = data.services.filter((item: any) => item.is_active).length;
+  const visibleServices = data.services.filter((item: any) => !item.archived_at);
+  const activeServices = visibleServices.filter((item: any) => item.is_active).length;
 
   const updateRow = async (
     table: string,
@@ -467,7 +468,7 @@ function Admin() {
             />
 
             <div className="space-y-2.5 md:hidden">
-              {data.services.map((service: any) => (
+              {visibleServices.map((service: any) => (
                 <div
                   key={service.id}
                   className="rounded-2xl border border-border bg-card p-4 shadow-soft"
@@ -530,7 +531,7 @@ function Admin() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.services.map((service: any) => (
+                  {visibleServices.map((service: any) => (
                     <TableRow key={service.id}>
                       <TableCell>
                         <p className="font-medium">{service.name}</p>
@@ -574,7 +575,7 @@ function Admin() {
             <SectionHeader
               title="Promoções"
               subtitle="Crie campanhas e vincule a um serviço."
-              action={<PromotionEditor services={data.services} onSaved={refresh} />}
+              action={<PromotionEditor services={visibleServices} onSaved={refresh} />}
             />
             <div className="grid gap-2.5 sm:gap-4 md:grid-cols-2 xl:grid-cols-3">
               {data.promotions.length === 0 ? (
@@ -966,7 +967,7 @@ function ServiceEditor({
   const remove = async () => {
     if (!service?.id || busy) return;
     const confirmed = window.confirm(
-      `Excluir "${service.name}"?\n\nSe esse serviço já tiver histórico, ele será apenas arquivado para preservar os agendamentos antigos.`,
+      `Excluir "${service.name}"?\n\nEle sairá da lista de serviços. Se houver agendamentos antigos, o histórico continuará preservado.`,
     );
     if (!confirmed) return;
 
@@ -979,8 +980,8 @@ function ServiceEditor({
       if (error) throw error;
 
       if (String(data ?? "") === "archived") {
-        toast.success("Serviço arquivado.", {
-          description: "O histórico foi preservado e ele não aparece em novos agendamentos.",
+        toast.success("Serviço removido da lista.", {
+          description: "Os agendamentos antigos continuam preservados no histórico.",
         });
       } else {
         toast.success("Serviço excluído.");
