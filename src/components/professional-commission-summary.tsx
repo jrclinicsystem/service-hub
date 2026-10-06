@@ -24,6 +24,7 @@ function paidAmount(row: any) {
 }
 
 function remainingAmount(row: any) {
+  if (row?.status === "paid" || row?.status === "cancelled") return 0;
   return Math.max(0, Math.round((Number(row?.commission_amount ?? 0) - paidAmount(row)) * 100) / 100);
 }
 
@@ -82,6 +83,9 @@ export function ProfessionalCommissionSummary({ professionalId }: { professional
     queryFn: () => loadProfessionalCommissions(professionalId),
     enabled: Boolean(professionalId),
     retry: 1,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
   });
 
   if (query.isLoading) {
@@ -103,7 +107,6 @@ export function ProfessionalCommissionSummary({ professionalId }: { professional
   }
 
   const rows = query.data ?? [];
-  const total = rows.reduce((sum: number, row: any) => sum + Number(row.commission_amount || 0), 0);
   const pending = rows.reduce((sum: number, row: any) => sum + remainingAmount(row), 0);
   const paid = rows.reduce((sum: number, row: any) => sum + paidAmount(row), 0);
 
@@ -121,7 +124,7 @@ export function ProfessionalCommissionSummary({ professionalId }: { professional
       </div>
 
       <div className="mt-5 grid gap-3 sm:grid-cols-3">
-        <SummaryCard icon={CircleDollarSign} label="Comissão total" value={money(total)} />
+        <SummaryCard icon={CircleDollarSign} label="Comissão em aberto" value={money(pending)} />
         <SummaryCard icon={Clock3} label="Restante a receber" value={money(pending)} />
         <SummaryCard icon={CheckCircle2} label="Já recebido" value={money(paid)} />
       </div>
