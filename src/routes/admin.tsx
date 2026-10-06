@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   Stethoscope,
   Tag,
+  Trash2,
   Users,
 } from "lucide-react";
 import { useState } from "react";
@@ -840,6 +841,7 @@ function ServiceEditor({
   const [summary, setSummary] = useState(service?.summary ?? "");
   const [descriptionText, setDescriptionText] = useState(service?.description ?? "");
   const [busy, setBusy] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const toggleProfessional = (professionalId: string, checked: boolean) => {
     setSelectedProfessionalIds((current) =>
@@ -959,6 +961,38 @@ function ServiceEditor({
     }
 
     onSaved();
+  };
+
+  const remove = async () => {
+    if (!service?.id || busy) return;
+    const confirmed = window.confirm(
+      `Excluir "${service.name}"?\n\nSe esse serviço já tiver histórico, ele será apenas arquivado para preservar os agendamentos antigos.`,
+    );
+    if (!confirmed) return;
+
+    setBusy(true);
+    setDeleting(true);
+    try {
+      const { data, error } = await db.rpc("delete_admin_service", {
+        _service_id: service.id,
+      });
+      if (error) throw error;
+
+      if (String(data ?? "") === "archived") {
+        toast.success("Serviço arquivado.", {
+          description: "O histórico foi preservado e ele não aparece em novos agendamentos.",
+        });
+      } else {
+        toast.success("Serviço excluído.");
+      }
+      setOpen(false);
+      onSaved();
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : "Não foi possível excluir o serviço.");
+    } finally {
+      setDeleting(false);
+      setBusy(false);
+    }
   };
 
   return (
@@ -1116,9 +1150,21 @@ function ServiceEditor({
             </Field>
           </div>
         </div>
-        <DialogFooter>
+        <DialogFooter className="gap-2 sm:justify-between">
+          {service ? (
+            <Button
+              type="button"
+              variant="destructive"
+              className="w-full sm:w-auto"
+              disabled={busy}
+              onClick={remove}
+            >
+              <Trash2 className="size-4" />
+              {deleting ? "Excluindo..." : "Excluir serviço"}
+            </Button>
+          ) : null}
           <Button className="w-full sm:w-auto" disabled={busy} onClick={save}>
-            {busy ? "Salvando..." : "Salvar serviço"}
+            {busy && !deleting ? "Salvando..." : "Salvar serviço"}
           </Button>
         </DialogFooter>
       </DialogContent>

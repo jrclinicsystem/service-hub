@@ -866,7 +866,6 @@ function CreateAppointmentDialog({
       db
         .from("services")
         .select("id, name, price, duration_min, session_count, is_active")
-        .eq("is_active", true)
         .order("name"),
       db
         .from("professionals")
@@ -1079,15 +1078,20 @@ function CreateAppointmentDialog({
     [serviceIds, services],
   );
 
+  const selectableServices = useMemo(
+    () => services.filter((service) => service.is_active || serviceIds.includes(service.id)),
+    [services, serviceIds],
+  );
+
   const filteredServices = useMemo(() => {
     const term = serviceSearch.trim().toLocaleLowerCase("pt-BR");
-    if (!term) return services;
-    return services.filter((service) =>
+    if (!term) return selectableServices;
+    return selectableServices.filter((service) =>
       String(service.name ?? "")
         .toLocaleLowerCase("pt-BR")
         .includes(term),
     );
-  }, [services, serviceSearch]);
+  }, [selectableServices, serviceSearch]);
 
   const toggleService = (id: string) => {
     const requiredByCombo = selectedComboLinks.some((key) => {
@@ -1516,6 +1520,7 @@ function CreateAppointmentDialog({
                           <span className="block truncate text-sm font-medium">{service.name}</span>
                           <span className="mt-0.5 block text-[11px] text-muted-foreground">
                             {formatPrice(Number(service.price ?? 0))}
+                            {!service.is_active ? " · inativo (histórico)" : ""}
                           </span>
                         </span>
                         <span
