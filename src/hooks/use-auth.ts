@@ -13,8 +13,8 @@ export function useAuth() {
       setLoading(false);
     });
 
-    supabase.auth.getSession().then(({ data }) => {
-      setUser(data.session?.user ?? null);
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user ?? null);
       setLoading(false);
     });
 
