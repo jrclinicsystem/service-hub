@@ -1,0 +1,3 @@
+- [ ] Corrigir normalização, confirmação e separação de credenciais/autorização no login.
+- [ ] Validar acesso da colaboradora pela permissão existente, sem conceder papéis.
+- [ ] Executar testes e verificar o preview; documentar limitações do serviço de autenticação conectado.
