@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
+import { authErrorMessage, normalizeAuthEmail, verifiedPortalAccess } from "@/lib/auth-access";
 
 const title = "Entrar na JR Clinic";
 const description =
@@ -53,8 +54,7 @@ function adminDestination(value?: string) {
 }
 
 async function resolveAuthenticatedDestination(next?: string) {
-  const { data: destination, error } = await db.rpc("current_portal_destination");
-  if (error) throw error;
+  const destination = await verifiedPortalAccess(db);
 
   if (destination === "admin") return adminDestination(next);
   if (destination === "professional") return "/profissional";
@@ -165,18 +165,14 @@ function AuthPage() {
     setBusy(true);
     setCheckingAccess(true);
     const { error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
+      email: normalizeAuthEmail(email),
       password,
     });
 
     if (error) {
       setBusy(false);
       setCheckingAccess(false);
-      if (error.message.toLowerCase().includes("invalid login credentials")) {
-        toast.error("E-mail ou senha incorretos. Se necessário, use ‘Esqueci minha senha’. ");
-      } else {
-        toast.error(error.message);
-      }
+      toast.error(authErrorMessage(error));
       return;
     }
 
@@ -200,7 +196,7 @@ function AuthPage() {
   };
 
   const sendPasswordReset = async () => {
-    const normalizedEmail = email.trim();
+    const normalizedEmail = normalizeAuthEmail(email);
     if (!normalizedEmail) {
       toast.error("Digite seu e-mail primeiro.");
       return;
@@ -252,7 +248,7 @@ function AuthPage() {
     setBusy(true);
     const redirectTo = `${publicAuthOrigin()}/auth${next ? `?next=${encodeURIComponent(next)}` : ""}`;
     const { error } = await supabase.auth.signUp({
-      email: email.trim(),
+      email: normalizeAuthEmail(email),
       password,
       options: {
         emailRedirectTo: redirectTo,
@@ -274,7 +270,7 @@ function AuthPage() {
       return;
     }
 
-    toast.success("Conta criada! Verifique seu e-mail se a confirmação for solicitada.");
+    toast.success("Confira seu e-mail para confirmar o cadastro. Se já houver uma conta, entre ou use ‘Esqueci minha senha’; cadastrar novamente não altera a senha existente.");
   };
 
   const isAdminAccess = isPanelDestination(next);

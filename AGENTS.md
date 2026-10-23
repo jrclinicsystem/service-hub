@@ -8,3 +8,5 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+
+- Resolve portal access from the verified Auth user and current RLS-scoped admin/professional authorization, never from signup metadata or cached staff roles; allowlisting before signup must not require role promotion at login.
