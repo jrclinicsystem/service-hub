@@ -1,3 +1,4 @@
+import { appointmentDisplayStatus } from "@/lib/appointment-status";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
@@ -85,6 +86,8 @@ function paymentLabel(item: any) {
 }
 
 function statusLabel(status: string) {
+  if (status === "remarcado") return "Remarcado";
+  if (status === "atendido") return "Atendido";
   if (status === "aguardando_pagamento") return "Aguardando pagamento";
   if (status === "confirmado") return "Confirmado";
   if (status === "cancelado") return "Cancelado";
@@ -267,7 +270,7 @@ function AppointmentCard({ item, onClick }: any) {
     <button type="button" onClick={onClick} className="w-full rounded-2xl border border-border bg-card p-4 text-left shadow-soft transition hover:border-primary/30 hover:bg-secondary/20 sm:p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0"><p className="truncate text-sm font-semibold sm:text-base">{item.service?.name ?? "Serviço"}</p><p className="mt-1 truncate text-[11px] text-muted-foreground sm:text-xs">{item.professional?.name ?? "Equipe JR Clinic"} · {item.professional?.specialty ?? "Profissional"}</p></div>
-        <StatusBadge status={item.status} />
+        <StatusBadge status={appointmentDisplayStatus(item)} />
       </div>
       <div className="mt-3 grid grid-cols-3 gap-2 rounded-xl bg-secondary/45 p-3 text-xs">
         <MiniDetail label="Data" value={formatDate(item.scheduled_date)} /><MiniDetail label="Horário" value={item.scheduled_time} /><MiniDetail label="Pagamento" value={paymentLabel(item)} accent />
@@ -297,7 +300,7 @@ function AppointmentDetailsDialog({ appointment, onOpenChange, onRemove, removin
   return (
     <Dialog open={Boolean(appointment)} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92dvh] w-[calc(100%-1rem)] overflow-y-auto rounded-3xl p-5 sm:max-w-2xl sm:p-6">
-        <DialogHeader><div className="flex flex-wrap items-center gap-2"><DialogTitle>{appointment.service?.name ?? "Detalhes do agendamento"}</DialogTitle><StatusBadge status={appointment.status} /></div><DialogDescription>Informações completas da sua reserva.</DialogDescription></DialogHeader>
+        <DialogHeader><div className="flex flex-wrap items-center gap-2"><DialogTitle>{appointment.service?.name ?? "Detalhes do agendamento"}</DialogTitle><StatusBadge status={appointmentDisplayStatus(appointment)} /></div><DialogDescription>Informações completas da sua reserva.</DialogDescription></DialogHeader>
 
         <div className="mt-2 rounded-2xl border border-border bg-secondary/35 p-4">
           <div className="flex items-center gap-2 text-primary"><BadgeCheck className="size-4" /><p className="text-sm font-semibold">{paymentLabel(appointment)}</p></div>

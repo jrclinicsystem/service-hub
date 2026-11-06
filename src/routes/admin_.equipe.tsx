@@ -1,3 +1,4 @@
+import { appointmentDisplayStatus, withAppointmentHistory } from "@/lib/appointment-status";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import {
@@ -71,6 +72,7 @@ function periodForTime(time: string) {
 }
 
 function appointmentStatusLabel(status: string) {
+  if (status === "remarcado") return "Remarcado";
   if (status === "pendente") return "Aguardando confirmação";
   if (status === "confirmado") return "Confirmado";
   if (status === "cancelado") return "Cancelado";
@@ -134,7 +136,7 @@ async function loadTeamAgenda() {
   const [professionals, access, appointments, services, links, slots, availability] = await Promise.all([
     db.from("professionals").select("id, name, specialty, avatar_url, is_active, sort_order, deleted_at").is("deleted_at", null).order("sort_order").order("name"),
     db.from("professional_access").select("id, professional_id, email, enabled, created_by, created_at, updated_at").order("created_at"),
-    db.from("appointments").select("id, service_id, professional_id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status, payment_choice, service_price_snapshot").order("scheduled_date").order("scheduled_time"),
+    withAppointmentHistory((history) => db.from("appointments").select(`id, service_id, professional_id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status${history}, payment_choice, service_price_snapshot`).order("scheduled_date").order("scheduled_time")),
     db.from("services").select("id, name, duration_min, price, is_active").order("name"),
     db.from("service_professionals").select("service_id, professional_id"),
     db.from("professional_time_slots").select("id, professional_id, slot, is_available, sort_order").order("sort_order").order("slot"),
@@ -320,7 +322,7 @@ function TeamAgendaPage() {
                     <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="font-semibold">{appointment.patient_name}</p><p className="mt-1 text-xs text-muted-foreground">{appointment.service?.name || "Atendimento"} · {formatPrice(Number(appointment.service_price_snapshot ?? appointment.service?.price ?? 0))}</p></div><div className="text-right"><p className="font-semibold">{appointment.scheduled_time}</p><p className="text-[10px] text-muted-foreground">{formatDate(appointment.scheduled_date)}</p></div></div>
                     <ExistingAppointmentPriceEditor appointment={appointment} onSaved={refresh} />
                     {hasWhatsApp && appointment.status !== "cancelado" ? <div className="mt-3">{proximity === "urgent" ? <Button type="button" size="sm" className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => openAppointmentWhatsApp(appointment, selected, "reminder")}><MessageCircle className="size-4" /> {days === 0 ? "Falar com cliente" : "Recontatar cliente"}</Button> : appointment.status === "pendente" ? <Button type="button" size="sm" variant="outline" className="rounded-xl border-emerald-600/40 text-emerald-700" onClick={() => openAppointmentWhatsApp(appointment, selected, "confirmation")}><MessageCircle className="size-4" /> Confirmar pelo WhatsApp</Button> : null}</div> : null}
-                    <div className="mt-3 flex items-center justify-between border-t border-border/70 pt-3"><Badge variant={appointment.status === "confirmado" ? "default" : "outline"} className="rounded-full">{appointmentStatusLabel(appointment.status)}</Badge><Button type="button" variant="ghost" size="icon" className="text-destructive" onClick={async () => { if (!window.confirm(`Apagar o agendamento de ${appointment.patient_name}?`)) return; const { error: removeError } = await db.from("appointments").delete().eq("id", appointment.id); if (removeError) { toast.error(removeError.message); return; } toast.success("Agendamento apagado."); await refresh(); }}><Trash2 className="size-4" /></Button></div>
+                    <div className="mt-3 flex items-center justify-between border-t border-border/70 pt-3"><Badge variant={appointment.status === "confirmado" ? "default" : "outline"} className="rounded-full">{appointmentStatusLabel(appointmentDisplayStatus(appointment))}</Badge><Button type="button" variant="ghost" size="icon" className="text-destructive" onClick={async () => { if (!window.confirm(`Apagar o agendamento de ${appointment.patient_name}?`)) return; const { error: removeError } = await db.from("appointments").delete().eq("id", appointment.id); if (removeError) { toast.error(removeError.message); return; } toast.success("Agendamento apagado."); await refresh(); }}><Trash2 className="size-4" /></Button></div>
                   </article>
                 );
               })}

@@ -19,6 +19,7 @@ import {
   Trash2,
   XCircle,
 } from "lucide-react";
+import { appointmentDisplayStatus, withAppointmentHistory } from "@/lib/appointment-status";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -139,14 +140,14 @@ async function loadProfessionalAgenda() {
       .select("id, name, specialty, avatar_url, is_active, deleted_at")
       .eq("id", professionalId)
       .maybeSingle(),
-    db
+    withAppointmentHistory((history) => db
       .from("appointments")
       .select(
-        "id, service_id, professional_id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status, payment_choice, service_price_snapshot, balance_amount",
+        `id, service_id, professional_id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status${history}, payment_choice, service_price_snapshot, balance_amount`,
       )
       .eq("professional_id", professionalId)
       .order("scheduled_date")
-      .order("scheduled_time"),
+      .order("scheduled_time")),
     db
       .from("professional_time_slots")
       .select("id, professional_id, slot, is_available, sort_order")
@@ -276,6 +277,7 @@ function ProfessionalAgenda() {
     const professionalId = data.professional.id;
     const notify = async (payload: any) => {
       const next = payload.new as any;
+      void refetch();
       if (
         !next?.id ||
         next.professional_id !== professionalId ||
@@ -648,7 +650,7 @@ function ProfessionalAppointmentCard({ appointment, onSaved }: any) {
   const [priceValue, setPriceValue] = useState("");
   const response = responseFor(appointment)?.response;
   const attended = appointment.status === "atendido";
-  const confirmed = attended || response === "confirmado" || appointment.status === "confirmado";
+  const confirmed = attended || appointment.status === "confirmado";
   const waiting = appointment.status === "pendente" && !confirmed;
   const scheduledMoment = new Date(
     `${appointment.scheduled_date}T${appointment.scheduled_time}:00`,
@@ -749,7 +751,7 @@ function ProfessionalAppointmentCard({ appointment, onSaved }: any) {
         : confirmed
           ? "confirmado"
           : waiting
-            ? "aguardando confirmação"
+            ? appointmentDisplayStatus(appointment) === "remarcado" ? "Remarcado · aguarda confirmação" : "aguardando confirmação"
             : appointment.status;
   const cardClass =
     proximity === "urgent"

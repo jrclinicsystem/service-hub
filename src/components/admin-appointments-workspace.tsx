@@ -20,6 +20,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { AdminOperationSummary } from "@/components/admin-operation-summary";
+import { AppointmentRescheduleDialog } from "@/components/appointment-reschedule-dialog";
+import { appointmentDisplayStatus, appointmentScheduleHistory, withAppointmentHistory } from "@/lib/appointment-status";
 import { AppointmentCalendar } from "@/components/appointment-calendar";
 import { CalendarDayDialog } from "@/components/calendar-day-dialog";
 import { Badge } from "@/components/ui/badge";
@@ -163,6 +165,7 @@ function appointmentComboProgress(item: any) {
 }
 
 function statusLabel(status: string) {
+  if (status === "remarcado") return "Remarcado";
   if (status === "atendido") return "Atendido";
   if (status === "confirmado") return "Confirmado";
   if (status === "cancelado") return "Cancelado";
@@ -225,13 +228,13 @@ function playNotificationSound(audioRef: { current: AudioContext | null }) {
 }
 
 async function fetchAppointment(id: string) {
-  const { data, error } = await db
+  const { data, error } = await withAppointmentHistory((history) => db
     .from("appointments")
     .select(
-      "id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status, created_at, status_updated_at, payment_choice, payment_received, payment_method_code, service_price_snapshot, deposit_percent, deposit_amount, balance_amount, service:services!appointments_service_id_fkey(name, price, duration_min), appointment_services(service_id, position, price_snapshot, session_count, status, completed_at, completed_by, service:services!appointment_services_service_id_fkey(name, price, duration_min, session_count)), appointment_sessions(id, service_id, service_name_snapshot, service_position, session_number, scheduled_date, scheduled_time, status, completed_at, completed_by), professional:professionals(name, specialty), payments(status, amount, kind, payment_method_id, provider, paid_at, created_at, status_detail), seller_assignment:appointment_sellers(seller_id, seller_name_snapshot, commission_percentage_snapshot, seller:sellers(id, name, commission_percentage, is_active, deleted_at))",
+      `id, client_id, service_id, professional_id${history}, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status, created_at, status_updated_at, payment_choice, payment_received, payment_method_code, service_price_snapshot, deposit_percent, deposit_amount, balance_amount, service:services!appointments_service_id_fkey(name, price, duration_min), appointment_services(service_id, position, price_snapshot, session_count, status, completed_at, completed_by, service:services!appointment_services_service_id_fkey(name, price, duration_min, session_count)), appointment_sessions(id, service_id, service_name_snapshot, service_position, session_number, scheduled_date, scheduled_time, status, completed_at, completed_by), professional:professionals(name, specialty), payments(status, amount, kind, payment_method_id, provider, paid_at, created_at, status_detail), seller_assignment:appointment_sellers(seller_id, seller_name_snapshot, commission_percentage_snapshot, seller:sellers(id, name, commission_percentage, is_active, deleted_at))`,
     )
     .eq("id", id)
-    .maybeSingle();
+    .maybeSingle());
   if (error) return null;
   return data;
 }
@@ -251,7 +254,7 @@ export function AdminAppointmentsWorkspace({
   onRefresh,
 }: {
   appointments: any[];
-  onStatusChange: (id: string, status: "pendente" | "confirmado" | "cancelado") => Promise<boolean>;
+  onStatusChange: (id: string, status: "pendente" | "confirmado" | "cancelado", expected: any) => Promise<boolean>;
   onRefresh: () => void;
 }) {
   const [scope, setScope] = useState<Scope>("pending");
@@ -261,6 +264,7 @@ export function AdminAppointmentsWorkspace({
   const [selected, setSelected] = useState<any | null>(null);
   const [incoming, setIncoming] = useState<any | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [rescheduling, setRescheduling] = useState<any | null>(null);
   const [editingAppointment, setEditingAppointment] = useState<any | null>(null);
   const [busyAction, setBusyAction] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -282,9 +286,9 @@ export function AdminAppointmentsWorkspace({
   useEffect(() => {
     const notify = async (payload: any) => {
       const next = payload.new as any;
+      onRefresh();
       if (!next?.id || next.status !== "pendente" || notified.current.has(next.id)) return;
       notified.current.add(next.id);
-      onRefresh();
       const detail = await fetchAppointment(next.id);
       if (!detail) return;
       // Avoid stacking two dialogs/overlays when a manual appointment triggers realtime.
@@ -358,8 +362,12 @@ export function AdminAppointmentsWorkspace({
   }, [appointments, scope, search, calendarDate]);
 
   const act = async (appointment: any, status: "confirmado" | "cancelado") => {
+    if (busyAction) return;
+    if (status === "cancelado" && !window.confirm(
+      `Cancelar o agendamento de ${appointment.patient_name}? O horário será liberado e o registro continuará no histórico. Pagamentos existentes serão preservados.`,
+    )) return;
     setBusyAction(true);
-    const ok = await onStatusChange(appointment.id, status);
+    const ok = await onStatusChange(appointment.id, status, appointment);
     setBusyAction(false);
     if (!ok) return;
     setIncoming(null);
@@ -559,6 +567,11 @@ export function AdminAppointmentsWorkspace({
           onRefresh();
         }}
       />
+      <AppointmentRescheduleDialog
+        appointment={rescheduling}
+        onClose={() => setRescheduling(null)}
+        onSaved={() => { setRescheduling(null); setScope("pending"); onRefresh(); }}
+      />
       <CalendarDayDialog
         date={calendarDayOpen}
         appointments={appointments}
@@ -573,6 +586,11 @@ export function AdminAppointmentsWorkspace({
         onOpenChange={(open: boolean) => !open && setSelected(null)}
         onConfirm={() => selected && act(selected, "confirmado")}
         onCancel={() => selected && act(selected, "cancelado")}
+        onReschedule={() => {
+          const current = selected;
+          setSelected(null);
+          setRescheduling(current);
+        }}
         onAttended={() => selected && completeAttendance(selected)}
         onEdit={() => {
           if (!selected || selected.status === "atendido") return;
@@ -660,7 +678,7 @@ function AdminAppointmentCard({
             </p>
           </div>
           <div className="max-w-full shrink-0">
-            <AdminStatusBadge status={appointment.status} />
+            <AdminStatusBadge status={appointmentDisplayStatus(appointment)} />
           </div>
         </div>
         <div className="mt-3 rounded-xl bg-secondary/45 p-3">
@@ -991,7 +1009,7 @@ function CreateAppointmentDialog({
   useEffect(() => {
     let cancelled = false;
     const currentEditingSlot =
-      editing &&
+      editing && editing.status !== "cancelado" &&
       (editing.professional_id ?? editing.professional?.id) === professionalId &&
       editing.scheduled_date === scheduledDate
         ? editing.scheduled_time
@@ -2086,6 +2104,7 @@ function AppointmentAdminDialog({
   onOpenChange,
   onConfirm,
   onCancel,
+  onReschedule,
   onAttended,
   onEdit,
   onPriceSaved,
@@ -2120,7 +2139,7 @@ function AppointmentAdminDialog({
         <DialogHeader>
           <div className="flex flex-wrap items-center gap-2">
             <DialogTitle>{appointment.patient_name}</DialogTitle>
-            <AdminStatusBadge status={appointment.status} />
+            <AdminStatusBadge status={appointmentDisplayStatus(appointment)} />
           </div>
           <DialogDescription>
             {appointmentServiceLabel(appointment)} · {formatDate(appointment.scheduled_date)} às{" "}
@@ -2244,11 +2263,33 @@ function AppointmentAdminDialog({
             </Button>
           </div>
         ) : null}
+        {appointment.status !== "atendido" && !combo.started ? (
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button variant="outline" className="rounded-xl" disabled={busy || !Array.isArray(appointment.schedule_history)} onClick={onReschedule}
+              title={!Array.isArray(appointment.schedule_history) ? "Remarcação com histórico ainda não ativada" : undefined}>
+              <CalendarDays className="size-4" /> Remarcar
+            </Button>
+            {appointment.status !== "cancelado" ? (
+              <Button variant="destructive" className="rounded-xl" disabled={busy} onClick={onCancel}>
+                <X className="size-4" /> Cancelar agendamento
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
+        {appointmentScheduleHistory(appointment).length > 0 ? (
+          <div className="mt-4 rounded-2xl border border-border p-4 text-xs">
+            <p className="font-semibold">Histórico de remarcações</p>
+            {appointmentScheduleHistory(appointment).map((change, index) => (
+              <p key={`${change.changed_at}-${index}`} className="mt-2 text-muted-foreground">
+                {formatDate(change.from_date)} às {change.from_time.slice(0, 5)} →{" "}
+                {formatDate(change.to_date)} às {change.to_time.slice(0, 5)}
+                <span className="block text-[10px]">{formatDateTime(change.changed_at)}</span>
+              </p>
+            ))}
+          </div>
+        ) : null}
         {canDecide ? (
           <DialogFooter className="mt-4 grid grid-cols-2 gap-2 sm:flex">
-            <Button variant="destructive" disabled={busy} onClick={onCancel}>
-              <X className="size-4" /> Cancelar
-            </Button>
             <Button disabled={busy} onClick={onConfirm}>
               <Check className="size-4" /> Confirmar manualmente
             </Button>
@@ -2312,7 +2353,7 @@ function NewAppointmentAlert({ appointment, open, onLater, onConfirm, onCancel, 
                 {servicesLabel}
               </p>
             </div>
-            <AdminStatusBadge status={appointment.status} />
+            <AdminStatusBadge status={appointmentDisplayStatus(appointment)} />
           </div>
           <div className="mt-3 grid min-w-0 grid-cols-2 gap-3">
             <SmallInfo label="Data" value={formatDate(appointment.scheduled_date)} />

@@ -1,3 +1,4 @@
+import { withAppointmentHistory } from "@/lib/appointment-status";
 import { createServerFn } from "@tanstack/react-start";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
@@ -221,14 +222,14 @@ export const getMyAppointments = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const db = context.supabase as any;
-    const { data, error } = await db
+    const { data, error } = await withAppointmentHistory((history) => db
       .from("appointments")
       .select(
-        "id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status, created_at, status_updated_at, payment_choice, user_hidden_at, service_price_snapshot, deposit_percent, deposit_amount, balance_amount, service:services(name, price, duration_min), professional:professionals(name, specialty), payments(status, amount, kind, payment_method_id, provider, paid_at, created_at, status_detail, provider_payment_id)",
+        `id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status${history}, created_at, status_updated_at, payment_choice, user_hidden_at, service_price_snapshot, deposit_percent, deposit_amount, balance_amount, service:services(name, price, duration_min), professional:professionals(name, specialty), payments(status, amount, kind, payment_method_id, provider, paid_at, created_at, status_detail, provider_payment_id)`,
       )
       .is("user_hidden_at", null)
       .order("scheduled_date", { ascending: false })
-      .order("scheduled_time", { ascending: false });
+      .order("scheduled_time", { ascending: false }));
 
     if (error) throw error;
     return data ?? [];
@@ -288,12 +289,12 @@ export const getAdminOverview = createServerFn({ method: "GET" })
 
     const db = context.supabase as any;
     const [appointments, services, categories, promotions, timeSlots, adminEmails] = await Promise.all([
-      db
+      withAppointmentHistory((history) => db
         .from("appointments")
         .select(
-          "id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status, created_at, status_updated_at, payment_choice, service_price_snapshot, deposit_percent, deposit_amount, balance_amount, service:services(name, price, duration_min), professional:professionals(name, specialty), payments(status, amount, kind, payment_method_id, provider, paid_at, created_at)",
+          `id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status${history}, created_at, status_updated_at, payment_choice, service_price_snapshot, deposit_percent, deposit_amount, balance_amount, service:services(name, price, duration_min), professional:professionals(name, specialty), payments(status, amount, kind, payment_method_id, provider, paid_at, created_at)`,
         )
-        .order("scheduled_date", { ascending: true }),
+        .order("scheduled_date", { ascending: true })),
       db.from("services").select(serviceColumns).order("name"),
       db.from("categories").select("id, name, description, sort_order").order("sort_order"),
       db

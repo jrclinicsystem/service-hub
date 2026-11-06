@@ -1,3 +1,4 @@
+import { withAppointmentHistory } from "@/lib/appointment-status";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import {
@@ -137,13 +138,13 @@ async function loadAdminOverview() {
     timeSlots,
     adminEmails,
   ] = await Promise.all([
-    db
+    withAppointmentHistory((history) => db
       .from("appointments")
       .select(
-        "id, client_id, service_id, professional_id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status, created_at, status_updated_at, payment_choice, payment_received, payment_method_code, service_price_snapshot, deposit_percent, deposit_amount, balance_amount, service:services!appointments_service_id_fkey(id, name, price, duration_min), appointment_services(service_id, position, price_snapshot, session_count, status, completed_at, completed_by, service:services!appointment_services_service_id_fkey(id, name, price, duration_min, session_count)), appointment_sessions(id, service_id, service_name_snapshot, service_position, session_number, scheduled_date, scheduled_time, status, completed_at, completed_by), professional:professionals(id, name, specialty), payments(status, amount, kind, payment_method_id, provider, paid_at, created_at, status_detail), seller_assignment:appointment_sellers(seller_id, seller_name_snapshot, commission_percentage_snapshot, seller:sellers(id, name, commission_percentage, is_active, deleted_at))",
+        `id, client_id, service_id, professional_id${history}, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status, created_at, status_updated_at, payment_choice, payment_received, payment_method_code, service_price_snapshot, deposit_percent, deposit_amount, balance_amount, service:services!appointments_service_id_fkey(id, name, price, duration_min), appointment_services(service_id, position, price_snapshot, session_count, status, completed_at, completed_by, service:services!appointment_services_service_id_fkey(id, name, price, duration_min, session_count)), appointment_sessions(id, service_id, service_name_snapshot, service_position, session_number, scheduled_date, scheduled_time, status, completed_at, completed_by), professional:professionals(id, name, specialty), payments(status, amount, kind, payment_method_id, provider, paid_at, created_at, status_detail), seller_assignment:appointment_sellers(seller_id, seller_name_snapshot, commission_percentage_snapshot, seller:sellers(id, name, commission_percentage, is_active, deleted_at))`,
       )
       .order("scheduled_date", { ascending: true })
-      .order("scheduled_time", { ascending: true }),
+      .order("scheduled_time", { ascending: true })),
     db
       .from("services")
       .select(
@@ -310,18 +311,25 @@ function Admin() {
   const updateAppointmentStatus = async (
     id: string,
     status: "pendente" | "confirmado" | "cancelado",
+    current: any,
   ) => {
-    return updateRow(
-      "appointments",
-      "id",
-      id,
-      { status },
-      status === "confirmado"
-        ? "Agendamento confirmado."
-        : status === "cancelado"
-          ? "Agendamento recusado/cancelado."
-          : "Status atualizado.",
-    );
+    if (!current || current.status === "atendido") return false;
+    const result = await db.from("appointments")
+      .update({ status, status_updated_at: new Date().toISOString() })
+      .eq("id", id).eq("status", current.status)
+      .eq("scheduled_date", current.scheduled_date)
+      .eq("scheduled_time", current.scheduled_time)
+      .select("id").maybeSingle();
+    if (result.error || !result.data) {
+      toast.error(result.error?.message ?? "O agendamento foi alterado. Atualize a agenda e tente novamente.");
+      refresh();
+      return false;
+    }
+    toast.success(status === "cancelado"
+      ? "Agendamento cancelado. Horário liberado e histórico preservado."
+      : "Agendamento confirmado.");
+    refresh();
+    return true;
   };
 
   const categoryName = (service: any) =>

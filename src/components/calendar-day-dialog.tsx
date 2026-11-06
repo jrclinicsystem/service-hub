@@ -1,3 +1,4 @@
+import { appointmentStatusLabel } from "@/lib/appointment-status";
 import { CalendarClock, CheckCircle2, Circle, Clock3, Plus, StickyNote, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -177,7 +178,7 @@ export function CalendarDayDialog({
                     </div>
                   </div>
                   <div className="mt-2 flex items-center justify-between border-t border-border/70 pt-2">
-                    <Badge variant={appointment.status === "confirmado" || appointment.status === "atendido" ? "default" : appointment.status === "cancelado" ? "destructive" : "outline"} className={`rounded-full text-[9px] ${appointment.status === "atendido" ? "bg-emerald-600 text-white hover:bg-emerald-600" : ""}`}>{appointment.status === "atendido" ? "Atendido" : appointment.status === "confirmado" ? "Confirmado" : appointment.status === "cancelado" ? "Cancelado" : "Pendente"}</Badge>
+                    <Badge variant={appointment.status === "confirmado" || appointment.status === "atendido" ? "default" : appointment.status === "cancelado" ? "destructive" : "outline"} className={`rounded-full text-[9px] ${appointment.status === "atendido" ? "bg-emerald-600 text-white hover:bg-emerald-600" : ""}`}>{appointmentStatusLabel(appointment)}</Badge>
                     <span className="text-[9px] text-muted-foreground">{formatDate(appointment.scheduled_date)}</span>
                   </div>
                 </div>
