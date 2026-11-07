@@ -167,6 +167,8 @@ body:has(a.admin-sidebar-presence-anchor) a.admin-sidebar-presence-anchor {
     display: grid;
     width: calc(100% - 24px);
     max-width: 29rem;
+    max-height: 74dvh;
+    overflow-y: auto;
     margin: 0 auto;
     gap: 6px;
     padding: 9px;
@@ -339,22 +341,27 @@ body:has(a.admin-sidebar-presence-anchor) a.admin-sidebar-presence-anchor {
   }
 
   .admin-catalog-shortcut {
-    top: 374px !important;
+    top: 371px !important;
     bottom: auto !important;
   }
 
   .admin-client-shortcut {
-    top: 423px !important;
+    top: 417px !important;
+    bottom: auto !important;
+  }
+
+  .admin-reactivation-shortcut {
+    top: 463px !important;
     bottom: auto !important;
   }
 
   .admin-room-shortcut {
-    top: 472px !important;
+    top: 509px !important;
     bottom: auto !important;
   }
 
   .admin-team-shortcut {
-    top: 541px !important;
+    top: 573px !important;
     bottom: auto !important;
     left: 18px !important;
     width: 214px !important;
@@ -374,17 +381,17 @@ body:has(a.admin-sidebar-presence-anchor) a.admin-sidebar-presence-anchor {
   }
 
   .admin-access-shortcut {
-    top: 590px !important;
+    top: 617px !important;
     bottom: auto !important;
   }
 
   .admin-seller-shortcut {
-    top: 639px !important;
+    top: 661px !important;
     bottom: auto !important;
   }
 
   .admin-finance-shortcut {
-    top: 688px !important;
+    top: 705px !important;
     bottom: auto !important;
   }
 }

@@ -16,6 +16,7 @@ import {
   Clock3,
   ExternalLink,
   Plus,
+  RotateCcw,
   ShieldCheck,
   Sparkles,
   Stethoscope,
@@ -63,6 +64,11 @@ const AvailabilityInlinePage = lazy(async () => {
 
 const ClientsInlinePage = lazy(async () => {
   const module = await import("./admin_.clientes");
+  return { default: module.Route.options.component as ComponentType };
+});
+
+const ReactivationInlinePage = lazy(async () => {
+  const module = await import("./admin_.reativacao");
   return { default: module.Route.options.component as ComponentType };
 });
 
@@ -179,7 +185,7 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
-type InlineAdminSection = "availability" | "catalog" | "clients" | "rooms" | "team" | "access" | "sellers" | "finance" | null;
+type InlineAdminSection = "availability" | "catalog" | "clients" | "reactivation" | "rooms" | "team" | "access" | "sellers" | "finance" | null;
 type MainAdminSection = "agendamentos" | "servicos" | "promocoes" | "horarios" | "acessos";
 
 const mainSectionLabels: Record<MainAdminSection, string> = {
@@ -264,6 +270,14 @@ function PersistentAdminSidebar({
           <UserRound className="size-4 shrink-0" />
           <span>Clientes</span>
         </button>
+        <button
+          type="button"
+          className={`persistent-admin-sidebar-item${inlineSection === "reactivation" ? " is-active" : ""}`}
+          onClick={() => onInlineSection("reactivation")}
+        >
+          <RotateCcw className="size-4 shrink-0" />
+          <span>Captação e reativação</span>
+        </button>
 
         <button
           type="button"
@@ -333,7 +347,7 @@ function MobileAdminNav({
   onInlineSection: (section: Exclude<InlineAdminSection, null>) => void;
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
-  const moreActive = inlineSection === "availability" || inlineSection === "clients" || inlineSection === "rooms" || inlineSection === "team" || inlineSection === "access" || inlineSection === "sellers" || inlineSection === "finance";
+  const moreActive = inlineSection === "availability" || inlineSection === "clients" || inlineSection === "reactivation" || inlineSection === "rooms" || inlineSection === "team" || inlineSection === "access" || inlineSection === "sellers" || inlineSection === "finance";
 
   const selectMain = (section: MainAdminSection) => {
     setMoreOpen(false);
@@ -398,6 +412,10 @@ function MobileAdminNav({
               <span className="admin-mobile-more-option-icon"><UserRound /></span>
               <span><strong>Clientes</strong><small>Cadastro e aniversariantes</small></span>
             </button>
+            <button type="button" className="admin-mobile-more-option" role="menuitem" onClick={() => selectInline("reactivation")}>
+              <span className="admin-mobile-more-option-icon"><RotateCcw /></span>
+              <span><strong>Captação e reativação</strong><small>Clientes inativos e contatos</small></span>
+            </button>
             <button type="button" className="admin-mobile-more-option" role="menuitem" onClick={() => selectInline("rooms")}>
               <span className="admin-mobile-more-option-icon"><Building2 /></span>
               <span><strong>Reservas de Salas</strong><small>Aluguel e bloqueio de consultórios</small></span>
@@ -458,6 +476,7 @@ function SystemAccess() {
     void import("./admin_.disponibilidade");
     void import("./admin_.catalogo");
     void import("./admin_.clientes");
+    void import("./admin_.reativacao");
     void import("./admin_.vendedores");
     void import("@/components/admin-room-reservations");
     void import("./admin_.equipe");
@@ -479,6 +498,10 @@ function SystemAccess() {
     }
     if (section === "clientes") {
       setInlineSection("clients");
+      return undefined;
+    }
+    if (section === "reativacao") {
+      setInlineSection("reactivation");
       return undefined;
     }
     if (section === "salas") {
@@ -552,7 +575,7 @@ function SystemAccess() {
 
   const openInlineSection = (section: Exclude<InlineAdminSection, null>) => {
     setInlineSection(section);
-    const hash = section === "availability" ? "disponibilidade" : section === "catalog" ? "catalogo" : section === "clients" ? "clientes" : section === "rooms" ? "salas" : section === "team" ? "equipe" : section === "access" ? "acessos" : section === "sellers" ? "vendedores" : "financeiro";
+    const hash = section === "availability" ? "disponibilidade" : section === "catalog" ? "catalogo" : section === "clients" ? "clientes" : section === "reactivation" ? "reativacao" : section === "rooms" ? "salas" : section === "team" ? "equipe" : section === "access" ? "acessos" : section === "sellers" ? "vendedores" : "financeiro";
     window.history.replaceState(window.history.state, "", `/admin#${hash}`);
   };
 
@@ -563,6 +586,8 @@ function SystemAccess() {
         ? CatalogInlinePage
         : inlineSection === "clients"
           ? ClientsInlinePage
+          : inlineSection === "reactivation"
+            ? ReactivationInlinePage
           : inlineSection === "rooms"
             ? RoomsInlinePage
             : inlineSection === "team"
@@ -622,6 +647,15 @@ function SystemAccess() {
           >
             <UserRound className="size-4 shrink-0 opacity-80" />
             <span>Clientes</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => openInlineSection("reactivation")}
+            className={`admin-sidebar-shortcut admin-reactivation-shortcut${inlineSection === "reactivation" ? " is-active" : ""}`}
+            aria-pressed={inlineSection === "reactivation"}
+          >
+            <RotateCcw className="size-4 shrink-0 opacity-80" />
+            <span>Captação e reativação</span>
           </button>
           <button
             type="button"
