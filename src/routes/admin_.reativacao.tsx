@@ -70,7 +70,15 @@ function formatDateTime(at: string) {
 }
 function whatsappMessage(name: string) {
   const first = name.trim().split(/\s+/)[0] || "cliente";
-  return "Olá, " + first + "! Tudo bem? Aqui é a equipe da JR Clinic. Gostaríamos de saber como você está e se deseja receber informações sobre nossos atendimentos. Se preferir não receber mensagens, é só nos avisar.";
+  return [
+    "Oi, " + first + "!  Tudo bem?",
+    "Estamos passando para lembrar que você merece um momento só seu!",
+    "",
+    "Já faz mais de 30 dias desde sua última visita à J.R Clinic, e queremos te convidar para voltar a cuidar da sua beleza e bem-estar.",
+    "Temos condições especiais esperando por você!",
+    "",
+    "Que tal garantir seu próximo horário? Posso te enviar nossa agenda!",
+  ].join("\n");
 }
 
 function ReactivationPage() {
