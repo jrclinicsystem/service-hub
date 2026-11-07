@@ -6,6 +6,7 @@ import {
   ExternalLink,
   ShieldCheck,
   Sparkles,
+  RotateCcw,
   Stethoscope,
   Tag,
   UserRound,
@@ -16,7 +17,7 @@ import { Link } from "@tanstack/react-router";
 import logo from "@/assets/jr-clinic-logo.png";
 
 type ActiveSection =
-  "home" | "team" | "catalog" | "finance" | "access" | "availability" | "clients" | "sellers";
+  "home" | "team" | "catalog" | "finance" | "access" | "availability" | "clients" | "reactivation" | "sellers";
 
 const mainItems = [
   { hash: "agendamentos", label: "Agendamentos", icon: CalendarDays },
@@ -99,6 +100,10 @@ export function AdminSubpageSidebar({ active }: { active: ActiveSection }) {
           <Link to="/admin/clientes" preload="intent" className={itemClass(active === "clients")}>
             <UserRound className="size-4 shrink-0 opacity-80" />
             <span>Clientes</span>
+          </Link>
+          <Link to="/admin/reativacao" preload="intent" className={itemClass(active === "reactivation")}>
+            <RotateCcw className="size-4 shrink-0 opacity-80" />
+            <span>Captação e reativação</span>
           </Link>
         </div>
 
