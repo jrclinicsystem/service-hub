@@ -69,7 +69,9 @@ function formatDateTime(at: string) {
   return new Date(at).toLocaleString("pt-BR", { timeZone: "America/Fortaleza", dateStyle: "short", timeStyle: "short" });
 }
 function whatsappMessage(name: string) {
-  const first = name.trim().split(/\s+/)[0] || "cliente";
+  const originalFirstName = name.trim().split(/\s+/)[0] || "cliente";
+  const normalized = originalFirstName.toLocaleLowerCase("pt-BR");
+  const first = normalized.charAt(0).toLocaleUpperCase("pt-BR") + normalized.slice(1);
   return [
     "Oi, " + first + "!  Tudo bem?",
     "Estamos passando para lembrar que você merece um momento só seu!",
