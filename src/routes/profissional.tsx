@@ -35,6 +35,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
 import { NotificationCenter } from "@/components/notification-center";
 import { PwaInstallButton } from "@/components/pwa-install-button";
 import { activateProfessionalPush, currentPushSubscription, deactivatePushOnThisDevice } from "@/lib/web-push";
@@ -240,6 +241,7 @@ async function loadProfessionalAgenda() {
 }
 
 function ProfessionalAgenda() {
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [dateFilter, setDateFilter] = useState("");
   const [scope, setScope] = useState<"upcoming" | "all">("upcoming");
@@ -254,7 +256,8 @@ function ProfessionalAgenda() {
   const notifiedIds = useRef(new Set<string>());
 
   const { data, isLoading, error, refetch, isFetching } = useQuery({
-    queryKey: ["professional-agenda"],
+    queryKey: ["professional-agenda", user?.id],
+    enabled: Boolean(user?.id) && !authLoading,
     queryFn: loadProfessionalAgenda,
     retry: 1,
   });
