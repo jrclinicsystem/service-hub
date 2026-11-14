@@ -36,6 +36,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
+import { deactivatePushOnThisDevice } from "@/lib/web-push";
 import { getMyAppointments, hideMyAppointment } from "@/lib/clinic.functions";
 import { formatDate, formatPrice } from "@/lib/clinic";
 
@@ -198,7 +199,11 @@ function MinhaConta() {
     }
   };
 
-  const signOut = async () => { await supabase.auth.signOut(); window.location.replace("/auth"); };
+  const signOut = async () => {
+    await deactivatePushOnThisDevice();
+    await supabase.auth.signOut();
+    window.location.replace("/auth");
+  };
 
   return (
     <div className="min-h-screen overflow-x-hidden">
