@@ -35,6 +35,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
+import { NotificationCenter } from "@/components/notification-center";
+import { PwaInstallButton } from "@/components/pwa-install-button";
+import { activateProfessionalPush, currentPushSubscription, deactivatePushOnThisDevice } from "@/lib/web-push";
 import {
   appointmentProximity,
   appointmentWhatsAppUrl,
@@ -268,8 +271,15 @@ function ProfessionalAgenda() {
   );
 
   useEffect(() => {
-    if (typeof Notification !== "undefined" && Notification.permission === "granted")
-      setNotificationsEnabled(true);
+    let mounted = true;
+    void currentPushSubscription()
+      .then((subscription) => {
+        if (mounted) setNotificationsEnabled(Boolean(subscription) && Notification.permission === "granted");
+      })
+      .catch(() => {
+        if (mounted) setNotificationsEnabled(false);
+      });
+    return () => { mounted = false; };
   }, []);
 
   useEffect(() => {
@@ -298,11 +308,7 @@ function ProfessionalAgenda() {
         ? `${detail.patient_name} · ${detail.service?.name ?? "Atendimento"} · ${formatDate(detail.scheduled_date)} às ${detail.scheduled_time}`
         : "Você recebeu um novo agendamento na sua agenda.";
       toast.success("Novo agendamento para confirmar", { description });
-      if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-        try {
-          new Notification("JR Clinic · Novo agendamento", { body: description });
-        } catch {}
-      }
+      // System-level pushes are delivered by the service worker, never duplicated here.
     };
     const channel = supabase
       .channel(`jrclinic-professional-${professionalId}`)
@@ -333,23 +339,18 @@ function ProfessionalAgenda() {
   }, [data?.authorized, data?.professional?.id, refetch]);
 
   const enableNotifications = async () => {
+    if (!data?.authorized || !data.professional?.id) return;
     try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      if (AudioCtx && !audioRef.current) audioRef.current = new AudioCtx();
-      if (audioRef.current?.state === "suspended") await audioRef.current.resume();
-      playNotificationSound(audioRef);
-      if (typeof Notification === "undefined") {
-        setNotificationsEnabled(true);
-        toast.success("Som de notificações ativado.");
-        return;
-      }
-      const permission =
-        Notification.permission === "granted" ? "granted" : await Notification.requestPermission();
-      setNotificationsEnabled(permission === "granted");
-      if (permission === "granted") toast.success("Notificações do navegador ativadas.");
-      else toast.info("O som foi ativado, mas as notificações do navegador não foram permitidas.");
-    } catch {
-      toast.error("O navegador não permitiu ativar o áudio de notificações.");
+      await activateProfessionalPush(data.professional.id);
+      setNotificationsEnabled(true);
+      toast.success("Avisos push ativados neste aparelho.", {
+        description: "Você receberá somente atualizações da sua agenda.",
+      });
+    } catch (err) {
+      setNotificationsEnabled(false);
+      toast.error("Não foi possível ativar os avisos.", {
+        description: err instanceof Error ? err.message : "Verifique as permissões do navegador.",
+      });
     }
   };
 
@@ -393,6 +394,7 @@ function ProfessionalAgenda() {
   };
 
   const signOut = async () => {
+    await deactivatePushOnThisDevice();
     await supabase.auth.signOut();
     navigate({ to: "/auth", search: { next: "/profissional" } });
   };
@@ -528,9 +530,11 @@ function ProfessionalAgenda() {
                 </p>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <NotificationCenter mode="professional" />
+              <PwaInstallButton />
               <Button
-                variant={notificationsEnabled ? "secondary" : "default"}
+                variant={notificationsEnabled ? "secondary" : "default"
                 size="sm"
                 className="rounded-full"
                 onClick={enableNotifications}
