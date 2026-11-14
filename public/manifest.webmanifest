@@ -1,0 +1,19 @@
+{
+  "name": "JR Clinic",
+  "short_name": "JR Clinic",
+  "description": "Agenda profissional e gestão da JR Clinic.",
+  "id": "/profissional",
+  "start_url": "/profissional",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f8f3f0",
+  "theme_color": "#0f4d3e",
+  "lang": "pt-BR",
+  "categories": ["business", "medical"],
+  "icons": [
+    { "src": "/icons/jr-clinic-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/jr-clinic-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/jr-clinic-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
