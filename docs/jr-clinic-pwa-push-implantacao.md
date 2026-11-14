@@ -40,6 +40,29 @@ Configure **uma chamada agendada uma vez por minuto** em serviço confiável
 da publicação real da JR Clinic e o mesmo segredo protegido.
 **Nunca** exponha este token em JavaScript do navegador, links ou URL de query.
 O sistema NÃO entrega push de fundo enquanto este agendamento não existir.
+A versão auditada permanece com `pg_cron` e `pg_net` **não instalados**
+e sem inscrições de aparelhos; **não interprete build aprovado como entrega real**.
+
+### Operação segura no Supabase e Lovable
+
+1. No projeto Lovable da JR Clinic, vá às configurações de **Secrets**
+   e registre os cinco nomes acima como **variáveis do servidor**, sem prefixo `VITE_`.
+   A chave de serviço é a do projeto Supabase `ldrqcbqaekmohwpneekx`, nunca de outra instância.
+2. Confirme a URL **efetivamente publicada** (não use automaticamente a URL de preview).
+3. No [Supabase Vault](https://supabase.com/dashboard/project/ldrqcbqaekmohwpneekx),
+   crie os segredos privados `jr_clinic_push_origin` e
+   `jr_clinic_push_dispatch_secret`; este último deve ter exatamente o mesmo
+   valor de `PUSH_DISPATCH_SECRET` no Lovable. Não salve nenhum valor em GitHub.
+4. Execute manualmente, após essas configurações, o roteiro
+   `docs/sql/jr-clinic-push-cron-template.sql` no SQL Editor do mesmo projeto.
+   Ele verifica os nomes do Vault e cria uma chamada por minuto.
+5. Confirme o HTTP 200 do despachante e teste entrega real, retorno 404/410,
+   troca de conta e Android/iOS. **Não execute o cron antes de confirmar a publicação**.
+
+**A execução do roteiro é intencionalmente manual.** O arquivo está em
+`docs/sql/`, não em `supabase/migrations/`, para evitar agendar automaticamente
+o envio no ambiente errado.
+
 Permissão de notificação, HTTPS, assinatura válida e conectividade do aparelho também são necessárias.
 
 ## Checklist antes de publicar
