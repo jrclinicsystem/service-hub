@@ -19,6 +19,7 @@ import { toast } from "sonner";
 
 import logo from "@/assets/jr-clinic-logo.png";
 import { AdminAppointmentsWorkspace } from "@/components/admin-appointments-workspace";
+import { NotificationCenter } from "@/components/notification-center";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -53,6 +54,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { formatPrice } from "@/lib/clinic";
+import { deactivatePushOnThisDevice } from "@/lib/web-push";
 
 const title = "Painel administrativo — JR Clinic";
 const description = "Gestão de serviços, promoções, agenda e acessos administrativos da JR Clinic.";
@@ -221,6 +223,7 @@ function Admin() {
   };
 
   const signOut = async () => {
+    await deactivatePushOnThisDevice();
     await supabase.auth.signOut();
     navigate({ to: "/auth", search: { next: undefined } });
   };
@@ -351,6 +354,7 @@ function Admin() {
             </div>
           </div>
           <div className="flex items-center gap-1 sm:gap-2">
+            <NotificationCenter mode="admin" />
             <Button
               variant="ghost"
               size="sm"

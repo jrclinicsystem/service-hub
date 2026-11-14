@@ -26,8 +26,10 @@ import { Route as AdminClientesRouteImport } from './routes/admin_.clientes'
 import { Route as AdminDisponibilidadeRouteImport } from './routes/admin_.disponibilidade'
 import { Route as AdminEquipeRouteImport } from './routes/admin_.equipe'
 import { Route as AdminFinanceiroRouteImport } from './routes/admin_.financeiro'
+import { Route as AdminReativacaoRouteImport } from './routes/admin_.reativacao'
 import { Route as AdminVendedoresRouteImport } from './routes/admin_.vendedores'
 import { Route as ServicoSlugRouteImport } from './routes/servico.$slug'
+import { Route as ApiPublicPushDispatchRouteImport } from './routes/api/public/push-dispatch'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -113,6 +115,11 @@ const AdminFinanceiroRoute = AdminFinanceiroRouteImport.update({
   path: '/admin/financeiro',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminReativacaoRoute = AdminReativacaoRouteImport.update({
+  id: '/admin_/reativacao',
+  path: '/admin/reativacao',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminVendedoresRoute = AdminVendedoresRouteImport.update({
   id: '/admin_/vendedores',
   path: '/admin/vendedores',
@@ -121,6 +128,11 @@ const AdminVendedoresRoute = AdminVendedoresRouteImport.update({
 const ServicoSlugRoute = ServicoSlugRouteImport.update({
   id: '/servico/$slug',
   path: '/servico/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicPushDispatchRoute = ApiPublicPushDispatchRouteImport.update({
+  id: '/api/public/push-dispatch',
+  path: '/api/public/push-dispatch',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -141,8 +153,10 @@ export interface FileRoutesByFullPath {
   '/admin/disponibilidade': typeof AdminDisponibilidadeRoute
   '/admin/equipe': typeof AdminEquipeRoute
   '/admin/financeiro': typeof AdminFinanceiroRoute
+  '/admin/reativacao': typeof AdminReativacaoRoute
   '/admin/vendedores': typeof AdminVendedoresRoute
   '/servico/$slug': typeof ServicoSlugRoute
+  '/api/public/push-dispatch': typeof ApiPublicPushDispatchRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -161,8 +175,10 @@ export interface FileRoutesByTo {
   '/admin/disponibilidade': typeof AdminDisponibilidadeRoute
   '/admin/equipe': typeof AdminEquipeRoute
   '/admin/financeiro': typeof AdminFinanceiroRoute
+  '/admin/reativacao': typeof AdminReativacaoRoute
   '/admin/vendedores': typeof AdminVendedoresRoute
   '/servico/$slug': typeof ServicoSlugRoute
+  '/api/public/push-dispatch': typeof ApiPublicPushDispatchRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -183,8 +199,10 @@ export interface FileRoutesById {
   '/admin_/disponibilidade': typeof AdminDisponibilidadeRoute
   '/admin_/equipe': typeof AdminEquipeRoute
   '/admin_/financeiro': typeof AdminFinanceiroRoute
+  '/admin_/reativacao': typeof AdminReativacaoRoute
   '/admin_/vendedores': typeof AdminVendedoresRoute
   '/servico/$slug': typeof ServicoSlugRoute
+  '/api/public/push-dispatch': typeof ApiPublicPushDispatchRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -205,8 +223,10 @@ export interface FileRouteTypes {
     | '/admin/disponibilidade'
     | '/admin/equipe'
     | '/admin/financeiro'
+    | '/admin/reativacao'
     | '/admin/vendedores'
     | '/servico/$slug'
+    | '/api/public/push-dispatch'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -225,8 +245,10 @@ export interface FileRouteTypes {
     | '/admin/disponibilidade'
     | '/admin/equipe'
     | '/admin/financeiro'
+    | '/admin/reativacao'
     | '/admin/vendedores'
     | '/servico/$slug'
+    | '/api/public/push-dispatch'
   id:
     | '__root__'
     | '/'
@@ -246,8 +268,10 @@ export interface FileRouteTypes {
     | '/admin_/disponibilidade'
     | '/admin_/equipe'
     | '/admin_/financeiro'
+    | '/admin_/reativacao'
     | '/admin_/vendedores'
     | '/servico/$slug'
+    | '/api/public/push-dispatch'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -267,8 +291,10 @@ export interface RootRouteChildren {
   AdminDisponibilidadeRoute: typeof AdminDisponibilidadeRoute
   AdminEquipeRoute: typeof AdminEquipeRoute
   AdminFinanceiroRoute: typeof AdminFinanceiroRoute
+  AdminReativacaoRoute: typeof AdminReativacaoRoute
   AdminVendedoresRoute: typeof AdminVendedoresRoute
   ServicoSlugRoute: typeof ServicoSlugRoute
+  ApiPublicPushDispatchRoute: typeof ApiPublicPushDispatchRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -392,6 +418,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminFinanceiroRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin_/reativacao': {
+      id: '/admin_/reativacao'
+      path: '/admin/reativacao'
+      fullPath: '/admin/reativacao'
+      preLoaderRoute: typeof AdminReativacaoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin_/vendedores': {
       id: '/admin_/vendedores'
       path: '/admin/vendedores'
@@ -404,6 +437,13 @@ declare module '@tanstack/react-router' {
       path: '/servico/$slug'
       fullPath: '/servico/$slug'
       preLoaderRoute: typeof ServicoSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/push-dispatch': {
+      id: '/api/public/push-dispatch'
+      path: '/api/public/push-dispatch'
+      fullPath: '/api/public/push-dispatch'
+      preLoaderRoute: typeof ApiPublicPushDispatchRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -437,8 +477,10 @@ const rootRouteChildren: RootRouteChildren = {
   AdminDisponibilidadeRoute: AdminDisponibilidadeRoute,
   AdminEquipeRoute: AdminEquipeRoute,
   AdminFinanceiroRoute: AdminFinanceiroRoute,
+  AdminReativacaoRoute: AdminReativacaoRoute,
   AdminVendedoresRoute: AdminVendedoresRoute,
   ServicoSlugRoute: ServicoSlugRoute,
+  ApiPublicPushDispatchRoute: ApiPublicPushDispatchRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
