@@ -215,6 +215,11 @@ after insert or update of professional_id, status, scheduled_date, scheduled_tim
 on public.appointments
 for each row execute function private.jr_appointment_notification_event();
 
+-- Server-only authorization. These grants do not expose rows to public users.
+grant all on public.professional_notifications to service_role;
+grant all on public.push_subscriptions to service_role;
+grant all on public.push_deliveries to service_role;
+
 -- Only service_role may claim or complete deliveries. Both functions run as invoker.
 create or replace function public.claim_push_deliveries(_batch_size integer default 20)
 returns table (
