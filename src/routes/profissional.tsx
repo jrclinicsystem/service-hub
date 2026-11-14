@@ -534,7 +534,7 @@ function ProfessionalAgenda() {
               <NotificationCenter mode="professional" />
               <PwaInstallButton />
               <Button
-                variant={notificationsEnabled ? "secondary" : "default"
+                variant={notificationsEnabled ? "secondary" : "default"}
                 size="sm"
                 className="rounded-full"
                 onClick={enableNotifications}
