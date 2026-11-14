@@ -44,7 +44,6 @@ export type Database = {
           scheduled_date: string
           scheduled_time: string
           service_id: string
-          schedule_history: Json
           status: string
           user_id: string | null
         }
@@ -59,7 +58,6 @@ export type Database = {
           scheduled_date: string
           scheduled_time: string
           service_id: string
-          schedule_history?: Json
           status?: string
           user_id?: string | null
         }
@@ -74,7 +72,6 @@ export type Database = {
           scheduled_date?: string
           scheduled_time?: string
           service_id?: string
-          schedule_history?: Json
           status?: string
           user_id?: string | null
         }
