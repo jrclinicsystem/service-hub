@@ -37,8 +37,9 @@ async function showPushNotification(event) {
   await self.registration.showNotification(title, {
     body,
     tag,
-    icon: "/icons/jr-clinic-192.png",
-    badge: "/icons/jr-clinic-192.png",
+    icon: "/icons/jr-clinic-notification.webp",
+    // Android status bar icons require a white mark on a transparent image.
+    badge: "/icons/jr-clinic-notification-badge.png",
     data: { url: safeInternalPath(data.url) },
     renotify: false,
   });
