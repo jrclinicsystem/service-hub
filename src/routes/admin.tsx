@@ -53,6 +53,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
 import { formatPrice } from "@/lib/clinic";
 import { deactivatePushOnThisDevice } from "@/lib/web-push";
 
@@ -210,10 +211,12 @@ async function loadAdminOverview() {
 }
 
 function Admin() {
+  const { user, loading: authLoading } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["admin-overview"],
+    queryKey: ["admin-overview", user?.id],
+    enabled: Boolean(user?.id) && !authLoading,
     queryFn: loadAdminOverview,
     retry: 1,
   });
