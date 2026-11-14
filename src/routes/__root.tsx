@@ -23,13 +23,15 @@ import {
   Tag,
   UserRound,
 } from "lucide-react";
-import { lazy, Suspense, useEffect, useState, type ComponentType, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
 
 import logo from "@/assets/jr-clinic-logo.png";
 import { jrClinicIconDataUrl } from "@/assets/jr-clinic-icon";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 import { SupportWhatsapp } from "@/components/support-whatsapp";
 import { Toaster } from "@/components/ui/sonner";
+import { useAuth } from "@/hooks/use-auth";
+import { deactivatePushOnThisDevice } from "@/lib/web-push";
 
 import appCss from "../styles.css?url";
 import paymentOptionsCss from "../payment-options.css?url";
@@ -728,12 +730,32 @@ function SystemAccess() {
   );
 }
 
+function AuthSessionBoundary({ queryClient }: { queryClient: QueryClient }) {
+  const { user, loading } = useAuth();
+  const previousUserId = useRef<string | null | undefined>(undefined);
+
+  useEffect(() => {
+    if (loading) return;
+    const current = user?.id ?? null;
+    const previous = previousUserId.current;
+    if (previous !== undefined && previous !== current) {
+      // A persistent tab must never keep a different account's private query cache.
+      void queryClient.cancelQueries();
+      queryClient.clear();
+      if (previous !== null) void deactivatePushOnThisDevice();
+    }
+    previousUserId.current = current;
+  }, [user?.id, loading, queryClient]);
+
+  return <SystemAccess />;
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
   return (
     <QueryClientProvider client={queryClient}>
-      <SystemAccess />
+      <AuthSessionBoundary queryClient={queryClient} />
       <Toaster />
     </QueryClientProvider>
   );
