@@ -17,6 +17,7 @@ const eventLabels: Record<string, string> = {
   confirmacao: "Confirmação",
   cancelamento: "Cancelamento",
   remarcacao: "Remarcação",
+  remarcacao_sessao: "Sessão remarcada",
   transferencia_recebida: "Transferência recebida",
   transferencia_saida: "Transferência enviada",
 };
