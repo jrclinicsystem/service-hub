@@ -13,45 +13,59 @@ function safeInternalPath(value) {
   }
 }
 
+async function showPushNotification(event) {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = {};
+  }
+
+  let title = "JR Clinic";
+  if (typeof data.title === "string" && data.title.length <= 120) {
+    title = data.title;
+  }
+  let body = "Há uma atualização na sua agenda.";
+  if (typeof data.body === "string" && data.body.length <= 300) {
+    body = data.body;
+  }
+  let tag = `jr-clinic-${Date.now()}`;
+  if (typeof data.tag === "string" && data.tag.length <= 100) {
+    tag = data.tag;
+  }
+
+  await self.registration.showNotification(title, {
+    body,
+    tag,
+    icon: "/icons/jr-clinic-192.png",
+    badge: "/icons/jr-clinic-192.png",
+    data: { url: safeInternalPath(data.url) },
+    renotify: false,
+  });
+}
+
 self.addEventListener("push", (event) => {
-  event.waitUntil((async () => {
-    let data = {};
-    try {
-      data = event.data ? event.data.json() : {};
-    } catch {
-      data = {};
-    }
-    const title = typeof data.title === "string" && data.title.length <= 120
-      ? data.title
-      : "JR Clinic";
-    const body = typeof data.body === "string" && data.body.length <= 300
-      ? data.body
-      : "Há uma atualização na sua agenda.";
-    const tag = typeof data.tag === "string" && data.tag.length <= 100
-      ? data.tag
-      : `jr-clinic-${Date.now()}`;
-    await self.registration.showNotification(title, {
-      body,
-      tag,
-      icon: "/icons/jr-clinic-192.png",
-      badge: "/icons/jr-clinic-192.png",
-      data: { url: safeInternalPath(data.url) },
-      renotify: false,
-    });
-  })());
+  event.waitUntil(showPushNotification(event));
 });
+
+async function openNotification(target) {
+  const windows = await self.clients.matchAll({
+    type: "window",
+    includeUncontrolled: true,
+  });
+  const existing = windows.find(
+    (client) => new URL(client.url).origin === self.location.origin,
+  );
+  if (existing) {
+    await existing.navigate(target);
+    await existing.focus();
+    return;
+  }
+  await self.clients.openWindow(target);
+}
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const target = safeInternalPath(event.notification.data?.url);
-  event.waitUntil((async () => {
-    const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
-    const existing = windows.find((client) => new URL(client.url).origin === self.location.origin);
-    if (existing) {
-      await existing.navigate(target);
-      await existing.focus();
-      return;
-    }
-    await self.clients.openWindow(target);
-  })());
+  event.waitUntil(openNotification(target));
 });
