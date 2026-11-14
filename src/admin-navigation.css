@@ -395,3 +395,37 @@ body:has(a.admin-sidebar-presence-anchor) a.admin-sidebar-presence-anchor {
     bottom: auto !important;
   }
 }
+
+/* Admin notification entry belongs to the sidebar menu, not to icon-only header chrome.
+ * Explicitly outrank the older desktop header rules in styles.css. */
+@media (min-width: 1024px) {
+  body:has(a[href="/admin/equipe"]) header.sticky.top-0.z-40 > div > div:last-child > .admin-notification-trigger {
+    display: flex !important;
+    width: 100% !important;
+    height: 44px !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 10px !important;
+    padding: 0 12px !important;
+    border: 1px solid transparent !important;
+    border-radius: 12px !important;
+    background: transparent !important;
+    color: rgb(255 250 246 / 0.75) !important;
+    box-shadow: none !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    text-align: left !important;
+  }
+
+  body:has(a[href="/admin/equipe"]) header.sticky.top-0.z-40 > div > div:last-child > .admin-notification-trigger:hover,
+  body:has(a[href="/admin/equipe"]) header.sticky.top-0.z-40 > div > div:last-child > .admin-notification-trigger[data-state="open"] {
+    border-color: rgb(255 250 246 / 0.10) !important;
+    background: rgb(255 250 246 / 0.10) !important;
+    color: #fffaf6 !important;
+  }
+
+  body:has(a[href="/admin/equipe"]) header.sticky.top-0.z-40 > div > div:last-child > .admin-notification-trigger:focus-visible {
+    outline: 2px solid rgb(255 250 246 / 0.70) !important;
+    outline-offset: 2px !important;
+  }
+}
