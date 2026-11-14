@@ -2,12 +2,29 @@ import { supabase } from "@/integrations/supabase/client";
 import { getPushNotificationConfig } from "@/lib/push.functions";
 
 const db = supabase as any;
+const DEVICE_OWNER_KEY = "jrclinic:push-owner";
 
 function applicationServerKey(value: string) {
   const padding = "=".repeat((4 - (value.length % 4)) % 4);
-  const base64 = (value + padding).replace(/-/g, "+").replace(/_/g, "/");
-  const raw = window.atob(base64);
+  const raw = window.atob((value + padding).replace(/-/g, "+").replace(/_/g, "/"));
   return Uint8Array.from(raw, (character) => character.charCodeAt(0));
+}
+
+function storedOwner() {
+  try {
+    return localStorage.getItem(DEVICE_OWNER_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function rememberOwner(id: string | null) {
+  try {
+    if (id) localStorage.setItem(DEVICE_OWNER_KEY, id);
+    else localStorage.removeItem(DEVICE_OWNER_KEY);
+  } catch {
+    // Private browsing can restrict local storage. Database authorization remains authoritative.
+  }
 }
 
 export function isIosDevice() {
@@ -21,8 +38,10 @@ export function isInstalledApp() {
 }
 
 export function supportsIosPush() {
-  const match = navigator.userAgent.match(/OS (\d+)[_.](\d+)?[_.]?(\d+)?/);
-  if (!match) return false;
+  // iPadOS can identify itself as desktop Safari; do not reject a capable
+  // installed device just because its user-agent omits the iOS version.
+  const match = navigator.userAgent.match(/OS (\\d+)[_.](\\d+)?[_.]?(\\d+)?/);
+  if (!match) return true;
   const major = Number(match[1]);
   const minor = Number(match[2] ?? 0);
   return major > 16 || (major === 16 && minor >= 4);
@@ -30,7 +49,7 @@ export function supportsIosPush() {
 
 export async function currentPushSubscription() {
   if (!("serviceWorker" in navigator) || !("PushManager" in window)) return null;
-  const registration = await navigator.serviceWorker.getRegistration("/sw.js");
+  const registration = await navigator.serviceWorker.getRegistration("/");
   return registration?.pushManager.getSubscription() ?? null;
 }
 
@@ -42,6 +61,10 @@ export async function activateProfessionalPush(professionalId: string) {
     throw new Error("No iPhone, use iOS 16.4 ou superior e instale com Adicionar à Tela de Início antes de ativar.");
   }
   if (typeof Notification === "undefined") throw new Error("Este navegador não permite notificações.");
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError || !userData.user) throw new Error("Sua sessão expirou. Entre novamente.");
+  const userId = userData.user.id;
+
   const permission = Notification.permission === "granted"
     ? "granted"
     : await Notification.requestPermission();
@@ -54,52 +77,79 @@ export async function activateProfessionalPush(professionalId: string) {
 
   const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
   await navigator.serviceWorker.ready;
-  const subscription = registration.pushManager.getSubscription
-    ? await registration.pushManager.getSubscription()
-    : null;
-  const activeSubscription = subscription ?? await registration.pushManager.subscribe({
+  let subscription = await registration.pushManager.getSubscription();
+  // Shared device: the previous browser subscription must not survive a change of identity.
+  const owner = storedOwner();
+  if (subscription && owner && owner !== userId) {
+    await subscription.unsubscribe();
+    subscription = null;
+  }
+
+  const subscribe = () => registration.pushManager.subscribe({
     userVisibleOnly: true,
-    applicationServerKey: applicationServerKey(configuration.publicKey),
+    applicationServerKey: applicationServerKey(configuration.publicKey!),
   });
-  const json = activeSubscription.toJSON();
-  if (!json.endpoint || !json.keys?.p256dh || !json.keys.auth) {
-    throw new Error("O navegador criou uma inscrição incompleta.");
+
+  const registerInDatabase = async (active: PushSubscription) => {
+    const json = active.toJSON();
+    if (!json.endpoint || !json.keys?.p256dh || !json.keys.auth) {
+      throw new Error("O navegador criou uma inscrição incompleta.");
+    }
+    // UPSERT never deletes a same-owner subscription, preserving pending deliveries.
+    const { error } = await db.from("push_subscriptions").upsert({
+      user_id: userId,
+      professional_id: professionalId,
+      endpoint: json.endpoint,
+      p256dh: json.keys.p256dh,
+      auth: json.keys.auth,
+      device_label: navigator.platform || "Aparelho",
+      user_agent: navigator.userAgent.slice(0, 500),
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "endpoint" });
+    if (error) throw new Error(error.message);
+  };
+
+  const reusedExisting = Boolean(subscription);
+  subscription ??= await subscribe();
+  try {
+    await registerInDatabase(subscription);
+  } catch (firstError) {
+    if (!reusedExisting) {
+      await subscription.unsubscribe().catch(() => false);
+      throw new Error(`Não foi possível vincular este aparelho: ${firstError instanceof Error ? firstError.message : "Erro no banco"}`);
+    }
+    // An endpoint can belong to an old signed-out or different account.
+    // Never seize/delete somebody else's subscription; rotate locally instead.
+    await subscription.unsubscribe().catch(() => false);
+    subscription = await subscribe();
+    try {
+      await registerInDatabase(subscription);
+    } catch (retryError) {
+      await subscription.unsubscribe().catch(() => false);
+      throw new Error(`Não foi possível vincular este aparelho: ${retryError instanceof Error ? retryError.message : "Erro no banco"}`);
+    }
   }
-
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-  if (userError || !userData.user) throw new Error("Sua sessão expirou. Entre novamente.");
-
-  // Release this endpoint from any previous account on a shared device before linking it.
-  const { error: releaseError } = await db.rpc("release_device_push_subscription", {
-    _endpoint: json.endpoint,
-  });
-  if (releaseError) throw new Error(`Não foi possível proteger a inscrição deste aparelho: ${releaseError.message}`);
-
-  const { error } = await db.from("push_subscriptions").upsert({
-    user_id: userData.user.id,
-    professional_id: professionalId,
-    endpoint: json.endpoint,
-    p256dh: json.keys.p256dh,
-    auth: json.keys.auth,
-    device_label: navigator.platform || "Aparelho",
-    user_agent: navigator.userAgent.slice(0, 500),
-    updated_at: new Date().toISOString(),
-  }, { onConflict: "endpoint" });
-  if (error) {
-    await activeSubscription.unsubscribe().catch(() => false);
-    throw new Error(`Não foi possível vincular este aparelho à sua agenda: ${error.message}`);
-  }
-  return activeSubscription;
+  rememberOwner(userId);
+  return subscription;
 }
 
 export async function deactivatePushOnThisDevice() {
-  try {
-    const subscription = await currentPushSubscription();
-    if (subscription?.endpoint) {
+  const subscription = await currentPushSubscription().catch(() => null);
+  if (subscription) {
+    try {
       await db.rpc("release_device_push_subscription", { _endpoint: subscription.endpoint });
-      await subscription.unsubscribe();
+    } catch {
+      // Supabase session may already be revoked by another tab.
     }
+    // Unsubscribe even if the API call failed or the account has already signed out.
+    await subscription.unsubscribe().catch(() => false);
+  }
+  rememberOwner(null);
+  try {
+    const registration = await navigator.serviceWorker.getRegistration("/");
+    const existing = await registration?.getNotifications();
+    existing?.forEach((notification) => notification.close());
   } catch {
-    // Sign-out must still finish when the device is offline or permission was already revoked.
+    // A missing service worker must not prevent logout.
   }
 }
