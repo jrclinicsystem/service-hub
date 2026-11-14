@@ -116,16 +116,33 @@ export function NotificationCenter({ mode }: { mode: "professional" | "admin" })
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button type="button" variant="outline" size="icon" className="relative rounded-full" aria-label={`Abrir notificações${unread.data ? `, ${unread.data} não lidas` : ""}`}>
-          <Bell className="size-4" />
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className={mode === "admin"
+            ? "admin-notification-trigger relative rounded-full lg:h-11 lg:w-full lg:justify-start lg:gap-3 lg:rounded-xl lg:border-transparent lg:bg-transparent lg:px-3 lg:text-white/75 lg:shadow-none lg:hover:bg-white/10 lg:hover:text-white"
+            : "relative rounded-full"}
+          aria-label={`Abrir notificações${unread.data ? `, ${unread.data} não lidas` : ""}`}
+          aria-expanded={open}
+        >
+          <Bell className="size-4 shrink-0" />
+          {mode === "admin" ? (
+            <span className="hidden text-[13px] font-medium lg:inline">Notificações</span>
+          ) : null}
           {unread.data ? (
-            <span className="absolute -right-1 -top-1 grid min-h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
+            <span className={mode === "admin"
+              ? "absolute -right-1 -top-1 grid min-h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground lg:static lg:ml-auto"
+              : "absolute -right-1 -top-1 grid min-h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground"}>
               {unread.data > 99 ? "99+" : unread.data}
             </span>
           ) : null}
         </Button>
       </SheetTrigger>
-      <SheetContent className="flex w-full flex-col overflow-hidden p-0 sm:max-w-lg">
+      <SheetContent
+        className="z-[200] flex w-full flex-col overflow-hidden border-l border-border bg-background p-0 text-foreground shadow-2xl sm:max-w-lg"
+        overlayClassName="z-[190] bg-black/55"
+      >
         <SheetHeader className="border-b border-border px-5 py-5 pr-12">
           <SheetTitle>{mode === "admin" ? "Central da clínica" : "Minhas notificações"}</SheetTitle>
           <SheetDescription>
