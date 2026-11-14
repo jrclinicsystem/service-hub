@@ -1,1 +1,5 @@
--- Placeholder replaced in the next edit.
+-- JR Clinic: this location is retained for compatibility with the initial draft.
+-- The complete, applied migration is:
+-- supabase/migrations/20261114030000_secure_professional_web_push.sql
+-- Target project: ldrqcbqaekmohwpneekx
+-- Do NOT execute this placeholder as a separate migration.
