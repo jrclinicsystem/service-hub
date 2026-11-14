@@ -115,7 +115,9 @@ export const Route = createFileRoute("/api/public/push-dispatch")({
                 }, subscription, vapid);
                 const response = await fetch(subscription.endpoint, {
                   ...payload,
-                  redirect: "error",
+                  // Edge runtimes reject redirect:"error". "manual" never follows
+                  // provider redirects; non-2xx responses are treated as failures.
+                  redirect: "manual",
                   signal: AbortSignal.timeout(12_000),
                 });
                 outcome = response.ok ? "sent" : "failed";
