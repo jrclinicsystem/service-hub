@@ -76,8 +76,14 @@ export function NotificationCenter({ mode }: { mode: "professional" | "admin" })
       if (error) throw error;
       return { rows: data ?? [], count: count ?? 0 };
     },
-    placeholderData: (previous) => previous,
+    refetchInterval: open ? 15_000 : false,
   });
+
+  useEffect(() => {
+    setOpen(false);
+    setPage(0);
+    setProfessionalId("all");
+  }, [user?.id]);
 
   useEffect(() => {
     if (!open) return;
