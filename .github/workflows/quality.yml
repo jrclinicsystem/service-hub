@@ -34,6 +34,9 @@ jobs:
       - name: Web Push endpoint security tests
         run: bun test tests/push-endpoint.test.ts
 
+      - name: iOS Web Push compatibility tests
+        run: bun test tests/push-platform.test.ts
+
       - name: Production build
         if: always()
         run: bun run build
