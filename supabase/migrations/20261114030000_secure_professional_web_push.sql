@@ -72,8 +72,7 @@ on public.push_subscriptions(professional_id, user_id) where is_active;
 alter table public.push_subscriptions enable row level security;
 revoke all on public.push_subscriptions from anon, authenticated;
 grant select, insert, delete on public.push_subscriptions to authenticated;
-grant update (p256dh, auth, device_label, user_agent, updated_at, is_active)
-on public.push_subscriptions to authenticated;
+grant update on public.push_subscriptions to authenticated;
 drop policy if exists "Own authorized push subscriptions read" on public.push_subscriptions;
 create policy "Own authorized push subscriptions read" on public.push_subscriptions
 for select to authenticated using (
