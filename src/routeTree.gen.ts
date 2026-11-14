@@ -29,6 +29,7 @@ import { Route as AdminFinanceiroRouteImport } from './routes/admin_.financeiro'
 import { Route as AdminReativacaoRouteImport } from './routes/admin_.reativacao'
 import { Route as AdminVendedoresRouteImport } from './routes/admin_.vendedores'
 import { Route as ServicoSlugRouteImport } from './routes/servico.$slug'
+import { Route as ApiPublicPushDispatchRouteImport } from './routes/api/public/push-dispatch'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -129,6 +130,11 @@ const ServicoSlugRoute = ServicoSlugRouteImport.update({
   path: '/servico/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicPushDispatchRoute = ApiPublicPushDispatchRouteImport.update({
+  id: '/api/public/push-dispatch',
+  path: '/api/public/push-dispatch',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -150,6 +156,7 @@ export interface FileRoutesByFullPath {
   '/admin/reativacao': typeof AdminReativacaoRoute
   '/admin/vendedores': typeof AdminVendedoresRoute
   '/servico/$slug': typeof ServicoSlugRoute
+  '/api/public/push-dispatch': typeof ApiPublicPushDispatchRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -171,6 +178,7 @@ export interface FileRoutesByTo {
   '/admin/reativacao': typeof AdminReativacaoRoute
   '/admin/vendedores': typeof AdminVendedoresRoute
   '/servico/$slug': typeof ServicoSlugRoute
+  '/api/public/push-dispatch': typeof ApiPublicPushDispatchRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -194,6 +202,7 @@ export interface FileRoutesById {
   '/admin_/reativacao': typeof AdminReativacaoRoute
   '/admin_/vendedores': typeof AdminVendedoresRoute
   '/servico/$slug': typeof ServicoSlugRoute
+  '/api/public/push-dispatch': typeof ApiPublicPushDispatchRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -217,6 +226,7 @@ export interface FileRouteTypes {
     | '/admin/reativacao'
     | '/admin/vendedores'
     | '/servico/$slug'
+    | '/api/public/push-dispatch'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -238,6 +248,7 @@ export interface FileRouteTypes {
     | '/admin/reativacao'
     | '/admin/vendedores'
     | '/servico/$slug'
+    | '/api/public/push-dispatch'
   id:
     | '__root__'
     | '/'
@@ -260,6 +271,7 @@ export interface FileRouteTypes {
     | '/admin_/reativacao'
     | '/admin_/vendedores'
     | '/servico/$slug'
+    | '/api/public/push-dispatch'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -282,6 +294,7 @@ export interface RootRouteChildren {
   AdminReativacaoRoute: typeof AdminReativacaoRoute
   AdminVendedoresRoute: typeof AdminVendedoresRoute
   ServicoSlugRoute: typeof ServicoSlugRoute
+  ApiPublicPushDispatchRoute: typeof ApiPublicPushDispatchRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -426,6 +439,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ServicoSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/push-dispatch': {
+      id: '/api/public/push-dispatch'
+      path: '/api/public/push-dispatch'
+      fullPath: '/api/public/push-dispatch'
+      preLoaderRoute: typeof ApiPublicPushDispatchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -460,6 +480,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminReativacaoRoute: AdminReativacaoRoute,
   AdminVendedoresRoute: AdminVendedoresRoute,
   ServicoSlugRoute: ServicoSlugRoute,
+  ApiPublicPushDispatchRoute: ApiPublicPushDispatchRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
