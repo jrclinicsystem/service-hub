@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { getPushNotificationConfig } from "@/lib/push.functions";
+import { iosPushVersionSupported } from "@/lib/push-platform";
 
 const db = supabase as any;
 const DEVICE_OWNER_KEY = "jrclinic:push-owner";
@@ -38,13 +39,8 @@ export function isInstalledApp() {
 }
 
 export function supportsIosPush() {
-  // iPadOS can identify itself as desktop Safari; do not reject a capable
-  // installed device just because its user-agent omits the iOS version.
-  const match = navigator.userAgent.match(/OS (\\d+)[_.](\\d+)?[_.]?(\\d+)?/);
-  if (!match) return true;
-  const major = Number(match[1]);
-  const minor = Number(match[2] ?? 0);
-  return major > 16 || (major === 16 && minor >= 4);
+  const desktopIpad = navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
+  return iosPushVersionSupported(navigator.userAgent, desktopIpad);
 }
 
 export async function currentPushSubscription() {
@@ -58,7 +54,7 @@ export async function activateProfessionalPush(professionalId: string) {
     throw new Error("Este navegador não oferece Web Push em uma conexão segura.");
   }
   if (isIosDevice() && (!isInstalledApp() || !supportsIosPush())) {
-    throw new Error("No iPhone, use iOS 16.4 ou superior e instale com Adicionar à Tela de Início antes de ativar.");
+    throw new Error("No iPhone ou iPad, use iOS/iPadOS 16.4 ou superior e instale com Adicionar à Tela de Início antes de ativar.");
   }
   if (typeof Notification === "undefined") throw new Error("Este navegador não permite notificações.");
   // Ask on the direct tap gesture, before any other asynchronous operation.
