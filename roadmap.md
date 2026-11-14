@@ -1,3 +1,8 @@
-- [ ] Corrigir normalização, confirmação e separação de credenciais/autorização no login.
-- [ ] Validar acesso da colaboradora pela permissão existente, sem conceder papéis.
-- [ ] Executar testes e verificar o preview; documentar limitações do serviço de autenticação conectado.
+- [ ] Preservar a autenticação e corrigir os erros de compilação herdados.
+- [ ] Adicionar PWA instalável e fluxo de ativação de Web Push no perfil profissional.
+- [ ] Versionar migração de notificações, inscrições, RLS, eventos e fila para o backend `ldrqcbqaekmohwpneekx`, sem aplicá-la ao banco Lovable divergente.
+- [ ] Implementar envio Web Push no servidor com VAPID, autorização atual, retries e expiração de inscrições.
+- [ ] Adicionar central individual e administrativa com segregação, filtros, leitura e paginação.
+- [ ] Remover o aviso local duplicado, preservando apenas a atualização em tempo real da agenda.
+- [ ] Executar testes, typecheck, lint/build e validar o preview sem publicar.
+- [ ] Documentar credenciais, instalação da migração e checklist físico Android/iOS não executado.
