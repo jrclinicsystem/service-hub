@@ -43,3 +43,49 @@
 5. Publicar manualmente a nova interface no Lovable somente depois de confirmar os testes.
 
 **Nota:** o Supabase Security Advisor mantém avisos preexistentes em outras funções `SECURITY DEFINER`; isso exige uma auditoria própria para evitar alterar indiscriminadamente regras do financeiro e de agendamento.
+
+
+## Segunda passagem técnica (14/11/2026, continuação)
+
+Esta seção é uma **revisão técnica adicional assistida**, e NÃO se apresenta como
+uma nova execução da ferramenta Codex. A auditoria independente do Codex ainda
+deve ser rodada sobre o novo commit.
+
+### Ajustes adicionais
+
+- Corrigido o parse de `OS 16_3` e `OS 16_4` no Safari; o código anterior
+  continha um regex com barra invertida dupla. Testes cobrem versões antigas,
+  iOS 16.4+ e modo desktop no iPad.
+- No painel profissional, o botão de ativação permanece desabilitado e informa
+  “Notificações em preparação” enquanto o servidor não disponibiliza a
+  configuração Web Push. Isso evita solicitar permissão sem capacidade de envio.
+- `SystemAccess` é remontado com uma chave por `user.id` imediatamente após
+  uma troca de identidade, evitando retenção visual de estado privado anterior.
+- Foi identificada e corrigida uma regressão secundária: o redirecionamento
+  automático da referência principal para a próxima sessão poderia disparar o
+  gatilho de histórico e remover confirmações anteriores. O gatilho agora
+  ignora `jr_clinic.suppress_main_push = 'on'` nesse fluxo interno.
+- Criado `docs/sql/jr-clinic-push-cron-template.sql` para operação manual
+  com Supabase Cron, pg_net e Vault. **Não habilitamos o job**, porque a URL
+  de publicação e os cinco segredos do servidor ainda não foram confirmados.
+
+### Evidência de testes sem efeitos persistentes
+
+- Transação temporária com uma sessão futura pertencente a pacote cujo
+  agendamento principal está `atendido`: gerou precisamente um evento
+  `remarcacao_sessao`, com data e horário corretos; alterações revertidas.
+- Transação temporária com remarcação interna da referência principal:
+  `schedule_history` e respostas anteriores preservadas; alterações revertidas.
+- A validação da versão `schedule_revision` e isolamento financeiro/notificações
+  foi confirmada em testes prévios; nenhuma entrega real de Push foi executada.
+- O CI passa lint, build, testes de reativação, bloqueio de endpoints SSRF
+  e compatibilidade iOS. Build verde **não substitui testes físicos**.
+
+### Estado de implantação
+
+- Lovable e GitHub sincronizados, porém `is_published=true` indica que existe
+  uma versão publicada; não comprova que o commit novo foi republicado.
+- `pg_cron` e `pg_net` ainda não estão instalados na base da JR Clinic.
+- Fila, inscrições e notificações reais continuam vazias.
+- Próximo bloqueador: definir os segredos no runtime do Lovable e ativar
+  o job **apenas após** a publicação controlada e verificação do endpoint.
