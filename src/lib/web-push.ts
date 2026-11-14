@@ -61,14 +61,16 @@ export async function activateProfessionalPush(professionalId: string) {
     throw new Error("No iPhone, use iOS 16.4 ou superior e instale com Adicionar à Tela de Início antes de ativar.");
   }
   if (typeof Notification === "undefined") throw new Error("Este navegador não permite notificações.");
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-  if (userError || !userData.user) throw new Error("Sua sessão expirou. Entre novamente.");
-  const userId = userData.user.id;
-
+  // Ask on the direct tap gesture, before any other asynchronous operation.
+  // iOS Safari is especially strict about losing user activation.
   const permission = Notification.permission === "granted"
     ? "granted"
     : await Notification.requestPermission();
   if (permission !== "granted") throw new Error("A permissão de notificações não foi concedida.");
+
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError || !userData.user) throw new Error("Sua sessão expirou. Entre novamente.");
+  const userId = userData.user.id;
 
   const configuration = await getPushNotificationConfig();
   if (!configuration.enabled || !configuration.publicKey) {
