@@ -2,7 +2,7 @@ export function normalizeAuthEmail(email: string) {
   return email.trim().toLowerCase();
 }
 
-export function authErrorMessage(error: { code?: string; message?: string }) {
+export function authErrorMessage(error: { code?: string | undefined; message?: string | undefined }) {
   if (error.code === "email_not_confirmed") return "Confirme seu e-mail antes de entrar. Abra o link de confirmação mais recente.";
   if (error.code === "invalid_credentials" || error.message?.toLowerCase().includes("invalid login credentials")) {
     return "E-mail ou senha incorretos. Se necessário, use ‘Esqueci minha senha’.";

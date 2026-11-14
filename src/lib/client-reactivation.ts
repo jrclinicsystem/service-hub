@@ -67,7 +67,8 @@ export function buildReactivationRows(
       (a, b) => Date.parse(a.at) - Date.parse(b.at),
     );
     if (!events.length) continue;
-    const last = events[events.length - 1];
+    const last = events.at(-1);
+    if (!last) continue;
     const days = inactivityDays(last.at, now);
     if (!Number.isFinite(days) || days < 0) continue;
     let lastReturn: string | null = null;
