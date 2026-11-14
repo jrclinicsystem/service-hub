@@ -18,6 +18,22 @@ function authorized(request: Request, secret: string) {
   return different === 0;
 }
 
+function allowedPushEndpoint(value: string) {
+  try {
+    const url = new URL(value);
+    const hostname = url.hostname.toLowerCase();
+    const isProvider = hostname === "fcm.googleapis.com"
+      || hostname === "updates.push.services.mozilla.com"
+      || hostname === "web.push.apple.com"
+      || (hostname.endsWith(".push.apple.com") && hostname !== ".push.apple.com")
+      || (hostname.endsWith(".notify.windows.com") && hostname !== ".notify.windows.com");
+    return url.protocol === "https:" && !url.username && !url.password
+      && !url.port && !url.hash && isProvider;
+  } catch {
+    return false;
+  }
+}
+
 function createBackendClient(serviceKey: string) {
   return createClient(JR_CLINIC_SUPABASE_URL, serviceKey, {
     auth: { storage: undefined, persistSession: false, autoRefreshToken: false },
@@ -34,14 +50,18 @@ function createBackendClient(serviceKey: string) {
   });
 }
 
-async function complete(db: any, deliveryId: string, outcome: "sent" | "failed", error?: string, gone = false) {
-  const { error: completionError } = await db.rpc("complete_push_delivery", {
+async function complete(
+  db: any, deliveryId: string, claimToken: string,
+  outcome: "sent" | "failed", error?: string, gone = false,
+) {
+  const { error: completionError } = await db.rpc("complete_push_delivery_v2", {
     _delivery_id: deliveryId,
+    _claim_token: claimToken,
     _outcome: outcome,
     _error: error?.slice(0, 1000) ?? null,
     _gone: gone,
   });
-  if (completionError) console.error("Unable to complete push delivery", completionError.message);
+  if (completionError) throw new Error(`Unable to complete push delivery: ${completionError.message}`);
 }
 
 export const Route = createFileRoute("/api/public/push-dispatch")({
@@ -71,7 +91,7 @@ export const Route = createFileRoute("/api/public/push-dispatch")({
         }
 
         const db = createBackendClient(serviceKey);
-        const { data: deliveries, error } = await db.rpc("claim_push_deliveries", { _batch_size: MAX_BATCH });
+        const { data: deliveries, error } = await db.rpc("claim_push_deliveries_v2", { _batch_size: MAX_BATCH });
         if (error) {
           console.error("Unable to claim push deliveries", error.message);
           return Response.json({ error: "Unable to claim deliveries" }, { status: 502 });
@@ -80,43 +100,64 @@ export const Route = createFileRoute("/api/public/push-dispatch")({
         const vapid: VapidKeys = { subject, publicKey, privateKey };
         let sent = 0;
         let failed = 0;
-        // Chunks stay below the server runtime outbound-connection limit.
+        let completionFailures = 0;
+
         for (let index = 0; index < (deliveries ?? []).length; index += 5) {
           const chunk = deliveries.slice(index, index + 5);
           await Promise.all(chunk.map(async (delivery: any) => {
-            const subscription: PushSubscription = {
-              endpoint: delivery.endpoint,
-              expirationTime: null,
-              keys: { p256dh: delivery.p256dh, auth: delivery.auth },
-            };
+            let outcome: "sent" | "failed" = "failed";
+            let gone = false;
+            let failureReason = "Falha desconhecida no serviço Web Push.";
+
             try {
-              const payload = await buildPushPayload({
-                data: JSON.stringify({
-                  title: delivery.title,
-                  body: delivery.body,
-                  url: delivery.deep_link,
-                  tag: delivery.notification_id,
-                }),
-                options: { ttl: 86400 },
-              }, subscription, vapid);
-              const response = await fetch(subscription.endpoint, payload);
-              if (response.ok) {
-                sent += 1;
-                await complete(db, delivery.delivery_id, "sent");
+              if (!allowedPushEndpoint(delivery.endpoint)) {
+                gone = true;
+                failureReason = "Inscrição com destino não permitido";
               } else {
-                const gone = response.status === 404 || response.status === 410;
-                failed += 1;
-                await complete(db, delivery.delivery_id, "failed", `Push service HTTP ${response.status}`, gone);
+                const subscription: PushSubscription = {
+                  endpoint: delivery.endpoint,
+                  expirationTime: null,
+                  keys: { p256dh: delivery.p256dh, auth: delivery.auth },
+                };
+                const payload = await buildPushPayload({
+                  data: JSON.stringify({
+                    title: delivery.title,
+                    body: delivery.body,
+                    url: delivery.deep_link,
+                    tag: delivery.notification_id,
+                  }),
+                  options: { ttl: 86400 },
+                }, subscription, vapid);
+                const response = await fetch(subscription.endpoint, {
+                  ...payload,
+                  redirect: "error",
+                  signal: AbortSignal.timeout(12_000),
+                });
+                outcome = response.ok ? "sent" : "failed";
+                gone = response.status === 404 || response.status === 410;
+                failureReason = `Push service HTTP ${response.status}`;
               }
             } catch (pushError) {
-              failed += 1;
-              const message = pushError instanceof Error ? pushError.message : "Push request failed";
-              await complete(db, delivery.delivery_id, "failed", message);
+              failureReason = pushError instanceof Error ? pushError.message : "Push request failed";
+            }
+
+            if (outcome === "sent") sent += 1;
+            else failed += 1;
+
+            try {
+              await complete(db, delivery.delivery_id, delivery.claim_token,
+                outcome, outcome === "sent" ? undefined : failureReason, gone);
+            } catch (completionError) {
+              completionFailures += 1;
+              console.error("Push delivery state not persisted", completionError);
             }
           }));
         }
 
-        return Response.json({ claimed: deliveries?.length ?? 0, sent, failed });
+        return Response.json(
+          { claimed: deliveries?.length ?? 0, sent, failed, completionFailures },
+          { status: completionFailures > 0 ? 502 : 200 },
+        );
       },
     },
   },
