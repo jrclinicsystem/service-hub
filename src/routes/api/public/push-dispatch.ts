@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
 import { buildPushPayload, type PushSubscription, type VapidKeys } from "@block65/webcrypto-web-push";
-import { timingSafeEqual } from "crypto";
 import { z } from "zod";
 
 import { JR_CLINIC_SUPABASE_URL } from "@/integrations/supabase/project";
@@ -10,9 +9,13 @@ const requestSchema = z.object({}).strict();
 const MAX_BATCH = 20;
 
 function authorized(request: Request, secret: string) {
-  const supplied = request.headers.get("authorization") ?? "";
-  const expected = `Bearer ${secret}`;
-  return supplied.length === expected.length && timingSafeEqual(Buffer.from(supplied), Buffer.from(expected));
+  const supplied = new TextEncoder().encode(request.headers.get("authorization") ?? "");
+  const expected = new TextEncoder().encode(`Bearer ${secret}`);
+  let different = supplied.length ^ expected.length;
+  for (let index = 0; index < Math.max(supplied.length, expected.length); index++) {
+    different |= (supplied[index] ?? 0) ^ (expected[index] ?? 0);
+  }
+  return different === 0;
 }
 
 function createBackendClient(serviceKey: string) {
@@ -49,8 +52,14 @@ export const Route = createFileRoute("/api/public/push-dispatch")({
         if (!dispatchSecret || !authorized(request, dispatchSecret)) {
           return new Response("Unauthorized", { status: 401 });
         }
-        const rawBody = await request.text();
-        const parsed = requestSchema.safeParse(rawBody ? JSON.parse(rawBody) : {});
+        let body: unknown;
+        try {
+          const rawBody = await request.text();
+          body = rawBody ? JSON.parse(rawBody) : {};
+        } catch {
+          return Response.json({ error: "Invalid JSON" }, { status: 400 });
+        }
+        const parsed = requestSchema.safeParse(body);
         if (!parsed.success) return Response.json({ error: "Invalid request" }, { status: 400 });
 
         const serviceKey = process.env["JR_CLINIC_SERVICE_ROLE_KEY"];
