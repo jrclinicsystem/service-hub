@@ -147,7 +147,7 @@ async function loadProfessionalAgenda() {
     withAppointmentHistory((history) => db
       .from("appointments")
       .select(
-        `id, service_id, professional_id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status${history}, payment_choice, service_price_snapshot, balance_amount`,
+        `id, service_id, professional_id, patient_name, patient_email, patient_phone, notes, scheduled_date, scheduled_time, status, schedule_revision${history}, payment_choice, service_price_snapshot, balance_amount`,
       )
       .eq("professional_id", professionalId)
       .order("scheduled_date")
@@ -675,9 +675,13 @@ function ProfessionalAppointmentCard({ appointment, onSaved }: any) {
   const respond = async (nextResponse: "confirmado" | "recusado") => {
     if (!appointment.professional_id || appointment.status === "cancelado") return;
     setBusy(nextResponse === "confirmado" ? "confirm" : "decline");
-    const { error } = await db.rpc("respond_to_professional_appointment", {
+    const { error } = await db.rpc("respond_to_professional_appointment_v2", {
       _appointment_id: appointment.id,
       _response: nextResponse,
+      _expected_professional_id: appointment.professional_id,
+      _expected_date: appointment.scheduled_date,
+      _expected_time: appointment.scheduled_time,
+      _expected_revision: Number(appointment.schedule_revision ?? 0),
     });
     setBusy(null);
     if (error) {
