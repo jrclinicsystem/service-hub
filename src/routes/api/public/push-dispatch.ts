@@ -4,6 +4,7 @@ import { buildPushPayload, type PushSubscription, type VapidKeys } from "@block6
 import { z } from "zod";
 
 import { JR_CLINIC_SUPABASE_URL } from "@/integrations/supabase/project";
+import { allowedPushEndpoint } from "@/lib/push-endpoint";
 
 const requestSchema = z.object({}).strict();
 const MAX_BATCH = 20;
@@ -16,22 +17,6 @@ function authorized(request: Request, secret: string) {
     different |= (supplied[index] ?? 0) ^ (expected[index] ?? 0);
   }
   return different === 0;
-}
-
-function allowedPushEndpoint(value: string) {
-  try {
-    const url = new URL(value);
-    const hostname = url.hostname.toLowerCase();
-    const isProvider = hostname === "fcm.googleapis.com"
-      || hostname === "updates.push.services.mozilla.com"
-      || hostname === "web.push.apple.com"
-      || (hostname.endsWith(".push.apple.com") && hostname !== ".push.apple.com")
-      || (hostname.endsWith(".notify.windows.com") && hostname !== ".notify.windows.com");
-    return url.protocol === "https:" && !url.username && !url.password
-      && !url.port && !url.hash && isProvider;
-  } catch {
-    return false;
-  }
 }
 
 function createBackendClient(serviceKey: string) {
