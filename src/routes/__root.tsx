@@ -747,7 +747,9 @@ function AuthSessionBoundary({ queryClient }: { queryClient: QueryClient }) {
     previousUserId.current = current;
   }, [user?.id, loading, queryClient]);
 
-  return <SystemAccess />;
+  // Remount all account-bound components before effects run on identity changes.
+  // Their previous local state, subscriptions and in-flight UI can no longer render.
+  return <SystemAccess key={user?.id ?? "guest"} />;
 }
 
 function RootComponent() {
