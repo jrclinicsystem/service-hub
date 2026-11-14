@@ -75,7 +75,7 @@ create or replace function public.push_endpoint_allowed(_endpoint text)
 returns boolean language sql immutable security invoker set search_path = ''
 as $fn$
   select _endpoint is not null and length(_endpoint) between 20 and 2048
-    and lower(_endpoint) ~ '^https://(fcm\\.googleapis\\.com|updates\\.push\\.services\\.mozilla\\.com|web\\.push\\.apple\\.com|[a-z0-9.-]+\\.push\\.apple\\.com|[a-z0-9.-]+\\.notify\\.windows\\.com)/[^[:space:]#]*$';
+    and lower(_endpoint) ~ '^https://(fcm[.]googleapis[.]com|updates[.]push[.]services[.]mozilla[.]com|web[.]push[.]apple[.]com|[a-z0-9.-]+[.]push[.]apple[.]com|[a-z0-9.-]+[.]notify[.]windows[.]com)/[^[:space:]#]*$';
 $fn$;
 alter table public.push_subscriptions
   add constraint push_subscriptions_trusted_endpoint
