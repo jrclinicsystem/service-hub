@@ -39,6 +39,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { NotificationCenter } from "@/components/notification-center";
 import { PwaInstallButton } from "@/components/pwa-install-button";
 import { activateProfessionalPush, currentPushSubscription, deactivatePushOnThisDevice } from "@/lib/web-push";
+import { getPushNotificationConfig } from "@/lib/push.functions";
 import {
   appointmentProximity,
   appointmentWhatsAppUrl,
@@ -261,6 +262,13 @@ function ProfessionalAgenda() {
     queryFn: loadProfessionalAgenda,
     retry: 1,
   });
+  const pushAvailability = useQuery({
+    queryKey: ["professional-push-availability", user?.id],
+    enabled: Boolean(data?.authorized) && Boolean(user?.id),
+    queryFn: () => getPushNotificationConfig(),
+    staleTime: 60_000,
+    retry: 1,
+  });
   const appointments = data?.authorized ? data.appointments : [];
   const today = todayIso();
   const filteredAppointments = useMemo(
@@ -277,7 +285,8 @@ function ProfessionalAgenda() {
     let mounted = true;
     void currentPushSubscription()
       .then((subscription) => {
-        if (mounted) setNotificationsEnabled(Boolean(subscription) && Notification.permission === "granted");
+        if (mounted) setNotificationsEnabled(Boolean(subscription) &&
+          typeof Notification !== "undefined" && Notification.permission === "granted");
       })
       .catch(() => {
         if (mounted) setNotificationsEnabled(false);
@@ -342,7 +351,7 @@ function ProfessionalAgenda() {
   }, [data?.authorized, data?.professional?.id, refetch]);
 
   const enableNotifications = async () => {
-    if (!data?.authorized || !data.professional?.id) return;
+    if (!data?.authorized || !data.professional?.id || !pushAvailability.data?.enabled) return;
     try {
       await activateProfessionalPush(data.professional.id);
       setNotificationsEnabled(true);
@@ -541,9 +550,13 @@ function ProfessionalAgenda() {
                 size="sm"
                 className="rounded-full"
                 onClick={enableNotifications}
+                disabled={!pushAvailability.data?.enabled}
+                title={!pushAvailability.data?.enabled ? "O envio de notificações ainda não foi configurado pela clínica." : undefined}
               >
                 <BellRing className="size-4" />{" "}
-                {notificationsEnabled ? "Notificações ativas" : "Ativar notificações"}
+                {!pushAvailability.data?.enabled
+                  ? "Notificações em preparação"
+                  : notificationsEnabled ? "Notificações ativas" : "Ativar notificações"}
               </Button>
               <Button
                 variant="outline"
