@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
 
 const db = supabase as any;
 const PAGE_SIZE = 20;
@@ -30,13 +31,16 @@ function formatMoment(value: string) {
 
 export function NotificationCenter({ mode }: { mode: "professional" | "admin" }) {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [page, setPage] = useState(0);
   const [status, setStatus] = useState<"all" | "unread">("all");
   const [professionalId, setProfessionalId] = useState("all");
 
   const unread = useQuery({
-    queryKey: ["professional-notifications-unread", mode],
+    queryKey: ["professional-notifications-unread", mode, user?.id],
+    enabled: Boolean(user?.id),
+    refetchInterval: 30_000,
     queryFn: async () => {
       const { count, error } = await db.from("professional_notifications")
         .select("id", { count: "exact", head: true }).is("read_at", null);
@@ -47,8 +51,8 @@ export function NotificationCenter({ mode }: { mode: "professional" | "admin" })
   });
 
   const professionals = useQuery({
-    queryKey: ["notification-professionals"],
-    enabled: mode === "admin",
+    queryKey: ["notification-professionals", user?.id],
+    enabled: mode === "admin" && Boolean(user?.id),
     queryFn: async () => {
       const { data, error } = await db.from("professionals").select("id,name")
         .eq("is_active", true).is("deleted_at", null).order("name");
@@ -58,8 +62,8 @@ export function NotificationCenter({ mode }: { mode: "professional" | "admin" })
   });
 
   const list = useQuery({
-    queryKey: ["professional-notifications", mode, page, status, professionalId],
-    enabled: open,
+    queryKey: ["professional-notifications", mode, user?.id, page, status, professionalId],
+    enabled: open && Boolean(user?.id),
     queryFn: async () => {
       let query = db.from("professional_notifications").select(
         "id,event_type,title,body,service_name,scheduled_date,scheduled_time,deep_link,read_at,created_at,recipient_professional_id,professional:professionals!professional_notifications_recipient_professional_id_fkey(id,name)",
@@ -108,7 +112,7 @@ export function NotificationCenter({ mode }: { mode: "professional" | "admin" })
         <Button type="button" variant="outline" size="icon" className="relative rounded-full" aria-label={`Abrir notificações${unread.data ? `, ${unread.data} não lidas` : ""}`}>
           <Bell className="size-4" />
           {unread.data ? (
-            <span className="absolute -right-1 -top-1 grid min-size-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
+            <span className="absolute -right-1 -top-1 grid min-h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
               {unread.data > 99 ? "99+" : unread.data}
             </span>
           ) : null}
