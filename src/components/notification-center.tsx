@@ -125,11 +125,11 @@ export function NotificationCenter({ mode }: { mode: "professional" | "admin" })
   // Viewing the central marks the unread items on screen as read for this user only.
   const visibleUnreadKey = (list.data?.rows ?? []).filter((row: any) => !row.read_at).map((row: any) => row.id).join(",");
   useEffect(() => {
-    if (!open || !visibleUnreadKey) return;
+    if (!open || status !== "all" || !visibleUnreadKey) return;
     const timer = window.setTimeout(() => void markRead(visibleUnreadKey.split(",")), 1200);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, visibleUnreadKey]);
+  }, [open, status, visibleUnreadKey]);
 
   const rows = list.data?.rows ?? [];
   const total = list.data?.count ?? 0;
@@ -168,7 +168,7 @@ export function NotificationCenter({ mode }: { mode: "professional" | "admin" })
         <SheetHeader className="border-b border-border px-5 py-5 pr-12">
           <SheetTitle>{mode === "admin" ? "Central da clínica" : "Minhas notificações"}</SheetTitle>
           <SheetDescription>
-            {mode === "admin" ? "Histórico agregado, somente leitura, de todas as profissionais." : "Somente eventos vinculados à sua agenda e permissão atual."}
+            {mode === "admin" ? "Histórico de todas as profissionais. O status de leitura é individual." : "Somente eventos vinculados à sua agenda e permissão atual."}
           </SheetDescription>
         </SheetHeader>
 
@@ -177,6 +177,7 @@ export function NotificationCenter({ mode }: { mode: "professional" | "admin" })
             <option value="all">Todas</option>
             <option value="unread">Não lidas</option>
           </select>
+          <Button type="button" variant="outline" size="sm" disabled={!unread.data} onClick={() => void markRead(null)}>Marcar todas como lidas</Button>
           {mode === "admin" ? (
             <select aria-label="Filtrar por profissional" className="h-9 min-w-0 flex-1 rounded-lg border border-input bg-background px-3 text-xs" value={professionalId} onChange={(event) => { setProfessionalId(event.target.value); setPage(0); }}>
               <option value="all">Todas as profissionais</option>
@@ -216,7 +217,7 @@ export function NotificationCenter({ mode }: { mode: "professional" | "admin" })
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-3">
                   <time className="text-[10px] text-muted-foreground" dateTime={item.created_at}>{formatMoment(item.created_at)}</time>
                   <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-[11px]" asChild>
-                    <a href={mode === "admin" ? "/admin#agendamentos" : item.deep_link} onClick={() => { if (mode === "professional" && !item.read_at) void markRead(item.id); setOpen(false); }}>
+                    <a href={mode === "admin" ? "/admin#agendamentos" : item.deep_link} onClick={() => { if (!item.read_at) void markRead([item.id]); setOpen(false); }}>
                       Abrir agendamento <ExternalLink className="size-3" />
                     </a>
                   </Button>

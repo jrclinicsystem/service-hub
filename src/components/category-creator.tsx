@@ -87,7 +87,7 @@ export function CategoryCreator({
         </DialogHeader>
         <form
           className="grid gap-4 py-2"
-          onSubmit={(event) => { event.preventDefault(); void submit(); }}
+          onSubmit={(event) => { event.preventDefault(); event.stopPropagation(); void submit(); }}
         >
           <div>
             <Label htmlFor="new-category-name" className="mb-2 block">Nome *</Label>

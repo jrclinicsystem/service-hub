@@ -223,7 +223,7 @@ function Admin() {
   });
 
   const refresh = () => {
-    void queryClient.invalidateQueries({ queryKey: ["admin-overview"] });
+    return queryClient.invalidateQueries({ queryKey: ["admin-overview"] });
   };
 
   const signOut = async () => {

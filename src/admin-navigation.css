@@ -429,3 +429,78 @@ body:has(a.admin-sidebar-presence-anchor) a.admin-sidebar-presence-anchor {
     outline-offset: 2px !important;
   }
 }
+
+/* Desktop /admin: one independently scrolling navigation region, between the
+   existing logo and the existing notification/site/sign-out footer. */
+@media (min-width: 1024px) {
+  body:has(a.admin-sidebar-presence-anchor):has(header.sticky.top-0.z-40) .persistent-admin-sidebar {
+    display: flex !important;
+    position: fixed !important;
+    inset: 126px auto 174px 0 !important;
+    width: 250px !important;
+    z-index: 120 !important;
+    min-height: 0 !important;
+    flex-direction: column !important;
+    background: var(--sidebar) !important;
+    color: var(--sidebar-foreground) !important;
+    padding: 0 18px !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+  }
+  .persistent-admin-sidebar-logo,
+  .persistent-admin-sidebar-heading,
+  .persistent-admin-sidebar-site-link { display: none !important; }
+  body:has(a.admin-sidebar-presence-anchor) .persistent-admin-sidebar-nav {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+    flex-direction: column;
+    gap: 3px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior-y: contain;
+    scrollbar-width: thin;
+    scrollbar-color: rgb(255 250 246 / .25) transparent;
+    padding: 2px 0 8px;
+  }
+  .persistent-admin-sidebar-item {
+    display: flex;
+    flex: 0 0 auto;
+    width: 100%;
+    min-height: 42px;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    background: transparent;
+    color: rgb(255 250 246 / .78);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    text-align: left;
+    line-height: 1.25;
+    cursor: pointer;
+  }
+  .persistent-admin-sidebar-item:hover,
+  .persistent-admin-sidebar-item.is-active {
+    color: #fffaf6;
+    background: rgb(255 250 246 / .12);
+  }
+  .persistent-admin-sidebar-item:focus-visible {
+    outline: 2px solid rgb(255 250 246 / .75);
+    outline-offset: -2px;
+  }
+  .persistent-admin-sidebar-divider {
+    flex: 0 0 1px;
+    margin: 6px 5px;
+    background: rgb(255 250 246 / .15);
+  }
+  body:has(a.admin-sidebar-presence-anchor):has(header.sticky.top-0.z-40) .admin-sidebar-shortcut,
+  body:has(a.admin-sidebar-presence-anchor):has(header.sticky.top-0.z-40) main.max-w-\[1480px\] div:has(> [role="tablist"]) {
+    display: none !important;
+  }
+  body:has(a.admin-sidebar-presence-anchor) header.sticky.top-0.z-40 > div > div:last-child {
+    flex-shrink: 0 !important;
+  }
+}
