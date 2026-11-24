@@ -43,8 +43,8 @@ export function NotificationCenter({ mode }: { mode: "professional" | "admin" })
     enabled: Boolean(user?.id),
     refetchInterval: 30_000,
     queryFn: async () => {
-      const { count, error } = await db.from("professional_notifications")
-        .select("id", { count: "exact", head: true }).is("read_at", null);
+      const { count, error } = await db.from("my_professional_notifications")
+        .select("id", { count: "exact", head: true }).eq("is_read", false);
       if (error) throw error;
       return count ?? 0;
     },
@@ -66,16 +66,27 @@ export function NotificationCenter({ mode }: { mode: "professional" | "admin" })
     queryKey: ["professional-notifications", mode, user?.id, page, status, professionalId],
     enabled: open && Boolean(user?.id),
     queryFn: async () => {
-      let query = db.from("professional_notifications").select(
-        "id,event_type,title,body,service_name,scheduled_date,scheduled_time,deep_link,read_at,created_at,recipient_professional_id,professional:professionals!professional_notifications_recipient_professional_id_fkey(id,name)",
+      let query = db.from("my_professional_notifications").select(
+        "id,event_type,title,body,service_name,scheduled_date,scheduled_time,deep_link,is_read,created_at,recipient_professional_id",
         { count: "exact" },
       ).order("created_at", { ascending: false }).order("id", { ascending: false })
         .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
-      if (status === "unread") query = query.is("read_at", null);
+      if (status === "unread") query = query.eq("is_read", false);
       if (mode === "admin" && professionalId !== "all") query = query.eq("recipient_professional_id", professionalId);
       const { data, count, error } = await query;
       if (error) throw error;
-      return { rows: data ?? [], count: count ?? 0 };
+      const ids = [...new Set((data ?? []).map((row: any) => row.recipient_professional_id).filter(Boolean))];
+      let names = new Map<string, string>();
+      if (mode === "admin" && ids.length) {
+        const { data: people } = await db.from("professionals").select("id,name").in("id", ids);
+        names = new Map((people ?? []).map((p: any) => [p.id, p.name]));
+      }
+      const rows = (data ?? []).map((row: any) => ({
+        ...row,
+        read_at: row.is_read ? row.created_at : null,
+        professional: { name: names.get(row.recipient_professional_id) },
+      }));
+      return { rows, count: count ?? 0 };
     },
     refetchInterval: open ? 15_000 : false,
   });
@@ -99,15 +110,26 @@ export function NotificationCenter({ mode }: { mode: "professional" | "admin" })
     await queryClient.invalidateQueries({ queryKey: ["professional-notifications-unread"] });
   };
 
-  const markRead = async (id: string) => {
-    const { error } = await db.from("professional_notifications")
-      .update({ read_at: new Date().toISOString() }).eq("id", id).is("read_at", null);
+  const markRead = async (ids: string[] | null) => {
+    if (ids && ids.length === 0) return;
+    // Optimistic: badge drops immediately, server state confirms below.
+    queryClient.setQueryData(["professional-notifications-unread", mode, user?.id], (current: number | undefined) =>
+      ids === null ? 0 : Math.max(0, (current ?? 0) - ids.length));
+    const { error } = await db.rpc("mark_notifications_read", { _ids: ids });
     if (error) {
-      toast.error("Não foi possível marcar a notificação como lida.", { description: error.message });
-      return;
+      toast.error("Não foi possível marcar como lida.", { description: error.message });
     }
     await invalidate();
   };
+
+  // Viewing the central marks the unread items on screen as read for this user only.
+  const visibleUnreadKey = (list.data?.rows ?? []).filter((row: any) => !row.read_at).map((row: any) => row.id).join(",");
+  useEffect(() => {
+    if (!open || !visibleUnreadKey) return;
+    const timer = window.setTimeout(() => void markRead(visibleUnreadKey.split(",")), 1200);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, visibleUnreadKey]);
 
   const rows = list.data?.rows ?? [];
   const total = list.data?.count ?? 0;
@@ -184,8 +206,8 @@ export function NotificationCenter({ mode }: { mode: "professional" | "admin" })
                     </div>
                     <h3 className="mt-2 text-sm font-semibold">{item.title}</h3>
                   </div>
-                  {mode === "professional" && !item.read_at ? (
-                    <Button type="button" variant="ghost" size="icon" className="size-8 shrink-0" title="Marcar como lida" aria-label="Marcar como lida" onClick={() => markRead(item.id)}><Check className="size-4" /></Button>
+                  {!item.read_at ? (
+                    <Button type="button" variant="ghost" size="icon" className="size-8 shrink-0" title="Marcar como lida" aria-label="Marcar como lida" onClick={() => markRead([item.id])}><Check className="size-4" /></Button>
                   ) : null}
                 </div>
                 <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{item.body}</p>

@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { authErrorMessage, normalizeAuthEmail, verifiedPortalAccess } from "./auth-access";
 
 function client({ confirmed = true, authenticated = true, enabled = true, active = true, deleted = false, admin = false } = {}) {

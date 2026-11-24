@@ -90,7 +90,7 @@ export async function activateProfessionalPush(professionalId: string) {
 
   const registerInDatabase = async (active: PushSubscription) => {
     const json = active.toJSON();
-    if (!json.endpoint || !json.keys?.p256dh || !json.keys.auth) {
+    if (!json.endpoint || !json.keys?.["p256dh"] || !json.keys["auth"]) {
       throw new Error("O navegador criou uma inscrição incompleta.");
     }
     // UPSERT never deletes a same-owner subscription, preserving pending deliveries.
@@ -98,8 +98,8 @@ export async function activateProfessionalPush(professionalId: string) {
       user_id: userId,
       professional_id: professionalId,
       endpoint: json.endpoint,
-      p256dh: json.keys.p256dh,
-      auth: json.keys.auth,
+      p256dh: json.keys["p256dh"],
+      auth: json.keys["auth"],
       device_label: navigator.platform || "Aparelho",
       user_agent: navigator.userAgent.slice(0, 500),
       updated_at: new Date().toISOString(),

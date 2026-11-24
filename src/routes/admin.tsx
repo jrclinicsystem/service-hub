@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import logo from "@/assets/jr-clinic-logo.png";
 import { AdminAppointmentsWorkspace } from "@/components/admin-appointments-workspace";
 import { NotificationCenter } from "@/components/notification-center";
+import { CategoryCreator } from "@/components/category-creator";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -473,12 +474,16 @@ function Admin() {
               title="Catálogo de serviços"
               subtitle="Crie, edite ou retire serviços do catálogo."
               action={
-                <ServiceEditor
-                  categories={data.categories}
-                  professionals={data.professionals}
-                  serviceProfessionalLinks={data.serviceProfessionalLinks}
-                  onSaved={refresh}
-                />
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <CategoryCreator categories={data.categories} onCreated={() => refresh()} />
+                  <ServiceEditor
+                    categories={data.categories}
+                    professionals={data.professionals}
+                    serviceProfessionalLinks={data.serviceProfessionalLinks}
+ onCategoryCreated={refresh}
+                    onSaved={refresh}
+                  />
+                </div>
               }
             />
 
@@ -500,6 +505,7 @@ function Admin() {
                       categories={data.categories}
                       professionals={data.professionals}
                       serviceProfessionalLinks={data.serviceProfessionalLinks}
+ onCategoryCreated={refresh}
                       onSaved={refresh}
                     />
                   </div>
@@ -576,6 +582,7 @@ function Admin() {
                           categories={data.categories}
                           professionals={data.professionals}
                           serviceProfessionalLinks={data.serviceProfessionalLinks}
+ onCategoryCreated={refresh}
                           onSaved={refresh}
                         />
                       </TableCell>
@@ -833,6 +840,7 @@ function ServiceEditor({
   professionals,
   serviceProfessionalLinks,
   onSaved,
+  onCategoryCreated,
 }: any) {
   const linkedProfessionalIds = service?.id
     ? (serviceProfessionalLinks ?? [])
@@ -1047,6 +1055,8 @@ function ServiceEditor({
             />
           </Field>
           <Field label="Categoria" hint="Define em qual seção do catálogo o serviço aparece.">
+            <div className="flex items-center gap-2">
+            <div className="min-w-0 flex-1">
             <Select value={categoryId} onValueChange={setCategoryId}>
               <SelectTrigger>
                 <SelectValue placeholder="Selecione a categoria" />
@@ -1059,6 +1069,16 @@ function ServiceEditor({
                 ))}
               </SelectContent>
             </Select>
+            </div>
+            <CategoryCreator
+              compact
+              categories={categories}
+              onCreated={async (id) => {
+                await onCategoryCreated?.();
+                setCategoryId(id);
+              }}
+            />
+            </div>
           </Field>
 
           <div className="sm:col-span-2">

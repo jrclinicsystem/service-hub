@@ -73,7 +73,9 @@ export function buildReactivationRows(
     if (!Number.isFinite(days) || days < 0) continue;
     let lastReturn: string | null = null;
     for (let i = 1; i < events.length; i++) {
-      if (inactivityDays(events[i - 1].at, new Date(events[i].at)) > 30) lastReturn = events[i].at;
+      const prev = events[i - 1];
+      const cur = events[i];
+      if (prev && cur && inactivityDays(prev.at, new Date(cur.at)) > 30) lastReturn = cur.at;
     }
     const contactHistory = (contactsByClient.get(client.id) ?? []).sort(
       (a, b) => Date.parse(b.contacted_at) - Date.parse(a.contacted_at),
